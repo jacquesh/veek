@@ -1,0 +1,10 @@
+# Project Structure
+build/
+lib/
+resources/gfx/*
+
+# Vim Metafiles
+*.swp
+
+imgui.ini
+
