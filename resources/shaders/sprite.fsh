@@ -9,6 +9,6 @@ out vec4 outColor;
 
 void main()
 {
-    vec4 textureColor = texture(spriteTex, fragTexCoord);
-    outColor = colorTint * textureColor;
+    vec3 textureColor = texture(spriteTex, fragTexCoord).rgb;
+    outColor = colorTint * vec4(textureColor, 1);
 }
