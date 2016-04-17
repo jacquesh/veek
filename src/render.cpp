@@ -13,6 +13,9 @@ GLuint indexBuffer;
 GLuint vertexLocBuffer;
 GLuint texCoordBuffer;
 
+int screenWidth;
+int screenHeight;
+
 GLuint loadShader(const char* shaderFilename, GLenum shaderType)
 {
     SDL_RWops* shaderFile = SDL_RWFromFile(shaderFilename, "r");
@@ -162,27 +165,29 @@ void loadDefaultShaders()
     glBindVertexArray(0);
 }
 
+void updateWindowSize(int newWidth, int newHeight)
+{
+    screenWidth = newWidth;
+    screenHeight = newHeight;
+    glViewport(0,0, newWidth, newHeight);
+}
+
 /*
  * Renders a sprite at the given position and size and rotation (in radians).
  * The specified colour is used to tint the sprite (use white if no tinting is desired)
 */
 void renderTexture(GLuint textureID, Vector2 position, Vector2 size, float opacity)
 {
-    // TODO: Not-hardcode
-    float cameraWidth = 320.0f;
-    float cameraHeight = 240.0f;
-
     glUseProgram(spriteShader);
 
-    float screenDepth = 2.0f;
-    float projectionMatrix[16] = {2.0f/cameraWidth,0,0,0,
-                                  0,2.0f/cameraHeight,0,0,
-                                  0,0,-2.0f/screenDepth,0,
+    float projectionMatrix[16] = {2.0f/screenWidth,0,0,0,
+                                  0,2.0f/screenHeight,0,0,
+                                  0,0,-1.0f,0,
                                   0,0,-1,1};
     float viewingMatrix[16] = {1, 0, 0, 0,
                                 0, 1, 0, 0,
                                 0, 0, 1, 0,
-                                -cameraWidth/2.0f, -cameraHeight/2.0f, 0, 1};
+                                -screenWidth/2.0f, -screenHeight/2.0f, 0, 1};
 
     GLint projectionMatrixLoc = glGetUniformLocation(spriteShader, "projectionMatrix");
     GLint viewingMatrixLoc = glGetUniformLocation(spriteShader, "viewingMatrix");

@@ -35,8 +35,6 @@ typedef struct
 
 struct GameState
 {
-    Vector2 screenSize;
-
     GLuint cameraTexture;
 
     int device;
@@ -48,8 +46,9 @@ struct GameState
     ENetPeer* netPeer;
 };
 
-int width = 320;
-int height = 240;
+int cameraWidth = 320;
+int cameraHeight = 240;
+int pixelBytes = 0;
 uint8_t* pixelValues = 0;
 
 void enableCamera(GameState* game, bool enabled)
@@ -78,7 +77,8 @@ void initGame(GameState* game)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    pixelValues = new uint8_t[width*height*3];
+    pixelBytes = cameraWidth*cameraHeight*3;
+    pixelValues = new uint8_t[pixelBytes];
 
     int deviceCount = setupESCAPI();
     printf("%d devices available.\n", deviceCount);
@@ -88,15 +88,15 @@ void initGame(GameState* game)
         return;
     }
 
-    game->screenSize = Vector2(320, 240);
     game->device = deviceCount-1; // Can be anything in the range [0, deviceCount)
 
-    game->capture.mWidth = width;
-    game->capture.mHeight = height;
-    game->capture.mTargetBuf = new int[width*height];
+    game->capture.mWidth = cameraWidth;
+    game->capture.mHeight = cameraHeight;
+    game->capture.mTargetBuf = new int[cameraWidth*cameraHeight];
 
     enableCamera(game, false);
 }
+
 bool updateGame(GameState* game, float deltaTime)
 {
     bool keepRunning = true;
@@ -114,6 +114,19 @@ bool updateGame(GameState* game, float deltaTime)
             {
                 if(e.key.keysym.sym == SDLK_ESCAPE)
                     keepRunning = false;
+            } break;
+            case SDL_WINDOWEVENT:
+            {
+                switch(e.window.event)
+                {
+                    case SDL_WINDOWEVENT_RESIZED:
+                    case SDL_WINDOWEVENT_SIZE_CHANGED:
+                    {
+                        int newWidth = e.window.data1;
+                        int newHeight = e.window.data2;
+                        updateWindowSize(newWidth, newHeight);
+                    } break;
+                }
             } break;
         }
     }
@@ -137,7 +150,7 @@ bool updateGame(GameState* game, float deltaTime)
 
                 glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                             width, height, 0,
+                             cameraWidth, cameraHeight, 0,
                              GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                 glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -152,11 +165,11 @@ bool updateGame(GameState* game, float deltaTime)
 
     if(game->cameraEnabled && isCaptureDone(game->device))
     {
-        for(int y=0; y<height; ++y)
+        for(int y=0; y<cameraHeight; ++y)
         {
-            for(int x=0; x<width; ++x)
+            for(int x=0; x<cameraWidth; ++x)
             {
-                int targetBufferIndex = y*width + x;
+                int targetBufferIndex = y*cameraWidth+ x;
                 int pixelVal = game->capture.mTargetBuf[targetBufferIndex];
                 uint8_t* pixel = (uint8_t*)&pixelVal;
                 uint8_t red   = pixel[0];
@@ -164,7 +177,7 @@ bool updateGame(GameState* game, float deltaTime)
                 uint8_t blue  = pixel[2];
                 uint8_t alpha = pixel[3];
 
-                int pixelIndex = (height-y)*width + x;
+                int pixelIndex = (cameraHeight-y)*cameraWidth+ x;
                 pixelValues[3*pixelIndex + 0] = blue;
                 pixelValues[3*pixelIndex + 1] = green;
                 pixelValues[3*pixelIndex + 2] = red;
@@ -173,13 +186,13 @@ bool updateGame(GameState* game, float deltaTime)
 
         if(game->connected)
         {
-            ENetPacket* packet = enet_packet_create(pixelValues, (width*height*3)/2, 0);
+            ENetPacket* packet = enet_packet_create(pixelValues, pixelBytes/2, 0);
             enet_peer_send(game->netPeer, 0, packet);
         }
 
         glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                     width, height, 0,
+                     cameraWidth, cameraHeight, 0,
                      GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
         glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -188,10 +201,13 @@ bool updateGame(GameState* game, float deltaTime)
 
     return keepRunning;
 }
+
 void renderGame(GameState* game, float deltaTime)
 {
-    Vector2 cameraPosition = game->screenSize * 0.5f;
-    renderTexture(game->cameraTexture, cameraPosition, game->screenSize, 1.0f);
+    Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
+    Vector2 screenSize((float)screenWidth, (float)screenHeight);
+    Vector2 cameraPosition = screenSize * 0.5f;
+    renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
 
     ImVec2 windowLoc(0.0f, 0.0f);
     ImVec2 windowSize(200.0f, 100.f);
@@ -267,9 +283,11 @@ int main(int argc, char* argv[])
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
+    int initialWindowWidth = 640;
+    int initialWindowHeight = 480;
     SDL_Window* window = SDL_CreateWindow("Webcam Test",
                                           SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          width, height,
+                                          initialWindowWidth, initialWindowHeight,
                                           SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if(!window)
     {
@@ -294,6 +312,7 @@ int main(int argc, char* argv[])
             glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
     SDL_GL_SetSwapInterval(0);
+    updateWindowSize(initialWindowWidth, initialWindowHeight);
     ImGui_ImplSdlGL3_Init(window);
 
     const char* deviceName = 0;

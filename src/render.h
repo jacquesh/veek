@@ -8,6 +8,8 @@
 
 #include "vecmath.h"
 
+extern int screenWidth;
+extern int screenHeight;
 
 #define glPrintError(alwaysPrint) __glPrintError(__FILE__, __LINE__, alwaysPrint)
 static inline void __glPrintError(const char* file, int line, bool alwaysPrint)
@@ -51,9 +53,8 @@ GLuint loadShaderProgram(const char* vertShaderFilename,
                          const char* geomShaderFilename,
                          const char* fragShaderFilename);
 
-bool initRenderer(SDL_Window* window);
-
 void loadDefaultShaders();
+void updateWindowSize(int newWidth, int newHeight);
 
 void renderTexture(GLuint textureID, Vector2 position, Vector2 size, float opacity);
 
