@@ -10,10 +10,12 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "escapi.h"
+#include "enet/enet.h"
+
 #include "vecmath.h"
 #include "render.h"
 
-#include "escapi.h"
 
 // TODO: This is just here for testing, writing the audio recording to file
 #include <Mmreg.h>
@@ -33,15 +35,36 @@ typedef struct
 
 struct GameState
 {
+    Vector2 screenSize;
+
     GLuint cameraTexture;
 
     int device;
     SimpleCapParams capture;
+
+    bool cameraEnabled;
+    bool connected;
+    ENetHost* netHost;
+    ENetPeer* netPeer;
 };
 
 int width = 320;
 int height = 240;
 uint8_t* pixelValues = 0;
+
+void enableCamera(GameState* game, bool enabled)
+{
+    game->cameraEnabled = enabled;
+    if(enabled)
+    {
+        initCapture(game->device, &game->capture);
+        doCapture(game->device);
+    }
+    else
+    {
+        deinitCapture(game->device);
+    }
+}
 
 void initGame(GameState* game)
 {
@@ -55,7 +78,7 @@ void initGame(GameState* game)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    pixelValues = new uint8_t[width*height*4];
+    pixelValues = new uint8_t[width*height*3];
 
     int deviceCount = setupESCAPI();
     printf("%d devices available.\n", deviceCount);
@@ -65,14 +88,14 @@ void initGame(GameState* game)
         return;
     }
 
+    game->screenSize = Vector2(320, 240);
     game->device = deviceCount-1; // Can be anything in the range [0, deviceCount)
 
     game->capture.mWidth = width;
     game->capture.mHeight = height;
     game->capture.mTargetBuf = new int[width*height];
-    initCapture(game->device, &game->capture);
 
-    doCapture(game->device);
+    enableCamera(game, false);
 }
 bool updateGame(GameState* game, float deltaTime)
 {
@@ -95,7 +118,39 @@ bool updateGame(GameState* game, float deltaTime)
         }
     }
 
-    if(isCaptureDone(game->device))
+    ENetEvent netEvent;
+    if(game->netHost && enet_host_service(game->netHost, &netEvent, 0) > 0)
+    {
+        switch(netEvent.type)
+        {
+            case ENET_EVENT_TYPE_CONNECT:
+                printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                if(game->netPeer)
+                {
+                    game->connected = true;
+                }
+                break;
+
+            case ENET_EVENT_TYPE_RECEIVE:
+                printf("Received %u bytes\n", netEvent.packet->dataLength);
+                memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
+
+                glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                             width, height, 0,
+                             GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+                glBindTexture(GL_TEXTURE_2D, 0);
+
+                enet_packet_destroy(netEvent.packet);
+                break;
+
+            case ENET_EVENT_TYPE_DISCONNECT:
+                printf("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                break;
+        }
+    }
+
+    if(game->cameraEnabled && isCaptureDone(game->device))
     {
         for(int y=0; y<height; ++y)
         {
@@ -110,17 +165,22 @@ bool updateGame(GameState* game, float deltaTime)
                 uint8_t alpha = pixel[3];
 
                 int pixelIndex = (height-y)*width + x;
-                pixelValues[4*pixelIndex + 0] = blue;
-                pixelValues[4*pixelIndex + 1] = green;
-                pixelValues[4*pixelIndex + 2] = red;
-                pixelValues[4*pixelIndex + 3] = 255; // TODO: Actual alpha values? Surely we literally cannot get alpha values from the webcam?
+                pixelValues[3*pixelIndex + 0] = blue;
+                pixelValues[3*pixelIndex + 1] = green;
+                pixelValues[3*pixelIndex + 2] = red;
             }
         }
 
+        if(game->connected)
+        {
+            ENetPacket* packet = enet_packet_create(pixelValues, (width*height*3)/2, 0);
+            enet_peer_send(game->netPeer, 0, packet);
+        }
+
         glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                      width, height, 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, pixelValues);
+                     GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         doCapture(game->device);
@@ -128,15 +188,13 @@ bool updateGame(GameState* game, float deltaTime)
 
     return keepRunning;
 }
-void renderGame(GameState* game)
+void renderGame(GameState* game, float deltaTime)
 {
-    Vector2 position(width/2, height/2);
-    Vector2 size(width, height);
-
-    renderTexture(game->cameraTexture, position, size, 1.0f);
+    Vector2 cameraPosition = game->screenSize * 0.5f;
+    renderTexture(game->cameraTexture, cameraPosition, game->screenSize, 1.0f);
 
     ImVec2 windowLoc(0.0f, 0.0f);
-    ImVec2 windowSize(100.0f, 20.f);
+    ImVec2 windowSize(200.0f, 100.f);
     int UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize |
                   ImGuiWindowFlags_NoTitleBar |
@@ -145,15 +203,46 @@ void renderGame(GameState* game)
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
-    ImGui::Text("Webcam Test");
+    ImGui::Text("%.1fms", deltaTime*1000.0f);
+    if(ImGui::Button("Toggle Camera", ImVec2(90,20)))
+    {
+        enableCamera(game, !game->cameraEnabled);
+    }
+    if(ImGui::Button("Host", ImVec2(60,20)))
+    {
+        printf("Host\n");
+        ENetAddress addr = {};
+        addr.host = ENET_HOST_ANY;
+        addr.port = 12345;
+        game->netHost = enet_host_create(&addr, 1, 2, 0,0);
+        if(!game->netHost)
+        {
+            printf("Unable to create server\n");
+        }
+    }
+    if(ImGui::Button("Connect", ImVec2(60,20)))
+    {
+        printf("Connect\n");
+        ENetAddress peerAddr = {};
+        enet_address_set_host(&peerAddr, "localhost");
+        peerAddr.port = 12345;
+
+        game->netHost = enet_host_create(0, 1, 2, 0,0);
+        game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
+        if(!game->netHost)
+        {
+            printf("Unable to create client\n");
+        }
+    }
+
     ImGui::End();
 }
 
 void cleanupGame(GameState* game)
 {
+    enableCamera(game, false);
     delete[] pixelValues;
     delete[] game->capture.mTargetBuf;
-    deinitCapture(game->device);
 }
 
 
@@ -207,7 +296,7 @@ int main(int argc, char* argv[])
     printf("Initialized OpenGL %s with support for GLSL %s\n",
             glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(0);
     ImGui_ImplSdlGL3_Init(window);
 
     const char* deviceName = 0;
@@ -241,6 +330,13 @@ int main(int argc, char* argv[])
 
     alcCaptureStart(audioDevice);
 
+    if(enet_initialize() != 0)
+    {
+        printf("Unable to initialize enet!\n");
+        SDL_Quit();
+        // TODO: Should probably kill OpenAL as well
+        return 1;
+    }
 
     uint64_t performanceFreq = SDL_GetPerformanceFrequency();
     uint64_t performanceCounter = SDL_GetPerformanceCounter();
@@ -268,22 +364,12 @@ int main(int argc, char* argv[])
         float deltaTime = ((float)deltaPerfCount)/((float)performanceFreq);
 
         // Game Tick
-        int ticksWithoutDraw = 0;
-        while((SDL_GetPerformanceCounter() > nextTickTime) &&
-              (ticksWithoutDraw < maxTicksWithoutDraw))
-        {
-            // TODO: This deltaTime passed into update here is probably incorrect, surely
-            //       if this loop runs multiple times, it'll progress the game by more time
-            //       than has actually passed?
-            running &= updateGame(&game, frameTime);
-
-            nextTickTime += tickDuration;
-            ++ticksWithoutDraw;
-        }
+        running = updateGame(&game, deltaTime);
+        nextTickTime += tickDuration;
 
         // Rendering
         ImGui_ImplSdlGL3_NewFrame(window);
-        renderGame(&game);
+        renderGame(&game, deltaTime);
         ImGui::Render();
 
         SDL_GL_SwapWindow(window);
@@ -309,6 +395,8 @@ int main(int argc, char* argv[])
             audioSize += 4410;
         }
     }
+
+    enet_deinitialize();
 
     alcCaptureStop(audioDevice);
     // TODO: unconsumed samples
