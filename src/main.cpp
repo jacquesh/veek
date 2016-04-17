@@ -7,11 +7,29 @@
 #include "imgui_impl_sdl_gl3.h"
 
 #include <GL/gl3w.h>
+#include <AL/al.h>
+#include <AL/alc.h>
 
 #include "vecmath.h"
 #include "render.h"
 
 #include "escapi.h"
+
+// TODO: This is just here for testing, writing the audio recording to file
+#include <Mmreg.h>
+#pragma pack (push,1)
+typedef struct
+{
+	char			szRIFF[4];
+	long			lRIFFSize;
+	char			szWave[4];
+	char			szFmt[4];
+	long			lFmtSize;
+	WAVEFORMATEX	wfex;
+	char			szData[4];
+	long			lDataSize;
+} WAVEHEADER;
+#pragma pack (pop)
 
 struct GameState
 {
@@ -146,7 +164,7 @@ int main(int argc, char* argv[])
     printf("Initializing SDL version %d.%d.%d\n",
             SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
 
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0)
+    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
                                  "Unable to initialize SDL", 0);
@@ -191,6 +209,38 @@ int main(int argc, char* argv[])
 
     SDL_GL_SetSwapInterval(1);
     ImGui_ImplSdlGL3_Init(window);
+
+    const char* deviceName = 0;
+    ALchar audioBuffer[4410];
+    ALCdevice* audioDevice = alcCaptureOpenDevice(deviceName, 22050, AL_FORMAT_MONO16, 4410);
+    if(!audioDevice)
+    {
+        printf("Unable to open audio device!\n");
+        SDL_Quit();
+        return 1;
+    }
+    printf("Opened audio device: %s\n", alcGetString(audioDevice, ALC_CAPTURE_DEVICE_SPECIFIER));
+    int audioSize = 0;
+    WAVEHEADER audioHeader = {};
+    FILE* audioFile = fopen("out.wav", "wb");
+    sprintf(audioHeader.szRIFF, "RIFF");
+    audioHeader.lRIFFSize = 0;
+    sprintf(audioHeader.szWave, "WAVE");
+    sprintf(audioHeader.szFmt, "fmt ");
+    audioHeader.lFmtSize = sizeof(WAVEFORMATEX);
+    audioHeader.wfex.nChannels = 1;
+    audioHeader.wfex.wBitsPerSample = 16;
+    audioHeader.wfex.wFormatTag = WAVE_FORMAT_PCM;
+    audioHeader.wfex.nSamplesPerSec = 22050;
+    audioHeader.wfex.nBlockAlign = audioHeader.wfex.nChannels*audioHeader.wfex.wBitsPerSample/8;
+    audioHeader.wfex.nAvgBytesPerSec = audioHeader.wfex.nSamplesPerSec * audioHeader.wfex.nBlockAlign;
+    audioHeader.wfex.cbSize = 0;
+    sprintf(audioHeader.szData, "data");
+    audioHeader.lDataSize = 0;
+    fwrite(&audioHeader, sizeof(WAVEHEADER), 1, audioFile);
+
+    alcCaptureStart(audioDevice);
+
 
     uint64_t performanceFreq = SDL_GetPerformanceFrequency();
     uint64_t performanceCounter = SDL_GetPerformanceCounter();
@@ -248,7 +298,27 @@ int main(int argc, char* argv[])
             uint32_t sleepMS = (uint32_t)(sleepSeconds*1000);
             SDL_Delay(sleepMS);
         }
+
+        int samplesAvailable;
+        alcGetIntegerv(audioDevice, ALC_CAPTURE_SAMPLES, 1, &samplesAvailable);
+        //printf("%d audio samples are available\n", samplesAvailable);
+        if(samplesAvailable > (4410/audioHeader.wfex.nBlockAlign))
+        {
+            alcCaptureSamples(audioDevice, audioBuffer, 4410/audioHeader.wfex.nBlockAlign);
+            fwrite(audioBuffer, 4410, 1, audioFile);
+            audioSize += 4410;
+        }
     }
+
+    alcCaptureStop(audioDevice);
+    // TODO: unconsumed samples
+    fseek(audioFile, 4, SEEK_SET);
+    int size = audioSize + sizeof(WAVEHEADER) - 8;
+    fwrite(&size, 4, 1, audioFile);
+    fseek(audioFile, 42, SEEK_SET);
+    fwrite(&audioSize, 4, 1, audioFile);
+    fclose(audioFile);
+    alcCaptureCloseDevice(audioDevice);
 
     ImGui_ImplSdlGL3_Shutdown();
     SDL_DestroyWindow(window);
