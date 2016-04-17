@@ -253,7 +253,7 @@ int main(int argc, char* argv[])
     printf("Initializing SDL version %d.%d.%d\n",
             SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
 
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
+    if(SDL_Init(SDL_INIT_VIDEO) != 0)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
                                  "Unable to initialize SDL", 0);
@@ -265,15 +265,12 @@ int main(int argc, char* argv[])
                         SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
     SDL_Window* window = SDL_CreateWindow("Webcam Test",
                                           SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                           width, height,
-                                          SDL_WINDOW_OPENGL);
+                                          SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if(!window)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
@@ -344,9 +341,6 @@ int main(int argc, char* argv[])
     uint64_t tickRate = 64;
     uint64_t tickDuration = performanceFreq/tickRate;
     uint64_t nextTickTime = performanceCounter;
-    float frameTime = 1.0f/(float)tickRate;
-
-    int maxTicksWithoutDraw = 5;
 
     GameState game = {};
     initGame(&game);
@@ -399,7 +393,6 @@ int main(int argc, char* argv[])
     enet_deinitialize();
 
     alcCaptureStop(audioDevice);
-    // TODO: unconsumed samples
     fseek(audioFile, 4, SEEK_SET);
     int size = audioSize + sizeof(WAVEHEADER) - 8;
     fwrite(&size, 4, 1, audioFile);
