@@ -1,3 +1,4 @@
+#include "string.h"
 
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -7,20 +8,24 @@
 #include "imgui_impl_sdl_gl3.h"
 
 #include <GL/gl3w.h>
-#include <AL/al.h>
-#include <AL/alc.h>
+
+#include "daala/codec.h"
+#include "daala/daalaenc.h"
+#include "opus/opus.h"
 
 #include "escapi.h"
 #include "enet/enet.h"
 
 #include "vecmath.h"
-#include "render.h"
+#include "audio.h"
+#include "graphics.h"
+#include "graphicsutil.h"
 
 /*
 TODO: (In No particular order)
 - Add audio playback
 - Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
-- Add video compression (via http://www.theora.org/, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard, so at the very least for now we can use theora)
+- Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard, so at the very least for now we can use theora)
 - Look into x265 (http://x265.org/) which can be freely used in projects licenses with GPL (v2?, read the FAQ)
 - Add voice compression (also via the xiph.org people, teamspeak uses http://www.opus-codec.org/ or http://www.speex.org/)
 - Add server matching (IE you connect to a server, give a username and a channel-password to join, or ask for a channel name to be created, or whatever.)
@@ -32,22 +37,6 @@ TODO: (In No particular order)
 // Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
 // ^ "An Introduction to Video Compression in C/C++", uses ffmpeg to codec things with SDL
 
-// TODO: This is just here for testing, writing the audio recording to file
-#include <Mmreg.h>
-#pragma pack (push,1)
-typedef struct
-{
-	char			szRIFF[4];
-	long			lRIFFSize;
-	char			szWave[4];
-	char			szFmt[4];
-	long			lFmtSize;
-	WAVEFORMATEX	wfex;
-	char			szData[4];
-	long			lDataSize;
-} WAVEHEADER;
-#pragma pack (pop)
-
 struct GameState
 {
     GLuint cameraTexture;
@@ -56,6 +45,8 @@ struct GameState
     SimpleCapParams capture;
 
     bool cameraEnabled;
+    bool micEnabled;
+
     bool connected;
     ENetHost* netHost;
     ENetPeer* netPeer;
@@ -82,7 +73,15 @@ void enableCamera(GameState* game, bool enabled)
 
 void initGame(GameState* game)
 {
-    loadDefaultShaders();
+#if 0
+    daala_info vidInfo = {};
+    daala_enc_ctx* vidCtx = daala_encode_create(&vidInfo);
+    daala_encode_free(vidCtx);
+#endif
+#if 0
+    opus_encoder_get_size(2);
+#endif
+
     glGenTextures(1, &game->cameraTexture);
     glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -225,7 +224,7 @@ void renderGame(GameState* game, float deltaTime)
     renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
 
     ImVec2 windowLoc(0.0f, 0.0f);
-    ImVec2 windowSize(200.0f, 100.f);
+    ImVec2 windowSize(200.0f, 200.f);
     int UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize |
                   ImGuiWindowFlags_NoTitleBar |
@@ -235,10 +234,19 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::SetWindowSize(windowSize);
 
     ImGui::Text("%.1fms", deltaTime*1000.0f);
-    if(ImGui::Button("Toggle Camera", ImVec2(90,20)))
+    bool cameraEnabled = game->cameraEnabled;
+    bool cameraToggled = ImGui::Checkbox("Camera Enabled", &cameraEnabled);
+    if(cameraToggled)
     {
-        enableCamera(game, !game->cameraEnabled);
+        enableCamera(game, cameraEnabled);
     }
+    bool micEnabled = game->micEnabled;
+    bool micToggled = ImGui::Checkbox("Microphone Enabled", &micEnabled);
+    if(micToggled)
+    {
+        // TODO
+    }
+
     if(ImGui::Button("Host", ImVec2(60,20)))
     {
         printf("Host\n");
@@ -266,6 +274,17 @@ void renderGame(GameState* game, float deltaTime)
         }
     }
 
+    char* ringPtr = soundio_ring_buffer_read_ptr(ringBuffer);
+    float plotVals[4800];
+    for(int i=0; i<4800; ++i)
+    {
+        uint8_t byteVal = (uint8_t)*ringPtr;
+        ++ringPtr;
+        plotVals[i] = (((float)byteVal) - 128.0f)/128.0f;
+    }
+    soundio_ring_buffer_advance_read_ptr(ringBuffer, 4800);
+    ImGui::PlotLines("", plotVals, 4800, 0, 0, -0.1f,0.1f, ImVec2(180.0f, 50.0f));
+
     ImGui::End();
 }
 
@@ -279,8 +298,7 @@ void cleanupGame(GameState* game)
 
 int main(int argc, char* argv[])
 {
-    // TODO: Theres a (potential) difference between the version of SDL that we compiled with
-    //       and the version we're running with (so maybe thats worth mentioning here)
+    // Create Window
     printf("Initializing SDL version %d.%d.%d\n",
             SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
 
@@ -314,53 +332,30 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    // Initialize OpenGL
     SDL_GLContext glc = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, glc);
-    if(gl3wInit())
+    if(!initGraphics())
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
                                  "Unable to initialize OpenGL!", 0);
         SDL_Quit();
         return 1;
     }
+    updateWindowSize(initialWindowWidth, initialWindowHeight);
+    ImGui_ImplSdlGL3_Init(window);
     printf("Initialized OpenGL %s with support for GLSL %s\n",
             glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
-    SDL_GL_SetSwapInterval(0);
-    updateWindowSize(initialWindowWidth, initialWindowHeight);
-    ImGui_ImplSdlGL3_Init(window);
-
-    const char* deviceName = 0;
-    ALchar audioBuffer[4410];
-    ALCdevice* audioDevice = alcCaptureOpenDevice(deviceName, 22050, AL_FORMAT_MONO16, 4410);
-    if(!audioDevice)
+    // Initialize libsoundio
+    if(!initAudio())
     {
-        printf("Unable to open audio device!\n");
+        printf("Unable to initialize audio subsystem\n");
         SDL_Quit();
         return 1;
     }
-    printf("Opened audio device: %s\n", alcGetString(audioDevice, ALC_CAPTURE_DEVICE_SPECIFIER));
-    int audioSize = 0;
-    WAVEHEADER audioHeader = {};
-    FILE* audioFile = fopen("out.wav", "wb");
-    sprintf(audioHeader.szRIFF, "RIFF");
-    audioHeader.lRIFFSize = 0;
-    sprintf(audioHeader.szWave, "WAVE");
-    sprintf(audioHeader.szFmt, "fmt ");
-    audioHeader.lFmtSize = sizeof(WAVEFORMATEX);
-    audioHeader.wfex.nChannels = 1;
-    audioHeader.wfex.wBitsPerSample = 16;
-    audioHeader.wfex.wFormatTag = WAVE_FORMAT_PCM;
-    audioHeader.wfex.nSamplesPerSec = 22050;
-    audioHeader.wfex.nBlockAlign = audioHeader.wfex.nChannels*audioHeader.wfex.wBitsPerSample/8;
-    audioHeader.wfex.nAvgBytesPerSec = audioHeader.wfex.nSamplesPerSec * audioHeader.wfex.nBlockAlign;
-    audioHeader.wfex.cbSize = 0;
-    sprintf(audioHeader.szData, "data");
-    audioHeader.lDataSize = 0;
-    fwrite(&audioHeader, sizeof(WAVEHEADER), 1, audioFile);
 
-    alcCaptureStart(audioDevice);
-
+    // Initialize enet
     if(enet_initialize() != 0)
     {
         printf("Unable to initialize enet!\n");
@@ -369,10 +364,11 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    // Initialize game
     uint64_t performanceFreq = SDL_GetPerformanceFrequency();
     uint64_t performanceCounter = SDL_GetPerformanceCounter();
 
-    uint64_t tickRate = 64;
+    uint64_t tickRate = 20;
     uint64_t tickDuration = performanceFreq/tickRate;
     uint64_t nextTickTime = performanceCounter;
 
@@ -412,32 +408,17 @@ int main(int argc, char* argv[])
             uint32_t sleepMS = (uint32_t)(sleepSeconds*1000);
             SDL_Delay(sleepMS);
         }
-
-        int samplesAvailable;
-        alcGetIntegerv(audioDevice, ALC_CAPTURE_SAMPLES, 1, &samplesAvailable);
-        //printf("%d audio samples are available\n", samplesAvailable);
-        if(samplesAvailable > (4410/audioHeader.wfex.nBlockAlign))
-        {
-            alcCaptureSamples(audioDevice, audioBuffer, 4410/audioHeader.wfex.nBlockAlign);
-            fwrite(audioBuffer, 4410, 1, audioFile);
-            audioSize += 4410;
-        }
     }
+
+    cleanupGame(&game);
 
     enet_deinitialize();
 
-    alcCaptureStop(audioDevice);
-    fseek(audioFile, 4, SEEK_SET);
-    int size = audioSize + sizeof(WAVEHEADER) - 8;
-    fwrite(&size, 4, 1, audioFile);
-    fseek(audioFile, 42, SEEK_SET);
-    fwrite(&audioSize, 4, 1, audioFile);
-    fclose(audioFile);
-    alcCaptureCloseDevice(audioDevice);
-
+    deinitAudio();
     ImGui_ImplSdlGL3_Shutdown();
-    SDL_DestroyWindow(window);
+    deinitGraphics();
 
+    SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;
 }
