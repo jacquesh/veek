@@ -159,7 +159,7 @@ bool updateGame(GameState* game, float deltaTime)
                 break;
 
             case ENET_EVENT_TYPE_RECEIVE:
-                printf("Received %u bytes\n", netEvent.packet->dataLength);
+                printf("Received %llu bytes\n", netEvent.packet->dataLength);
                 memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
 
                 glBindTexture(GL_TEXTURE_2D, game->cameraTexture);

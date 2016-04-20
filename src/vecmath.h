@@ -29,8 +29,6 @@ Vector2& operator *=(Vector2& lhs, float rhs);
 
 
 int sign(int x);
-int round(float x);
-int round(double x);
 
 float clamp(float x, float min, float max);
 float lerp(float from, float to, float t);

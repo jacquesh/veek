@@ -16,7 +16,7 @@ float Vector2::sqrMagnitude()
 
 float Vector2::magnitude()
 {
-    return sqrt(sqrMagnitude());
+    return sqrtf(sqrMagnitude());
 }
 
 void Vector2::normalize()
@@ -112,15 +112,6 @@ Vector2& operator *=(Vector2& lhs, float rhs)
 // ========================
 // Function implementations
 // ========================
-int round(float x)
-{
-    return (int)(x + 0.5f);
-}
-int round(double x)
-{
-    return (int)(x + 0.5);
-}
-
 float clamp(float x, float min, float max)
 {
     if(x < min)

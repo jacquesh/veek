@@ -37,16 +37,16 @@ void printDevice(SoundIoDevice* device, bool isDefault)
     printf("      Now: %0.8f\n", device->software_latency_current);
 }
 
-void inReadCallback(SoundIoInStream* inStream, int frameCountMin, int frameCountMax)
+void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
     int framesRemaining = frameCountMax;
-    int channelCount = outStream->layout.channel_count;
+    int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* inArea;
 
     while(framesRemaining > 0)
     {
         int frameCount = framesRemaining;
-        int readError = soundio_instream_begin_read(inStream, &inArea, &frameCount);
+        int readError = soundio_instream_begin_read(stream, &inArea, &frameCount);
         if(readError)
         {
             printf("Read error\n");
@@ -74,22 +74,22 @@ void inReadCallback(SoundIoInStream* inStream, int frameCountMin, int frameCount
             */
         }
 
-        soundio_instream_end_read(inStream);
+        soundio_instream_end_read(stream);
         framesRemaining -= frameCount;
     }
 }
 
-void outWriteCallback(SoundIoOutStream* outStream, int frameCountMin, int frameCountMax)
+void outWriteCallback(SoundIoOutStream* steam, int frameCountMin, int frameCountMax)
 {
     printf("Write callback! %d - %d\n", frameCountMin, frameCountMax);
     int framesRemaining = frameCountMax;
-    int channelCount = outStream->layout.channel_count;
+    int channelCount = steam->layout.channel_count;
     SoundIoChannelArea* outArea;
 
     while(framesRemaining > 0)
     {
         int frameCount = framesRemaining;
-        int writeError = soundio_outstream_begin_write(outStream, &outArea, &frameCount);
+        int writeError = soundio_outstream_begin_write(steam, &outArea, &frameCount);
         if(writeError)
         {
             printf("Write error\n");
@@ -106,7 +106,7 @@ void outWriteCallback(SoundIoOutStream* outStream, int frameCountMin, int frameC
             }
         }
 
-        soundio_outstream_end_write(outStream);
+        soundio_outstream_end_write(steam);
         framesRemaining -= frameCount;
     }
 }
