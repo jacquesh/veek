@@ -1,4 +1,4 @@
-// dear imgui, v1.48 WIP
+// dear imgui, v1.49 WIP
 // (internals)
 
 // You may use this file to debug, understand or extend ImGui features but we don't provide any guarantee of forward compatibility!
@@ -594,8 +594,9 @@ struct IMGUI_API ImGuiDrawContext
 struct IMGUI_API ImGuiWindow
 {
     char*                   Name;
-    ImGuiID                 ID;
-    ImGuiWindowFlags        Flags;
+    ImGuiID                 ID;                                 // == ImHash(Name)
+    ImGuiWindowFlags        Flags;                              // See enum ImGuiWindowFlags_
+    int                     IndexWithinParent;                  // Order within immediate parent window, if we are a child window. Otherwise 0.
     ImVec2                  PosFloat;
     ImVec2                  Pos;                                // Position rounded-up to nearest pixel
     ImVec2                  Size;                               // Current size (==SizeFull or collapsed title bar size)
@@ -636,8 +637,8 @@ struct IMGUI_API ImGuiWindow
     ImGuiStorage            StateStorage;
     float                   FontWindowScale;                    // Scale multiplier per-window
     ImDrawList*             DrawList;
-    ImGuiWindow*            RootWindow;
-    ImGuiWindow*            RootNonPopupWindow;
+    ImGuiWindow*            RootWindow;                         // If we are a child window, this is pointing to the first non-child parent window. Else point to ourself.
+    ImGuiWindow*            RootNonPopupWindow;                 // If we are a child widnow, this is pointing to the first non-child non-popup parent window. Else point to ourself.
 
     // Focus
     int                     FocusIdxAllCounter;                 // Start at -1 and increase as assigned via FocusItemRegister()
@@ -678,6 +679,8 @@ namespace ImGui
     IMGUI_API ImGuiWindow*  GetParentWindow();
     IMGUI_API ImGuiWindow*  FindWindowByName(const char* name);
     IMGUI_API void          FocusWindow(ImGuiWindow* window);
+
+    IMGUI_API void          EndFrame();                 // Ends the ImGui frame. Automatically called by Render()! you most likely don't need to ever call that yourself directly. If you don't need to render you can call EndFrame() but you'll have wasted CPU already. If you don't need to render, don't create any windows instead!
 
     IMGUI_API void          SetActiveID(ImGuiID id, ImGuiWindow* window);
     IMGUI_API void          SetHoveredID(ImGuiID id);

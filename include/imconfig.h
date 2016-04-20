@@ -5,7 +5,6 @@
 //-----------------------------------------------------------------------------
 
 #pragma once
-#include "vecmath.h"
 
 //---- Define assertion handler. Defaults to calling assert().
 //#define IM_ASSERT(_EXPR)  MyAssert(_EXPR)
@@ -22,26 +21,24 @@
 //#define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCS
 
 //---- Don't implement help and test window functionality (ShowUserGuide()/ShowStyleEditor()/ShowTestWindow() methods will be empty)
-#define IMGUI_DISABLE_TEST_WINDOWS
+//#define IMGUI_DISABLE_TEST_WINDOWS
 
 //---- Don't define obsolete functions names
-#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#define IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 
 //---- Implement STB libraries in a namespace to avoid conflicts
 //#define IMGUI_STB_NAMESPACE     ImGuiStb
 
 //---- Define constructor and implicit cast operators to convert back<>forth from your math types and ImVec2/ImVec4.
-
-#define IM_VEC2_CLASS_EXTRA                                                 \
-        ImVec2(const Vector2& f) { x = f.x; y = f.y; }                       \
-        operator Vector2() const { return Vector2(x,y); }
-
 /*
-#define IM_VEC4_CLASS_EXTRA                                                 \
-        ImVec4(const Vector4& f) { x = f.x; y = f.y; z = f.z; w = f.w; }     \
-        operator Vector4() const { return dge::Vector4(x,y,z,w); }
-*/
+#define IM_VEC2_CLASS_EXTRA                                                 \
+        ImVec2(const MyVec2& f) { x = f.x; y = f.y; }                       \
+        operator MyVec2() const { return MyVec2(x,y); }
 
+#define IM_VEC4_CLASS_EXTRA                                                 \
+        ImVec4(const MyVec4& f) { x = f.x; y = f.y; z = f.z; w = f.w; }     \
+        operator MyVec4() const { return MyVec4(x,y,z,w); }
+*/
 
 //---- Tip: You can add extra functions within the ImGui:: namespace, here or in your own headers files.
 //---- e.g. create variants of the ImGui::Value() helper for your low-level math types, or your own widgets/helpers.

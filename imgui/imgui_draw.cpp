@@ -1,4 +1,4 @@
-// dear imgui, v1.48 WIP
+// dear imgui, v1.49 WIP
 // (drawing and font code)
 
 // Contains implementation for
@@ -823,6 +823,30 @@ void ImDrawList::AddRectFilledMultiColor(const ImVec2& a, const ImVec2& c, ImU32
     PrimWriteVtx(ImVec2(a.x, c.y), uv, col_bot_left);
 }
 
+void ImDrawList::AddQuad(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, ImU32 col, float thickness)
+{
+    if ((col >> 24) == 0)
+        return;
+
+    PathLineTo(a);
+    PathLineTo(b);
+    PathLineTo(c);
+    PathLineTo(d);
+    PathStroke(col, true, thickness);
+}
+
+void ImDrawList::AddQuadFilled(const ImVec2& a, const ImVec2& b, const ImVec2& c, const ImVec2& d, ImU32 col)
+{
+    if ((col >> 24) == 0)
+        return;
+
+    PathLineTo(a);
+    PathLineTo(b);
+    PathLineTo(c);
+    PathLineTo(d);
+    PathFill(col);
+}
+
 void ImDrawList::AddTriangle(const ImVec2& a, const ImVec2& b, const ImVec2& c, ImU32 col, float thickness)
 {
     if ((col >> 24) == 0)
@@ -1204,7 +1228,7 @@ ImFont* ImFontAtlas::AddFontFromMemoryCompressedTTF(const void* compressed_ttf_d
     ImFontConfig font_cfg = font_cfg_template ? *font_cfg_template : ImFontConfig();
     IM_ASSERT(font_cfg.FontData == NULL);
     font_cfg.FontDataOwnedByAtlas = true;
-    return AddFontFromMemoryTTF(buf_decompressed_data, (int)buf_decompressed_size, size_pixels, font_cfg_template, glyph_ranges);
+    return AddFontFromMemoryTTF(buf_decompressed_data, (int)buf_decompressed_size, size_pixels, &font_cfg, glyph_ranges);
 }
 
 ImFont* ImFontAtlas::AddFontFromMemoryCompressedBase85TTF(const char* compressed_ttf_data_base85, float size_pixels, const ImFontConfig* font_cfg, const ImWchar* glyph_ranges)
