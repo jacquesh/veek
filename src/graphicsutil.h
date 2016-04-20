@@ -6,10 +6,7 @@
 #define glPrintError(alwaysPrint) __glPrintError(__FILE__, __LINE__, alwaysPrint)
 void __glPrintError(const char* file, int line, bool alwaysPrint);
 
-GLuint loadShader(const char* shaderFilename, GLenum shaderType);
-GLuint loadShaderProgram(const char* vertShaderFilename, const char* fragShaderFilename);
-GLuint loadShaderProgram(const char* vertShaderFilename,
-                         const char* geomShaderFilename,
-                         const char* fragShaderFilename);
+GLuint loadShaderFromString(const char* shaderStr, GLenum shaderType);
+GLuint loadShaderProgramFromString(const char* vertShaderStr, const char* fragShaderStr);
 
 #endif

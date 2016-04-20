@@ -12,6 +12,8 @@ GLuint texCoordBuffer;
 int screenWidth;
 int screenHeight;
 
+#include "shaders.cpp"
+
 bool initGraphics()
 {
     if(gl3wInit())
@@ -22,8 +24,7 @@ bool initGraphics()
 
     // Load shader
     glGenVertexArrays(1, &spriteVAO);
-    spriteShader = loadShaderProgram("resources/shaders/sprite.vsh",
-                                          "resources/shaders/sprite.fsh");
+    spriteShader = loadShaderProgramFromString(vertexShader, fragmentShader);
     GLint spritePositionLoc = glGetAttribLocation(spriteShader, "position");
     GLint spriteTexCoordLoc = glGetAttribLocation(spriteShader, "texCoord");
 
