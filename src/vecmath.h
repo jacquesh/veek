@@ -30,7 +30,8 @@ Vector2& operator *=(Vector2& lhs, float rhs);
 
 int sign(int x);
 
-float clamp(float x, float min, float max);
+int clamp(int x, int min, int max);
+float clampf(float x, float min, float max);
 float lerp(float from, float to, float t);
 float signf(float x);
 

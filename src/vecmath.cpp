@@ -112,7 +112,20 @@ Vector2& operator *=(Vector2& lhs, float rhs)
 // ========================
 // Function implementations
 // ========================
-float clamp(float x, float min, float max)
+int clamp(int x, int min, int max)
+{
+    if(x < min)
+    {
+        x = min;
+    }
+    else if(x > max)
+    {
+        x = max;
+    }
+    return x;
+}
+
+float clampf(float x, float min, float max)
 {
     if(x < min)
     {
