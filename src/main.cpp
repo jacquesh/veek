@@ -11,7 +11,6 @@
 
 #include "daala/codec.h"
 #include "daala/daalaenc.h"
-#include "opus/opus.h"
 
 #include "escapi.h"
 #include "enet/enet.h"
@@ -36,6 +35,10 @@ TODO: (In No particular order)
 
 // Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
 // ^ "An Introduction to Video Compression in C/C++", uses ffmpeg to codec things with SDL
+
+#define NETDATA_TYPE_AUDIO 0x01
+#define NETDATA_TYPE_VIDEO 0x02
+#define NETDATA_TYPE_META  0x04
 
 struct GameState
 {
@@ -71,15 +74,48 @@ void enableCamera(GameState* game, bool enabled)
     }
 }
 
+uint32_t currentTime = 0;
+float currentTimef = 0.0f;
+void fillAudioOutBuffer(float deltaTime)
+{
+    float pi = 3.1415927f;
+    float frequency = 261.6f;
+    int samplesLength = 2410;
+    float timestep = 1.0f/48000.0f;
+    uint8_t* samples = new uint8_t[samplesLength];
+
+    for(int i=0; i<samplesLength; ++i)
+    {
+        float sinVal = sinf(frequency*2*pi*currentTimef);
+        uint8_t sinByte = (uint8_t)((sinVal+1.0f)*127.0f);
+        samples[i] = sinByte;
+
+        currentTimef += timestep;
+    }
+    readToAudioOutputBuffer(currentTime, samplesLength, samples);
+    currentTime += (uint32_t)lroundf(1000.0f*deltaTime);
+    delete samples;
+}
+
+ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
+{
+    ENetPacket* newPacket = enet_packet_create(0, 9+dataLength, ENET_PACKET_FLAG_UNSEQUENCED);
+    uint32_t dataTime = 0; // TODO
+
+    newPacket->data[0] = NETDATA_TYPE_AUDIO;
+    *((uint32_t*)(newPacket->data+1)) = htonl(dataTime);
+    *((uint32_t*)(newPacket->data+5)) = htonl(dataLength);
+    memcpy(newPacket->data+9, data, dataLength);
+
+    return newPacket;
+}
+
 void initGame(GameState* game)
 {
 #if 0
     daala_info vidInfo = {};
     daala_enc_ctx* vidCtx = daala_encode_create(&vidInfo);
     daala_encode_free(vidCtx);
-#endif
-#if 0
-    opus_encoder_get_size(2);
 #endif
 
     glGenTextures(1, &game->cameraTexture);
@@ -113,70 +149,6 @@ void initGame(GameState* game)
 
 bool updateGame(GameState* game, float deltaTime)
 {
-    bool keepRunning = true;
-    SDL_Event e;
-    while (SDL_PollEvent(&e))
-    {
-        ImGui_ImplSdlGL3_ProcessEvent(&e);
-        switch (e.type)
-        {
-            case SDL_QUIT:
-            {
-                keepRunning = false;
-            } break;
-            case SDL_KEYDOWN:
-            {
-                if(e.key.keysym.sym == SDLK_ESCAPE)
-                    keepRunning = false;
-            } break;
-            case SDL_WINDOWEVENT:
-            {
-                switch(e.window.event)
-                {
-                    case SDL_WINDOWEVENT_RESIZED:
-                    case SDL_WINDOWEVENT_SIZE_CHANGED:
-                    {
-                        int newWidth = e.window.data1;
-                        int newHeight = e.window.data2;
-                        updateWindowSize(newWidth, newHeight);
-                    } break;
-                }
-            } break;
-        }
-    }
-
-    ENetEvent netEvent;
-    if(game->netHost && enet_host_service(game->netHost, &netEvent, 0) > 0)
-    {
-        switch(netEvent.type)
-        {
-            case ENET_EVENT_TYPE_CONNECT:
-                printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                if(game->netPeer)
-                {
-                    game->connected = true;
-                }
-                break;
-
-            case ENET_EVENT_TYPE_RECEIVE:
-                printf("Received %llu bytes\n", netEvent.packet->dataLength);
-                memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
-
-                glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                             cameraWidth, cameraHeight, 0,
-                             GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-                glBindTexture(GL_TEXTURE_2D, 0);
-
-                enet_packet_destroy(netEvent.packet);
-                break;
-
-            case ENET_EVENT_TYPE_DISCONNECT:
-                printf("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                break;
-        }
-    }
-
     if(game->cameraEnabled && isCaptureDone(game->device))
     {
         for(int y=0; y<cameraHeight; ++y)
@@ -200,7 +172,7 @@ bool updateGame(GameState* game, float deltaTime)
 
         if(game->connected)
         {
-            ENetPacket* packet = enet_packet_create(pixelValues, pixelBytes/2, 0);
+            ENetPacket* packet = enet_packet_create(pixelValues, pixelBytes/2, ENET_PACKET_FLAG_UNSEQUENCED);
             enet_peer_send(game->netPeer, 0, packet);
         }
 
@@ -213,7 +185,7 @@ bool updateGame(GameState* game, float deltaTime)
         doCapture(game->device);
     }
 
-    return keepRunning;
+    return true;
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -240,11 +212,10 @@ void renderGame(GameState* game, float deltaTime)
     {
         enableCamera(game, cameraEnabled);
     }
-    bool micEnabled = game->micEnabled;
-    bool micToggled = ImGui::Checkbox("Microphone Enabled", &micEnabled);
+    bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
     if(micToggled)
     {
-        // TODO
+        enableMicrophone(game->micEnabled);
     }
 
     if(ImGui::Button("Host", ImVec2(60,20)))
@@ -274,6 +245,7 @@ void renderGame(GameState* game, float deltaTime)
         }
     }
 
+#if 0
     char* ringPtr = soundio_ring_buffer_read_ptr(ringBuffer);
     float plotVals[4800];
     for(int i=0; i<4800; ++i)
@@ -284,6 +256,7 @@ void renderGame(GameState* game, float deltaTime)
     }
     soundio_ring_buffer_advance_read_ptr(ringBuffer, 4800);
     ImGui::PlotLines("", plotVals, 4800, 0, 0, -0.1f,0.1f, ImVec2(180.0f, 50.0f));
+#endif
 
     ImGui::End();
 }
@@ -342,10 +315,13 @@ int main(int argc, char* argv[])
         SDL_Quit();
         return 1;
     }
-    updateWindowSize(initialWindowWidth, initialWindowHeight);
-    ImGui_ImplSdlGL3_Init(window);
     printf("Initialized OpenGL %s with support for GLSL %s\n",
             glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+    updateWindowSize(initialWindowWidth, initialWindowHeight);
+    ImGui_ImplSdlGL3_Init(window);
+    ImGuiIO& imguiIO = ImGui::GetIO();
+    imguiIO.IniFilename = 0;
 
     // Initialize libsoundio
     if(!initAudio())
@@ -372,6 +348,8 @@ int main(int argc, char* argv[])
     uint64_t tickDuration = performanceFreq/tickRate;
     uint64_t nextTickTime = performanceCounter;
 
+    uint32_t micBufferLen = 2410;
+    uint8_t* micBuffer = new uint8_t[micBufferLen];
     GameState game = {};
     initGame(&game);
 
@@ -381,15 +359,110 @@ int main(int argc, char* argv[])
     printf("Setup complete, start running...\n");
     while(running)
     {
+        nextTickTime += tickDuration;
+
         uint64_t newPerfCount = SDL_GetPerformanceCounter();
         uint64_t deltaPerfCount = newPerfCount - performanceCounter;
         performanceCounter = newPerfCount;
 
         float deltaTime = ((float)deltaPerfCount)/((float)performanceFreq);
+#if 0
+        printf("Our new frame is %d samples after our old one\n", (int)(deltaTime*48000));
+#endif
 
-        // Game Tick
-        running = updateGame(&game, deltaTime);
-        nextTickTime += tickDuration;
+        // Handle input
+        SDL_Event e;
+        while (SDL_PollEvent(&e))
+        {
+            ImGui_ImplSdlGL3_ProcessEvent(&e);
+            switch (e.type)
+            {
+                case SDL_QUIT:
+                {
+                    running = false;
+                } break;
+                case SDL_KEYDOWN:
+                {
+                    if(e.key.keysym.sym == SDLK_ESCAPE)
+                        running = false;
+                } break;
+                case SDL_WINDOWEVENT:
+                {
+                    switch(e.window.event)
+                    {
+                        case SDL_WINDOWEVENT_RESIZED:
+                        case SDL_WINDOWEVENT_SIZE_CHANGED:
+                        {
+                            int newWidth = e.window.data1;
+                            int newHeight = e.window.data2;
+                            updateWindowSize(newWidth, newHeight);
+                        } break;
+                    }
+                } break;
+            }
+        }
+
+        // Send network output data
+        if(game.micEnabled && game.connected)
+        {
+            // TODO: This is dumb since we have to copy the data twice, once from the audio system into
+            //       micBuffer and once from micBuffer into the packet, whereas we could just copy it
+            //       directly into the packet
+            writeFromAudioInputBuffer(micBufferLen, micBuffer);
+            ENetPacket* outPacket = createPacket(NETDATA_TYPE_AUDIO, micBufferLen, micBuffer);
+            enet_peer_send(game.netPeer, 0, outPacket);
+        }
+
+        // Handle network events
+        ENetEvent netEvent;
+        if(game.netHost && enet_host_service(game.netHost, &netEvent, 0) > 0)
+        {
+            switch(netEvent.type)
+            {
+                case ENET_EVENT_TYPE_CONNECT:
+                {
+                    printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    if(game.netPeer)
+                    {
+                        game.connected = true;
+                    }
+                } break;
+
+                case ENET_EVENT_TYPE_RECEIVE:
+                {
+                    printf("Received %llu bytes\n", netEvent.packet->dataLength);
+                    uint8_t dataType = *netEvent.packet->data;
+                    uint32_t dataTime = ntohl(*((uint32_t*)(netEvent.packet->data+1)));
+                    uint32_t dataLength = ntohl(*((uint32_t*)(netEvent.packet->data+5)));
+                    uint8_t* data = netEvent.packet->data+9;
+
+                    if(dataType == NETDATA_TYPE_AUDIO)
+                    {
+                        readToAudioOutputBuffer(dataTime, dataLength, data);
+                    }
+
+#if 0
+                    memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
+                    glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                                 cameraWidth, cameraHeight, 0,
+                                 GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+#endif
+                    enet_packet_destroy(netEvent.packet);
+                } break;
+
+                case ENET_EVENT_TYPE_DISCONNECT:
+                {
+                    printf("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                } break;
+            }
+        }
+
+        //fillAudioOutBuffer(deltaTime);
+
+        // Update the audio
+        updateGame(&game, deltaTime);
 
         // Rendering
         ImGui_ImplSdlGL3_NewFrame(window);
@@ -410,6 +483,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    delete[] micBuffer;
     cleanupGame(&game);
 
     enet_deinitialize();
