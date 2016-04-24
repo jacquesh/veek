@@ -131,7 +131,7 @@ void initGame(GameState* game)
     pixelValues = new uint8_t[pixelBytes];
 
     int deviceCount = setupESCAPI();
-    printf("%d devices available.\n", deviceCount);
+    printf("%d video input devices available.\n", deviceCount);
     if(deviceCount == 0)
     {
         printf("Unable to setup ESCAPI\n");
@@ -196,7 +196,7 @@ void renderGame(GameState* game, float deltaTime)
     renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
 
     ImVec2 windowLoc(0.0f, 0.0f);
-    ImVec2 windowSize(200.0f, 200.f);
+    ImVec2 windowSize(300.0f, 400.f);
     int UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize |
                   ImGuiWindowFlags_NoTitleBar |
@@ -212,10 +212,40 @@ void renderGame(GameState* game, float deltaTime)
     {
         enableCamera(game, cameraEnabled);
     }
-    bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
-    if(micToggled)
+
+    static bool audioCollapse = true;
+    static int selectedRecordingDevice = 0;
+    static int selectedPlaybackDevice = 0;
+    audioCollapse = ImGui::CollapsingHeader("Audio", 0, true, &audioCollapse);
+    if(audioCollapse)
     {
-        enableMicrophone(game->micEnabled);
+        bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
+        if(micToggled)
+        {
+            enableMicrophone(game->micEnabled);
+        }
+
+        bool micChanged = ImGui::Combo("Recording Device",
+                                       &selectedRecordingDevice,
+                                       (const char**)audioState.inputDeviceNames,
+                                       audioState.inputDeviceCount);
+        if(micChanged)
+        {
+            printf("Mic Device Changed\n");
+            setAudioInputDevice(0);
+        }
+        ImGui::Button("Listen", ImVec2(60, 20));
+
+        bool speakerChanged = ImGui::Combo("Playback Device",
+                                           &selectedPlaybackDevice,
+                                           (const char**)audioState.outputDeviceNames,
+                                           audioState.outputDeviceCount);
+        if(speakerChanged)
+        {
+            printf("Speaker Device Changed\n");
+        }
+        ImGui::Button("Play test sound", ImVec2(120, 20));
+
     }
 
     if(ImGui::Button("Host", ImVec2(60,20)))

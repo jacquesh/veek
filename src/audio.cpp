@@ -23,17 +23,15 @@ SoundIoOutStream* outStream;
 SoundIoRingBuffer* outBuffer;
 SDL_mutex* audioOutMutex;
 
-void printDevice(SoundIoDevice* device, bool isDefault)
+void printDevice(SoundIoDevice* device)
 {
-    const char* defaultStr = isDefault ? "(DEFAULT)" : "";
     const char* rawStr = device->is_raw ? "(RAW)" : "";
-    printf("%s%s%s\n", device->name, defaultStr, rawStr);
-    if(device->probe_error)
+    printf("%s%s\n", device->name, rawStr);
+    if(device->probe_error != SoundIoErrorNone)
     {
-        printf("PROBE_ERROR!\n");
+        printf("Probe Error: %s\n", soundio_strerror(device->probe_error));
         return;
     }
-
     printf("  Channel count: %d\n", device->current_layout.channel_count);
     printf("  Sample Rate: %d\n", device->sample_rate_current);
     printf("  Latency: %0.8f - %0.8f\n", device->software_latency_min, device->software_latency_max);
@@ -189,12 +187,65 @@ void enableMicrophone(bool enabled)
     }
 }
 
+void setAudioInputDevice(int newInputDevice)
+{
+    // TODO: We should probably wait for any currently running callbacks to finish
+    if(inStream)
+    {
+        soundio_instream_destroy(inStream);
+    }
+
+    audioState.currentInputDevice = newInputDevice;
+    inDevice = audioState.inputDeviceList[audioState.currentInputDevice];
+    inStream = soundio_instream_create(inDevice);
+    inStream->read_callback = inReadCallback;
+    inStream->sample_rate = 48000;
+    inStream->format = SoundIoFormatFloat32NE;
+    // TODO: Set all the other options, in particular can we force it to be mono?
+    //       Surely we never get more than mono data from a single microphone by definition?
+
+    int openError = soundio_instream_open(inStream);
+    if(openError != SoundIoErrorNone)
+    {
+        printf("Error opening input stream: %s\n", soundio_strerror(openError));
+    }
+    int startError = soundio_instream_start(inStream);
+    if(startError != SoundIoErrorNone)
+    {
+        printf("Error starting input stream: %s\n", soundio_strerror(startError));
+    }
+}
+
+void setAudioOutputDevice(int newOutputDevice)
+{
+    // TODO: We should probably wait for any currently running callbacks to finish
+    if(outStream)
+    {
+        soundio_outstream_destroy(outStream);
+    }
+
+    audioState.currentOutputDevice = newOutputDevice;
+    outDevice = audioState.outputDeviceList[audioState.currentOutputDevice];
+    outStream = soundio_outstream_create(outDevice);
+    outStream->write_callback = outWriteCallback;
+    outStream->sample_rate = 48000;
+    outStream->format = SoundIoFormatFloat32NE;
+    // TODO: Set all the other options
+
+    int openError = soundio_outstream_open(outStream);
+    if(openError != SoundIoErrorNone)
+    {
+        printf("Error opening output stream: %s\n", soundio_strerror(openError));
+    }
+    int startError = soundio_outstream_start(outStream);
+    if(startError != SoundIoErrorNone)
+    {
+        printf("Error starting output stream: %s\n", soundio_strerror(openError));
+    }
+}
+
 bool initAudio()
 {
-#if 0
-    opus_encoder_get_size(2);
-#endif
-
     // Initialize SoundIO
     soundio = soundio_create();
     if(!soundio)
@@ -211,84 +262,111 @@ bool initAudio()
     //       48000 Hz is probably VERY excessive
 
     // Setup input
+    int defaultInputDevice = soundio_default_input_device_index(soundio);
     int inputDeviceCount = soundio_input_device_count(soundio);
-    int defaultInDevice = soundio_default_input_device_index(soundio);
-    printf("%d SoundIO Input Devices:\n", inputDeviceCount);
+    int managedInputDeviceCount = 0;
+    for(int i=0; i<inputDeviceCount; ++i)
+    {
+        SoundIoDevice* device = soundio_get_input_device(soundio, i);
+        printDevice(device);
+        if(!device->is_raw)
+        {
+            managedInputDeviceCount += 1;
+        }
+        soundio_device_unref(device);
+    }
+    audioState.defaultInputDevice = 0;
+    audioState.inputDeviceCount = managedInputDeviceCount;
+    audioState.inputDeviceList = new SoundIoDevice*[audioState.inputDeviceCount];
+    audioState.inputDeviceNames = new char*[audioState.inputDeviceCount];
+    int managedInputIndex = 0;
     for(int i=0; i<inputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_input_device(soundio, i);
         if(!device->is_raw)
-            printDevice(device, i == defaultInDevice);
-        soundio_device_unref(device);
+        {
+            audioState.inputDeviceList[managedInputIndex] = device;
+            audioState.inputDeviceNames[managedInputIndex] = device->name;
+            if(i == defaultInputDevice)
+            {
+                audioState.defaultInputDevice = managedInputIndex;
+            }
+            managedInputIndex += 1;
+        }
+        else
+        {
+            soundio_device_unref(device);
+        }
     }
+    inBuffer = soundio_ring_buffer_create(soundio, 48000*sizeof(float));
     audioInMutex = SDL_CreateMutex();
-    inBuffer = soundio_ring_buffer_create(soundio, 48000);
-
-    inDevice = soundio_get_input_device(soundio, defaultInDevice);
-    inStream = soundio_instream_create(inDevice);
-    inStream->read_callback = inReadCallback;
-    inStream->sample_rate = 48000;
-    inStream->format = SoundIoFormatU8;
-    // TODO: Set all the other options, in particular can we force it to be mono?
-    //       Surely we never get more than mono data from a single microphone by definition?
-
-    int micOpenError = soundio_instream_open(inStream);
-    if(micOpenError)
-    {
-        printf("Error opening input stream\n");
-    }
-    int recorderror = soundio_instream_start(inStream);
-    if(recorderror)
-    {
-        printf("error starting input stream\n");
-    }
 
     // Setup output
+    int defaultOutputDevice = soundio_default_output_device_index(soundio);
     int outputDeviceCount = soundio_output_device_count(soundio);
-    int defaultOutDevice = soundio_default_output_device_index(soundio);
-    printf("%d SoundIO Output Devices:\n", outputDeviceCount);
+    int managedOutputDeviceCount = 0;
     for(int i=0; i<outputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_output_device(soundio, i);
         if(!device->is_raw)
-            printDevice(device, i== defaultOutDevice);
+        {
+            managedOutputDeviceCount += 1;
+        }
         soundio_device_unref(device);
     }
+    audioState.defaultOutputDevice = 0;
+    audioState.outputDeviceCount = managedOutputDeviceCount;
+    audioState.outputDeviceList = new SoundIoDevice*[audioState.outputDeviceCount];
+    audioState.outputDeviceNames = new char*[audioState.outputDeviceCount];
+    int managedOutputIndex = 0;
+    for(int i=0; i<outputDeviceCount; ++i)
+    {
+        SoundIoDevice* device = soundio_get_output_device(soundio, i);
+        if(!device->is_raw)
+        {
+            audioState.outputDeviceList[managedOutputIndex] = device;
+            audioState.outputDeviceNames[managedOutputIndex] = device->name;
+            if(i == defaultOutputDevice)
+            {
+                audioState.defaultOutputDevice = managedOutputIndex;
+            }
+            managedOutputIndex += 1;
+        }
+        else
+        {
+            soundio_device_unref(device);
+        }
+    }
+    outBuffer = soundio_ring_buffer_create(soundio, 48000*sizeof(float));
     audioOutMutex = SDL_CreateMutex();
-    outBuffer = soundio_ring_buffer_create(soundio, 48000);
 
-    outDevice = soundio_get_output_device(soundio, defaultOutDevice);
-    outStream = soundio_outstream_create(outDevice);
-    outStream->write_callback = outWriteCallback;
-    outStream->sample_rate = 48000;
-    outStream->format = SoundIoFormatU8;
-    // TODO: Set all the other options
-
-    int streamOpenError = soundio_outstream_open(outStream);
-    if(streamOpenError)
-    {
-        printf("Error opening output stream\n");
-    }
-    int playError = soundio_outstream_start(outStream);
-    if(playError)
-    {
-        printf("Error starting output stream\n");
-    }
-
+    setAudioInputDevice(audioState.defaultInputDevice);
+    setAudioOutputDevice(audioState.defaultOutputDevice);
     return true;
 }
 
 void deinitAudio()
 {
+    // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
+    //       may have been in progress when we stopped running, have finished
+
+    soundio_instream_pause(inStream, true);
     soundio_instream_destroy(inStream);
-    soundio_device_unref(inDevice);
     soundio_ring_buffer_destroy(inBuffer);
     SDL_DestroyMutex(audioInMutex);
+    for(int i=0; i<audioState.inputDeviceCount; ++i)
+    {
+        soundio_device_unref(audioState.inputDeviceList[i]);
+    }
 
+    soundio_outstream_pause(outStream, true);
     soundio_outstream_destroy(outStream);
-    soundio_device_unref(outDevice);
     soundio_ring_buffer_destroy(outBuffer);
     SDL_DestroyMutex(audioOutMutex);
+    for(int i=0; i<audioState.outputDeviceCount; ++i)
+    {
+        soundio_device_unref(audioState.outputDeviceList[i]);
+    }
 
     soundio_destroy(soundio);
 }

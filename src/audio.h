@@ -5,8 +5,30 @@
 
 #include "soundio/soundio.h"
 
+struct AudioData
+{
+    int inputDeviceCount;
+    SoundIoDevice** inputDeviceList;
+    char** inputDeviceNames;
+    int defaultInputDevice;
+    int currentInputDevice;
+    bool inputEnabled;
+
+    int outputDeviceCount;
+    SoundIoDevice** outputDeviceList;
+    char** outputDeviceNames;
+    int defaultOutputDevice;
+    int currentOutputDevice;
+    int outputEnabled;
+};
+
+extern AudioData audioState;
+
 bool initAudio();
 void deinitAudio();
+
+void setAudioInputDevice(int newInputDevice);
+void setAudioOutputDevice(int newOutputDevice);
 
 void enableMicrophone(bool enabled);
 
