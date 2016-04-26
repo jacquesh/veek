@@ -392,6 +392,7 @@ bool initAudio()
     // TODO: Check the supported input/output formats
     //       48000 Hz is probably VERY excessive
 
+    printf("Initializing %s\n", opus_get_version_string());
     int opusError;
     opus_int32 opusSampleRate = 48000;
     int opusChannels = 1;

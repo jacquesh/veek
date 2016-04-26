@@ -20,15 +20,20 @@
 
 /*
 TODO: (In No particular order)
-- Add audio playback
+- Send peer data over the network (count, names, (dis)connect events etc)
+- Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
+- Add rendering of all connected peers (video feed, or a square/base image)
+- Add different voice-activation methods (continuous, threshold, push-to-talk)
+- Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
+- Get rid of the libsoundio max-CPU
 - Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
-- Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard, so at the very least for now we can use theora)
+- Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard)
 - Look into x265 (http://x265.org/) which can be freely used in projects licenses with GPL (v2?, read the FAQ)
-- Add voice compression (also via the xiph.org people, teamspeak uses http://www.opus-codec.org/ or http://www.speex.org/)
 - Add server matching (IE you connect to a server, give a username and a channel-password to join, or ask for a channel name to be created, or whatever.)
 - Access camera image size properties (escapi resizes to whatever you ask for, which is bad, I don't want that, I want to resize it myself (or at least know what the original size was))
-- Eventually support more than 2 people at a time (possibly?)
 - Try to shrink distributable down to a single exe (so statically link everything possible)
+- Add screen-sharing support
+- Find some automated way to do builds that require modifying the build settings of dependencies
 */
 
 // Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
