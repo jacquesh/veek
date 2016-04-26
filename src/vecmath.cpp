@@ -112,6 +112,20 @@ Vector2& operator *=(Vector2& lhs, float rhs)
 // ========================
 // Function implementations
 // ========================
+int min(int x, int y)
+{
+    if(x <= y)
+        return x;
+    return y;
+}
+
+int max(int x, int y)
+{
+    if(x >= y)
+        return x;
+    return y;
+}
+
 int clamp(int x, int min, int max)
 {
     if(x < min)
