@@ -243,18 +243,6 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Button("Play test sound", ImVec2(120, 20));
     }
 
-    if(ImGui::Button("Host", ImVec2(60,20)))
-    {
-        printf("Host\n");
-        ENetAddress addr = {};
-        addr.host = ENET_HOST_ANY;
-        addr.port = 12345;
-        game->netHost = enet_host_create(&addr, 1, 2, 0,0);
-        if(!game->netHost)
-        {
-            printf("Unable to create server\n");
-        }
-    }
     if(ImGui::Button("Connect", ImVec2(60,20)))
     {
         printf("Connect\n");
@@ -513,6 +501,11 @@ int main(int argc, char* argv[])
             uint32_t sleepMS = (uint32_t)(sleepSeconds*1000);
             SDL_Delay(sleepMS);
         }
+    }
+
+    if(game.netPeer)
+    {
+        enet_peer_disconnect_now(game.netPeer, 0);
     }
 
     delete[] micBuffer;
