@@ -74,27 +74,20 @@ void enableCamera(GameState* game, bool enabled)
     }
 }
 
-uint32_t currentTime = 0;
 float currentTimef = 0.0f;
-void fillAudioOutBuffer(float deltaTime)
+void fillAudioBuffer(int length, float* buffer)
 {
     float pi = 3.1415927f;
     float frequency = 261.6f;
-    int samplesLength = 2410;
     float timestep = 1.0f/48000.0f;
-    uint8_t* samples = new uint8_t[samplesLength];
 
-    for(int i=0; i<samplesLength; ++i)
+    for(int i=0; i<length; ++i)
     {
         float sinVal = sinf(frequency*2*pi*currentTimef);
-        uint8_t sinByte = (uint8_t)((sinVal+1.0f)*127.0f);
-        samples[i] = sinByte;
+        buffer[i] = sinVal;
 
         currentTimef += timestep;
     }
-    readToAudioOutputBuffer(currentTime, samplesLength, samples);
-    currentTime += (uint32_t)lroundf(1000.0f*deltaTime);
-    delete samples;
 }
 
 ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
@@ -170,11 +163,13 @@ bool updateGame(GameState* game, float deltaTime)
             }
         }
 
+#if 0
         if(game->connected)
         {
             ENetPacket* packet = enet_packet_create(pixelValues, pixelBytes/2, ENET_PACKET_FLAG_UNSEQUENCED);
             enet_peer_send(game->netPeer, 0, packet);
         }
+#endif
 
         glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
@@ -213,11 +208,9 @@ void renderGame(GameState* game, float deltaTime)
         enableCamera(game, cameraEnabled);
     }
 
-    static bool audioCollapse = true;
     static int selectedRecordingDevice = 0;
     static int selectedPlaybackDevice = 0;
-    audioCollapse = ImGui::CollapsingHeader("Audio", 0, true, &audioCollapse);
-    if(audioCollapse)
+    if(ImGui::CollapsingHeader("Audio", 0, true, true))
     {
         bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
         if(micToggled)
@@ -245,7 +238,6 @@ void renderGame(GameState* game, float deltaTime)
             printf("Speaker Device Changed\n");
         }
         ImGui::Button("Play test sound", ImVec2(120, 20));
-
     }
 
     if(ImGui::Button("Host", ImVec2(60,20)))
@@ -264,7 +256,11 @@ void renderGame(GameState* game, float deltaTime)
     {
         printf("Connect\n");
         ENetAddress peerAddr = {};
+#if 0
         enet_address_set_host(&peerAddr, "localhost");
+#else
+        enet_address_set_host(&peerAddr, "139.59.166.106");
+#endif
         peerAddr.port = 12345;
 
         game->netHost = enet_host_create(0, 1, 2, 0,0);
@@ -274,19 +270,6 @@ void renderGame(GameState* game, float deltaTime)
             printf("Unable to create client\n");
         }
     }
-
-#if 0
-    char* ringPtr = soundio_ring_buffer_read_ptr(ringBuffer);
-    float plotVals[4800];
-    for(int i=0; i<4800; ++i)
-    {
-        uint8_t byteVal = (uint8_t)*ringPtr;
-        ++ringPtr;
-        plotVals[i] = (((float)byteVal) - 128.0f)/128.0f;
-    }
-    soundio_ring_buffer_advance_read_ptr(ringBuffer, 4800);
-    ImGui::PlotLines("", plotVals, 4800, 0, 0, -0.1f,0.1f, ImVec2(180.0f, 50.0f));
-#endif
 
     ImGui::End();
 }
@@ -360,6 +343,7 @@ int main(int argc, char* argv[])
         SDL_Quit();
         return 1;
     }
+    enableMicrophone(false);
 
     // Initialize enet
     if(enet_initialize() != 0)
@@ -379,7 +363,7 @@ int main(int argc, char* argv[])
     uint64_t nextTickTime = performanceCounter;
 
     uint32_t micBufferLen = 2410;
-    uint8_t* micBuffer = new uint8_t[micBufferLen];
+    float* micBuffer = new float[micBufferLen];
     GameState game = {};
     initGame(&game);
 
@@ -435,12 +419,21 @@ int main(int argc, char* argv[])
         // Send network output data
         if(game.micEnabled && game.connected)
         {
-            // TODO: This is dumb since we have to copy the data twice, once from the audio system into
-            //       micBuffer and once from micBuffer into the packet, whereas we could just copy it
-            //       directly into the packet
-            writeFromAudioInputBuffer(micBufferLen, micBuffer);
-            ENetPacket* outPacket = createPacket(NETDATA_TYPE_AUDIO, micBufferLen, micBuffer);
+#if 0
+            int audioFrames = micBufferLen;
+            fillAudioBuffer(micBufferLen, micBuffer);
+#else
+            int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
+#endif
+            int encodedBufferLength = micBufferLen;
+            uint8_t* encodedBuffer = new uint8_t[encodedBufferLength];
+            int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
+
+            printf("Send %d bytes of audio\n", audioBytes);
+            ENetPacket* outPacket = createPacket(NETDATA_TYPE_AUDIO, audioBytes, encodedBuffer);
             enet_peer_send(game.netPeer, 0, outPacket);
+
+            delete[] encodedBuffer;
         }
 
         // Handle network events
@@ -468,7 +461,9 @@ int main(int argc, char* argv[])
 
                     if(dataType == NETDATA_TYPE_AUDIO)
                     {
-                        readToAudioOutputBuffer(dataTime, dataLength, data);
+                        float* decodedAudio = new float[micBufferLen];
+                        int decodedFrames = decodePacket(dataLength, data, micBufferLen, decodedAudio);
+                        writeAudioOutputBuffer(decodedFrames, decodedAudio);
                     }
 
 #if 0
@@ -489,7 +484,11 @@ int main(int argc, char* argv[])
             }
         }
 
-        //fillAudioOutBuffer(deltaTime);
+#if 0
+        float sinBuffer[2410];
+        fillAudioBuffer(2410, sinBuffer);
+        writeAudioOutputBuffer(2410, sinBuffer);
+#endif
 
         // Update the audio
         updateGame(&game, deltaTime);

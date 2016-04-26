@@ -32,7 +32,12 @@ void setAudioOutputDevice(int newOutputDevice);
 
 void enableMicrophone(bool enabled);
 
-void readToAudioOutputBuffer(uint32_t timestamp, uint32_t length, uint8_t* data);
-void writeFromAudioInputBuffer(uint32_t bufferSize, uint8_t* buffer);
+int encodePacket(int sourceLength, float* sourceBuffer, int targetLength, uint8_t* targetBuffer);
+int decodePacket(int sourceLength, uint8_t* sourceBuffer, int targetLength, float* targetBuffer);
 
+// Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
+int readAudioInputBuffer(int bufferLength, float* buffer);
+int writeAudioOutputBuffer(int bufferLength, float* buffer);
+
+void writeAudioToFile(int length, uint8_t* data);
 #endif

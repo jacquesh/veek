@@ -11,7 +11,20 @@
 
 #include "vecmath.h"
 
+// TODO: Allow runtime switching of the recording/playback devices.
+//       are things that libsoundio provides as a layer on top?
+// TODO: The decoder states that we need to call decode with empty values for every lost packet
+//       We do actually keep track of time but we have yet to use that to check for packet loss
+//
+// TODO: It might be worthwhile using our own ring buffer (we need mutexes anyways, better
+//       information about how large of a block of data we can write at a time etc)
+//       Also I dunno if libsoundio uses atomics outside of the ringbuffer, if not we can remove that
+//       and then we can compile it ourselves? Seems weird, I dunno
+AudioData audioState = {};
+
 SoundIo* soundio;
+OpusEncoder* encoder;
+OpusDecoder* decoder;
 
 SoundIoDevice* inDevice;
 SoundIoInStream* inStream;
@@ -40,7 +53,10 @@ void printDevice(SoundIoDevice* device)
 
 void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
-    int framesRemaining = frameCountMin + (frameCountMax-frameCountMin)/2;
+    // TODO: Wut? If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
+    //       and get random values, should probably check the error and overflow callbacks
+    int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
+    //printf("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* inArea;
 
@@ -57,12 +73,12 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 
         for(int frame=0; frame<frameCount; ++frame)
         {
-            uint8_t val = *((uint8_t*)(inArea[0].ptr));
+            float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
-            uint8_t* writePtr = (uint8_t*)soundio_ring_buffer_write_ptr(inBuffer);
+            float* writePtr = (float*)soundio_ring_buffer_write_ptr(inBuffer);
             *writePtr = val;
-            soundio_ring_buffer_advance_write_ptr(inBuffer, 1);
+            soundio_ring_buffer_advance_write_ptr(inBuffer, sizeof(float));
             // TODO: Handle the layout (which we might force to be mono? see the initialization)
             /*
             for(int channel=0; channel<channelCount; ++channel)
@@ -79,12 +95,10 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 
 void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
-#if 0
-    printf("Write callback! %d - %d\n", frameCountMin, frameCountMax);
-#endif
     SDL_LockMutex(audioOutMutex);
-    int framesAvailable = soundio_ring_buffer_fill_count(outBuffer);
+    int framesAvailable = soundio_ring_buffer_fill_count(outBuffer)/sizeof(float);
     int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
+    //printf("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
 
@@ -98,32 +112,35 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             break;
         }
 
-        framesAvailable = soundio_ring_buffer_fill_count(outBuffer);
+        framesAvailable = soundio_ring_buffer_fill_count(outBuffer)/sizeof(float);
         if(framesAvailable > frameCount)
         {
             framesAvailable = frameCount; // NOTE: We need to ensure that we don't write too far
         }
         for(int frame=0; frame<framesAvailable; ++frame)
         {
-            uint8_t* readPtr = (uint8_t*)soundio_ring_buffer_read_ptr(outBuffer);
-            uint8_t val = *readPtr;
+            if(soundio_ring_buffer_fill_count(outBuffer) <= 0)
+            {
+                printf("Error - No data in the ringbuffer!\n");
+            }
+            float* readPtr = (float*)soundio_ring_buffer_read_ptr(outBuffer);
+            float val = *readPtr;
+            soundio_ring_buffer_advance_read_ptr(outBuffer, sizeof(float));
 
             for(int channel=0; channel<channelCount; ++channel)
             {
-                uint8_t* samplePtr = (uint8_t*)outArea[channel].ptr;
+                float* samplePtr = (float*)outArea[channel].ptr;
                 *samplePtr = val;
                 outArea[channel].ptr += outArea[channel].step;
             }
-            soundio_ring_buffer_advance_read_ptr(outBuffer, 1);
         }
 
         for(int frame=framesAvailable; frame<frameCount; ++frame)
         {
-            uint8_t silence = 128;
             for(int channel=0; channel<channelCount; ++channel)
             {
-                uint8_t* samplePtr = (uint8_t*)outArea[channel].ptr;
-                *samplePtr = silence;
+                float* samplePtr = (float*)outArea[channel].ptr;
+                *samplePtr = 0.0f;
                 outArea[channel].ptr += outArea[channel].step;
             }
         }
@@ -138,48 +155,150 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     SDL_UnlockMutex(audioOutMutex);
 }
 
-void readToAudioOutputBuffer(uint32_t timestamp, uint32_t length, uint8_t* data)
+void inOverflowCallback(SoundIoInStream* stream)
 {
-    SDL_LockMutex(audioOutMutex);
-    for(uint32_t i=0; i<length; ++i)
-    {
-        char* writePtr = soundio_ring_buffer_write_ptr(outBuffer);
-        soundio_ring_buffer_advance_write_ptr(outBuffer, 1);
-
-        uint8_t* buf = (uint8_t*)writePtr;
-        *buf = data[i];
-    }
-    SDL_UnlockMutex(audioOutMutex);
+    printf("Input underflow!\n");
 }
 
-void writeFromAudioInputBuffer(uint32_t bufferSize, uint8_t* buffer)
+void outUnderflowCallback(SoundIoOutStream* stream)
+{
+    printf("Output underflow!\n");
+}
+
+void inErrorCallback(SoundIoInStream* stream, int error)
+{
+    printf("Input error: %s\n", soundio_strerror(error));
+}
+
+void outErrorCallback(SoundIoOutStream* stream, int error)
+{
+    printf("Output error: %s\n", soundio_strerror(error));
+}
+
+int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
+                  int targetLength, float* targetBufferPtr)
+{
+    int frameSize = 240;
+    uint8_t* sourceBuffer = sourceBufferPtr;
+    float* targetBuffer = targetBufferPtr;
+    int sourceLengthRemaining = sourceLength;
+    int targetLengthRemaining = targetLength;
+
+    while((sourceLengthRemaining > sizeof(int)) && (targetLengthRemaining > frameSize))
+    {
+        int packetLength = *((int*)sourceBuffer); // TODO: Byte order checking/swapping
+
+        int correctErrors = 0; // TODO
+        int framesDecoded = opus_decode_float(decoder,
+                                              sourceBuffer+4, packetLength,
+                                              targetBuffer, targetLengthRemaining,
+                                              correctErrors);
+        if(framesDecoded < 0)
+        {
+            printf("Error decoding audio data. Error %d\n", framesDecoded);
+            break;
+        }
+
+        sourceLengthRemaining -= packetLength+4;
+        sourceBuffer += packetLength+4;
+        targetLengthRemaining -= framesDecoded;
+        targetBuffer += framesDecoded;
+    }
+
+    int framesWritten = targetLength - targetLengthRemaining;
+    return framesWritten;
+}
+
+int encodePacket(int sourceLength, float* sourceBufferPtr,
+                  int targetLength, uint8_t* targetBufferPtr)
+{
+    // TODO: Opus can only create packets from a given set of sample counts, we should probably
+    //       try support other packet sizes (is larger better? can it be dynamic? are we always
+    //       going to have a sample rate of 48k? etc)
+    int frameSize = 240;
+    float* sourceBuffer = sourceBufferPtr;
+    uint8_t* targetBuffer = targetBufferPtr;
+    int sourceLengthRemaining = sourceLength;
+    int targetLengthRemaining = targetLength;
+
+    // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
+    while((sourceLengthRemaining > frameSize) && (targetLengthRemaining > frameSize))
+    {
+        // TODO: Multiple channels, this currently assumes a single channel
+        int packetLength = opus_encode_float(encoder,
+                                             sourceBuffer, frameSize,
+                                             targetBuffer+4, targetLengthRemaining);
+        *((int*)targetBuffer) = packetLength; // TODO: Byte order checking/swapping
+        if(packetLength < 0)
+        {
+            printf("Error encoding audio. Error code %d\n", packetLength);
+            break;
+        }
+
+        sourceLengthRemaining -= frameSize;
+        sourceBuffer += frameSize;
+        targetLengthRemaining -= packetLength+4;
+        targetBuffer += packetLength+4;
+    }
+
+    int bytesWritten = targetLength - targetLengthRemaining;
+    return bytesWritten;
+}
+
+int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
+{
+    SDL_LockMutex(audioOutMutex);
+    // TODO: Consider the number of channels
+    int samplesToWrite = sourceBufferLength;
+    int ringBufferFreeSpace = soundio_ring_buffer_free_count(outBuffer)/sizeof(float);
+    if(samplesToWrite > ringBufferFreeSpace)
+    {
+        samplesToWrite = ringBufferFreeSpace;
+    }
+    //printf("Write %d samples\n", samplesToWrite);
+
+    for(int i=0; i<samplesToWrite; ++i)
+    {
+        float* writePtr = (float*)soundio_ring_buffer_write_ptr(outBuffer);
+        *writePtr = sourceBufferPtr[i];
+        soundio_ring_buffer_advance_write_ptr(outBuffer, sizeof(float));
+    }
+    SDL_UnlockMutex(audioOutMutex);
+
+    return samplesToWrite;
+}
+
+int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 {
     SDL_LockMutex(audioInMutex);
-    int inBufferSamplesAvailable = soundio_ring_buffer_fill_count(inBuffer);
-    int samplesFromBuffer = bufferSize;
-    if(inBufferSamplesAvailable < samplesFromBuffer)
-        samplesFromBuffer = inBufferSamplesAvailable;
+    // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
+    //       to be a single sample from a single channel, but its important to note that that is what
+    //       we're currently doing
+    // TODO: Should we return the number of samples written including or excluding the channel count?
+    int samplesToWrite = targetBufferLength;
+    int samplesAvailable = soundio_ring_buffer_fill_count(inBuffer)/sizeof(float);
+    if(samplesAvailable < samplesToWrite)
+        samplesToWrite = samplesAvailable;
 
-    // Fill the buffer as far as possible with samples from the microphone
-    for(int i=0; i<samplesFromBuffer; ++i)
+    for(int sample=0; sample<samplesToWrite; ++sample)
     {
-        char* readPtr = soundio_ring_buffer_read_ptr(inBuffer);
-        soundio_ring_buffer_advance_read_ptr(inBuffer, 1);
+        float* readPtr = (float*)soundio_ring_buffer_read_ptr(inBuffer);
+        float val = *readPtr;
+        soundio_ring_buffer_advance_read_ptr(inBuffer, sizeof(float));
 
-        uint8_t* buf = (uint8_t*)readPtr;
-        buffer[i] = *buf;
-    }
-
-    // Fill any remaining buffer space with silence
-    for(uint32_t i=samplesFromBuffer; i<bufferSize; ++i)
-    {
-        buffer[i] = 128;
+        targetBufferPtr[sample] = val;
     }
     SDL_UnlockMutex(audioInMutex);
+
+    return samplesToWrite;
 }
 
 void enableMicrophone(bool enabled)
 {
+    if(enabled)
+        printf("Mic on\n");
+    else
+        printf("Mic off\n");
     int error = soundio_instream_pause(inStream, !enabled);
     if(error)
     {
@@ -199,6 +318,8 @@ void setAudioInputDevice(int newInputDevice)
     inDevice = audioState.inputDeviceList[audioState.currentInputDevice];
     inStream = soundio_instream_create(inDevice);
     inStream->read_callback = inReadCallback;
+    inStream->overflow_callback = inOverflowCallback;
+    inStream->error_callback = inErrorCallback;
     inStream->sample_rate = 48000;
     inStream->format = SoundIoFormatFloat32NE;
     // TODO: Set all the other options, in particular can we force it to be mono?
@@ -228,6 +349,8 @@ void setAudioOutputDevice(int newOutputDevice)
     outDevice = audioState.outputDeviceList[audioState.currentOutputDevice];
     outStream = soundio_outstream_create(outDevice);
     outStream->write_callback = outWriteCallback;
+    outStream->underflow_callback = outUnderflowCallback;
+    outStream->error_callback = outErrorCallback;
     outStream->sample_rate = 48000;
     outStream->format = SoundIoFormatFloat32NE;
     // TODO: Set all the other options
@@ -260,6 +383,15 @@ bool initAudio()
     soundio_flush_events(soundio);
     // TODO: Check the supported input/output formats
     //       48000 Hz is probably VERY excessive
+
+    int opusError;
+    opus_int32 opusSampleRate = 48000;
+    int opusChannels = 1;
+    int opusApplication = OPUS_APPLICATION_VOIP;
+    encoder = opus_encoder_create(opusSampleRate, opusChannels, opusApplication, &opusError);
+    printf("Opus Error from encoder creation: %d\n", opusError);
+    decoder = opus_decoder_create(opusSampleRate, opusChannels, &opusError);
+    printf("Opus Error from decoder creation: %d\n", opusError);
 
     // Setup input
     int defaultInputDevice = soundio_default_input_device_index(soundio);
@@ -367,6 +499,9 @@ void deinitAudio()
     {
         soundio_device_unref(audioState.outputDeviceList[i]);
     }
+
+    opus_encoder_destroy(encoder);
+    opus_decoder_destroy(decoder);
 
     soundio_destroy(soundio);
 }
