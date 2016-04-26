@@ -1,5 +1,3 @@
-#include "string.h"
-
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_version.h>
@@ -208,6 +206,7 @@ void renderGame(GameState* game, float deltaTime)
         enableCamera(game, cameraEnabled);
     }
 
+    static bool listening = false;
     static int selectedRecordingDevice = 0;
     static int selectedPlaybackDevice = 0;
     if(ImGui::CollapsingHeader("Audio", 0, true, true))
@@ -227,7 +226,11 @@ void renderGame(GameState* game, float deltaTime)
             printf("Mic Device Changed\n");
             setAudioInputDevice(0);
         }
-        ImGui::Button("Listen", ImVec2(60, 20));
+        if(ImGui::Button("Listen", ImVec2(60, 20)))
+        {
+            listening = !listening;
+            listenToInput(listening);
+        }
 
         bool speakerChanged = ImGui::Combo("Playback Device",
                                            &selectedPlaybackDevice,
@@ -256,7 +259,7 @@ void renderGame(GameState* game, float deltaTime)
     {
         printf("Connect\n");
         ENetAddress peerAddr = {};
-#if 0
+#if 1
         enet_address_set_host(&peerAddr, "localhost");
 #else
         enet_address_set_host(&peerAddr, "139.59.166.106");

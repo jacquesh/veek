@@ -112,20 +112,23 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             break;
         }
 
-        framesAvailable = soundio_ring_buffer_fill_count(outBuffer)/sizeof(float);
-        if(framesAvailable > frameCount)
+        SoundIoRingBuffer* sourceBuffer = outBuffer;
+        if(audioState.isListeningToInput)
         {
-            framesAvailable = frameCount; // NOTE: We need to ensure that we don't write too far
+            sourceBuffer = inBuffer;
         }
+
+        framesAvailable = soundio_ring_buffer_fill_count(sourceBuffer)/sizeof(float);
+        framesAvailable = min(framesAvailable, frameCount);
         for(int frame=0; frame<framesAvailable; ++frame)
         {
-            if(soundio_ring_buffer_fill_count(outBuffer) <= 0)
+            if(soundio_ring_buffer_fill_count(sourceBuffer) <= 0)
             {
                 printf("Error - No data in the ringbuffer!\n");
             }
-            float* readPtr = (float*)soundio_ring_buffer_read_ptr(outBuffer);
+            float* readPtr = (float*)soundio_ring_buffer_read_ptr(sourceBuffer);
             float val = *readPtr;
-            soundio_ring_buffer_advance_read_ptr(outBuffer, sizeof(float));
+            soundio_ring_buffer_advance_read_ptr(sourceBuffer, sizeof(float));
 
             for(int channel=0; channel<channelCount; ++channel)
             {
@@ -173,6 +176,11 @@ void inErrorCallback(SoundIoInStream* stream, int error)
 void outErrorCallback(SoundIoOutStream* stream, int error)
 {
     printf("Output error: %s\n", soundio_strerror(error));
+}
+
+void listenToInput(bool listening)
+{
+    audioState.isListeningToInput = listening;
 }
 
 int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,

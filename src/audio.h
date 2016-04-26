@@ -20,9 +20,13 @@ struct AudioData
     int defaultOutputDevice;
     int currentOutputDevice;
     int outputEnabled;
+
+    bool isListeningToInput;
 };
 
-extern AudioData audioState;
+extern AudioData audioState; // TODO: We probably want to only have SOME of this be global
+                             //       E.g We probably don't need/want global access to the 
+                             //       enabled bools or the devices themselves etc
 
 bool initAudio();
 void deinitAudio();
@@ -30,6 +34,7 @@ void deinitAudio();
 void setAudioInputDevice(int newInputDevice);
 void setAudioOutputDevice(int newOutputDevice);
 
+void listenToInput(bool listen);
 void enableMicrophone(bool enabled);
 
 int encodePacket(int sourceLength, float* sourceBuffer, int targetLength, uint8_t* targetBuffer);
