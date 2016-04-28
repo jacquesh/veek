@@ -13,12 +13,12 @@ int main(int argc, char** argv)
     }
 
     int peerCount = 0;
-    ENetPeer* peers[MAX_CLIENTS] = {0};
+    ENetPeer* peers[NET_MAX_CLIENTS] = {0};
 
     ENetAddress addr = {};
     addr.host = ENET_HOST_ANY;
     addr.port = 12345;
-    ENetHost* netHost = enet_host_create(&addr, MAX_CLIENTS, 2, 0,0);
+    ENetHost* netHost = enet_host_create(&addr, NET_MAX_CLIENTS, 2, 0,0);
 
     bool running = true;
     while(running)
@@ -31,7 +31,7 @@ int main(int argc, char** argv)
                 case ENET_EVENT_TYPE_CONNECT:
                 {
                     int peerIndex = -1;
-                    for(int i=0; i<MAX_CLIENTS; ++i)
+                    for(int i=0; i<NET_MAX_CLIENTS; ++i)
                     {
                         if(!peers[i])
                         {
@@ -60,13 +60,15 @@ int main(int argc, char** argv)
                     ENetPacket* newPacket = enet_packet_create(netEvent.packet->data,
                                                                netEvent.packet->dataLength,
                                                                ENET_PACKET_FLAG_UNSEQUENCED);
-                    for(int i=0; i<MAX_CLIENTS; ++i)
+                    for(int i=0; i<NET_MAX_CLIENTS; ++i)
                     {
                         if(i == peerIndex)
                             continue;
+                        if(!peers[peerIndex])
+                            continue;
                         enet_peer_send(peers[peerIndex], 0, newPacket);
-                        enet_packet_destroy(netEvent.packet);
                     }
+                    enet_packet_destroy(netEvent.packet);
                 } break;
 
                 case ENET_EVENT_TYPE_DISCONNECT:

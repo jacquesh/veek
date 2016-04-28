@@ -130,24 +130,6 @@ void initGame(GameState* game)
 
 bool updateGame(GameState* game, float deltaTime)
 {
-    if(game->cameraEnabled && checkForNewVideoFrame())
-    {
-#if 0
-        if(game->connected)
-        {
-            ENetPacket* packet = enet_packet_create(pixelValues, pixelBytes/2, ENET_PACKET_FLAG_UNSEQUENCED);
-            enet_peer_send(game->netPeer, 0, packet);
-        }
-#endif
-
-        uint8_t* pixelValues = currentVideoFrame();
-        glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                     cameraWidth, cameraHeight, 0,
-                     GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-    }
 
     return true;
 }
@@ -166,7 +148,7 @@ void renderGame(GameState* game, float deltaTime)
     {
         if(!game->users[userIndex].connected)
             continue;
-        Vector2 position(cameraWidth + connectedUserIndex*userWidth, cameraPosition.y);
+        Vector2 position((float)(cameraWidth + connectedUserIndex*userWidth), cameraPosition.y);
         if((userIndex == 0) && (game->cameraEnabled))
         {
             renderTexture(game->cameraTexture, position, size, 1.0f);
@@ -401,19 +383,46 @@ int main(int argc, char* argv[])
             }
         }
 
-        // Send network output data
-        if(game.micEnabled && game.connected)
+        // Update the camera (uploading the new texture to the GPU if there is one)
+        if(game.cameraEnabled)
         {
-            int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
-            int encodedBufferLength = micBufferLen;
-            uint8_t* encodedBuffer = new uint8_t[encodedBufferLength];
-            int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
+            // TODO: If we can switch to using a callback for video (as with audio) then we can
+            //       remove our dependency on calling "checkForNewVideoFrame" and shift the network
+            //       stuff down into the "Send network output data" section
+            if(checkForNewVideoFrame())
+            {
+                uint8_t* pixelValues = currentVideoFrame();
+                glBindTexture(GL_TEXTURE_2D, game.cameraTexture);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                             cameraWidth, cameraHeight, 0,
+                             GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+                glBindTexture(GL_TEXTURE_2D, 0);
 
-            printf("Send %d bytes of audio\n", audioBytes);
-            ENetPacket* outPacket = createPacket(NET_MSGTYPE_AUDIO, audioBytes, encodedBuffer);
-            enet_peer_send(game.netPeer, 0, outPacket);
+                if(game.connected)
+                {
+                    int videoBytes = cameraWidth*cameraHeight*3;
+                    ENetPacket* packet = createPacket(NET_MSGTYPE_VIDEO, videoBytes, pixelValues);
+                    enet_peer_send(game.netPeer, 0, packet);
+                }
+            }
+        }
 
-            delete[] encodedBuffer;
+        // Send network output data
+        if(game.connected)
+        {
+            if(game.micEnabled)
+            {
+                int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
+                int encodedBufferLength = micBufferLen;
+                uint8_t* encodedBuffer = new uint8_t[encodedBufferLength];
+                int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
+
+                printf("Send %d bytes of audio\n", audioBytes);
+                ENetPacket* outPacket = createPacket(NET_MSGTYPE_AUDIO, audioBytes, encodedBuffer);
+                enet_peer_send(game.netPeer, 0, outPacket);
+
+                delete[] encodedBuffer;
+            }
         }
 
         // Handle network events
@@ -469,9 +478,6 @@ int main(int argc, char* argv[])
         fillAudioBuffer(2410, sinBuffer);
         writeAudioOutputBuffer(2410, sinBuffer);
 #endif
-
-        // Update the audio
-        updateGame(&game, deltaTime);
 
         // Rendering
         ImGui_ImplSdlGL3_NewFrame(window);

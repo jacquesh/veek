@@ -35,7 +35,7 @@ void enableCamera(bool enabled)
 
 bool checkForNewVideoFrame()
 {
-    bool result = isCaptureDone(cameraDevice);
+    bool result = (isCaptureDone(cameraDevice) == 1);
     if(result)
     {
         for(int y=0; y<cameraHeight; ++y)
