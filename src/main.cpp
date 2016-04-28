@@ -10,11 +10,11 @@
 #include "daala/codec.h"
 #include "daala/daalaenc.h"
 
-#include "escapi.h"
 #include "enet/enet.h"
 
 #include "vecmath.h"
 #include "audio.h"
+#include "video.h"
 #include "graphics.h"
 #include "graphicsutil.h"
 #include "network_common.h"
@@ -40,12 +40,14 @@ TODO: (In No particular order)
 // Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
 // ^ "An Introduction to Video Compression in C/C++", uses ffmpeg to codec things with SDL
 
+struct UserData
+{
+    bool connected;
+};
+
 struct GameState
 {
     GLuint cameraTexture;
-
-    int device;
-    SimpleCapParams capture;
 
     bool cameraEnabled;
     bool micEnabled;
@@ -53,26 +55,12 @@ struct GameState
     bool connected;
     ENetHost* netHost;
     ENetPeer* netPeer;
+
+    int connectedUserCount;
+    UserData users[NET_MAX_CLIENTS];
 };
 
-int cameraWidth = 320;
-int cameraHeight = 240;
-int pixelBytes = 0;
-uint8_t* pixelValues = 0;
-
-void enableCamera(GameState* game, bool enabled)
-{
-    game->cameraEnabled = enabled;
-    if(enabled)
-    {
-        initCapture(game->device, &game->capture);
-        doCapture(game->device);
-    }
-    else
-    {
-        deinitCapture(game->device);
-    }
-}
+GLuint pixelTexture;
 
 float currentTimef = 0.0f;
 void fillAudioBuffer(int length, float* buffer)
@@ -120,49 +108,30 @@ void initGame(GameState* game)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    pixelBytes = cameraWidth*cameraHeight*3;
-    pixelValues = new uint8_t[pixelBytes];
 
-    int deviceCount = setupESCAPI();
-    printf("%d video input devices available.\n", deviceCount);
-    if(deviceCount == 0)
-    {
-        printf("Unable to setup ESCAPI\n");
-        return;
-    }
+    unsigned char testImagePixel[] = {255, 255, 255};
+    glGenTextures(1, &pixelTexture);
+    glBindTexture(GL_TEXTURE_2D, pixelTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                 1, 1, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, &testImagePixel);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-    game->device = deviceCount-1; // Can be anything in the range [0, deviceCount)
-
-    game->capture.mWidth = cameraWidth;
-    game->capture.mHeight = cameraHeight;
-    game->capture.mTargetBuf = new int[cameraWidth*cameraHeight];
-
-    enableCamera(game, false);
+    game->users[0].connected = true;
+    game->users[1].connected = true;
+    game->users[2].connected = true;
 }
 
 bool updateGame(GameState* game, float deltaTime)
 {
-    if(game->cameraEnabled && isCaptureDone(game->device))
+    if(game->cameraEnabled && checkForNewVideoFrame())
     {
-        for(int y=0; y<cameraHeight; ++y)
-        {
-            for(int x=0; x<cameraWidth; ++x)
-            {
-                int targetBufferIndex = y*cameraWidth+ x;
-                int pixelVal = game->capture.mTargetBuf[targetBufferIndex];
-                uint8_t* pixel = (uint8_t*)&pixelVal;
-                uint8_t red   = pixel[0];
-                uint8_t green = pixel[1];
-                uint8_t blue  = pixel[2];
-                uint8_t alpha = pixel[3];
-
-                int pixelIndex = (cameraHeight-y)*cameraWidth+ x;
-                pixelValues[3*pixelIndex + 0] = blue;
-                pixelValues[3*pixelIndex + 1] = green;
-                pixelValues[3*pixelIndex + 2] = red;
-            }
-        }
-
 #if 0
         if(game->connected)
         {
@@ -171,13 +140,13 @@ bool updateGame(GameState* game, float deltaTime)
         }
 #endif
 
+        uint8_t* pixelValues = currentVideoFrame();
         glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                      cameraWidth, cameraHeight, 0,
                      GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        doCapture(game->device);
     }
 
     return true;
@@ -188,7 +157,27 @@ void renderGame(GameState* game, float deltaTime)
     Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
     Vector2 screenSize((float)screenWidth, (float)screenHeight);
     Vector2 cameraPosition = screenSize * 0.5f;
-    renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
+    //renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
+    //renderTexture(pixelTexture, cameraPosition, size, 1.0f);
+
+    int connectedUserIndex = 0;
+    int userWidth = cameraWidth+10;
+    for(int userIndex=0; userIndex<NET_MAX_CLIENTS; ++userIndex)
+    {
+        if(!game->users[userIndex].connected)
+            continue;
+        Vector2 position(cameraWidth + connectedUserIndex*userWidth, cameraPosition.y);
+        if((userIndex == 0) && (game->cameraEnabled))
+        {
+            renderTexture(game->cameraTexture, position, size, 1.0f);
+        }
+        else
+        {
+            renderTexture(pixelTexture, position, size, 1.0f);
+        }
+
+        connectedUserIndex += 1;
+    }
 
     ImVec2 windowLoc(0.0f, 0.0f);
     ImVec2 windowSize(300.0f, 400.f);
@@ -201,11 +190,10 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::SetWindowSize(windowSize);
 
     ImGui::Text("%.1fms", deltaTime*1000.0f);
-    bool cameraEnabled = game->cameraEnabled;
-    bool cameraToggled = ImGui::Checkbox("Camera Enabled", &cameraEnabled);
+    bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
     if(cameraToggled)
     {
-        enableCamera(game, cameraEnabled);
+        enableCamera(game->cameraEnabled);
     }
 
     static bool listening = false;
@@ -271,9 +259,6 @@ void renderGame(GameState* game, float deltaTime)
 
 void cleanupGame(GameState* game)
 {
-    enableCamera(game, false);
-    delete[] pixelValues;
-    delete[] game->capture.mTargetBuf;
 }
 
 
@@ -339,6 +324,14 @@ int main(int argc, char* argv[])
         return 1;
     }
     //enableMicrophone(false);
+
+    // Initialize escapi
+    if(!initVideo())
+    {
+        printf("Unable to initialize camera video subsystem\n");
+        SDL_Quit();
+        return 1;
+    }
 
     // Initialize enet
     if(enet_initialize() != 0)
@@ -509,6 +502,7 @@ int main(int argc, char* argv[])
 
     enet_deinitialize();
 
+    deinitVideo();
     deinitAudio();
     ImGui_ImplSdlGL3_Shutdown();
     deinitGraphics();
