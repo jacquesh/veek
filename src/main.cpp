@@ -7,9 +7,6 @@
 
 #include <GL/gl3w.h>
 
-#include "daala/codec.h"
-#include "daala/daalaenc.h"
-
 #include "enet/enet.h"
 
 #include "vecmath.h"
@@ -22,6 +19,11 @@
 /*
 TODO: (In No particular order)
 - Send peer data over the network (count, names, (dis)connect events etc)
+- Scale to more clients than just 2, IE allow each client to distinguish who each packet of
+    video/audio is coming from, highlight them when they're speaking, allow for rooms/channels etc
+- Check what happens when you join the server in the middle of a conversation/after a bunch of
+    data has been transfered, because the codecs are stateful so we might have to do some
+    shenanigans to make sure that it can handle that and setup the correct state to continue
 - Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
 - Add rendering of all connected peers (video feed, or a square/base image)
 - Add different voice-activation methods (continuous, threshold, push-to-talk)
@@ -30,6 +32,7 @@ TODO: (In No particular order)
 - Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
 - Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard)
 - Look into x265 (http://x265.org/) which can be freely used in projects licenses with GPL (v2?, read the FAQ)
+- Look into WebM (http://www.webmproject.org/code/) which is completely free (some dude on a forum claimed that daala is really slow compared to x265 and WebM)
 - Add server matching (IE you connect to a server, give a username and a channel-password to join, or ask for a channel name to be created, or whatever.)
 - Access camera image size properties (escapi resizes to whatever you ask for, which is bad, I don't want that, I want to resize it myself (or at least know what the original size was))
 - Try to shrink distributable down to a single exe (so statically link everything possible)
@@ -93,12 +96,6 @@ ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
 
 void initGame(GameState* game)
 {
-#if 0
-    daala_info vidInfo = {};
-    daala_enc_ctx* vidCtx = daala_encode_create(&vidInfo);
-    daala_encode_free(vidCtx);
-#endif
-
     glGenTextures(1, &game->cameraTexture);
     glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -126,12 +123,6 @@ void initGame(GameState* game)
     game->users[0].connected = true;
     game->users[1].connected = true;
     game->users[2].connected = true;
-}
-
-bool updateGame(GameState* game, float deltaTime)
-{
-
-    return true;
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -398,12 +389,14 @@ int main(int argc, char* argv[])
                              GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                 glBindTexture(GL_TEXTURE_2D, 0);
 
+#if 0
                 if(game.connected)
                 {
                     int videoBytes = cameraWidth*cameraHeight*3;
                     ENetPacket* packet = createPacket(NET_MSGTYPE_VIDEO, videoBytes, pixelValues);
                     enet_peer_send(game.netPeer, 0, packet);
                 }
+#endif
             }
         }
 

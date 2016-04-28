@@ -2,6 +2,9 @@
 #include <stdio.h>
 
 #include "escapi.h"
+#include "daala/codec.h"
+#include "daala/daalaenc.h"
+#include "daala/daaladec.h"
 
 int deviceCount;
 
@@ -68,23 +71,41 @@ uint8_t* currentVideoFrame()
 
 bool initVideo()
 {
+    pixelBytes = cameraWidth*cameraHeight*3;
+    pixelValues = new uint8_t[pixelBytes];
+
     deviceCount = setupESCAPI();
     printf("%d video input devices available.\n", deviceCount);
     if(deviceCount == 0)
     {
         return false;
     }
-
-    pixelBytes = cameraWidth*cameraHeight*3;
-    pixelValues = new uint8_t[pixelBytes];
-
     cameraDevice = deviceCount-1; // Can be anything in the range [0, deviceCount)
+    enableCamera(false);
 
     captureParams.mWidth = cameraWidth;
     captureParams.mHeight = cameraHeight;
     captureParams.mTargetBuf = new int[cameraWidth*cameraHeight];
 
-    enableCamera(false);
+#if 0
+    daala_log_init();
+    daala_info encoderInfo;
+    daala_info_init(&encoderInfo);
+    encoderInfo.pic_width = 320;
+    encoderInfo.pic_height = 240;
+    encoderInfo.bitdepth_mode = OD_BITDEPTH_MODE_8;
+    encoderInfo.timebase_numerator = ;
+    encoderInfo.timebase_denominator = ;
+    encoderInfo.frame_duration = ;
+    encoderInfo.aspect_numerator = ;
+    encoderInfo.aspect_denominator = ;
+    encoderInfo.full_precision_references = ;
+    encoderInfo.nplanes = ;
+    encoderInfo.keyframe_rate = ;
+
+    daala_enc_ctx* encoderContext = daala_encode_create(&encoderInfo);
+#endif
+
     return true;
 }
 
