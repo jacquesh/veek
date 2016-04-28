@@ -60,6 +60,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* inArea;
 
+    // TODO: Check the free space in inBuffer
     SDL_LockMutex(audioInMutex);
     while(framesRemaining > 0)
     {
@@ -150,10 +151,6 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
         soundio_outstream_end_write(stream);
         framesRemaining -= frameCount;
-
-#if 0
-        printf("Wrote %d frames from the buffer and %d frames of silence\n", framesAvailable, frameCount-framesAvailable);
-#endif
     }
     SDL_UnlockMutex(audioOutMutex);
 }

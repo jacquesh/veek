@@ -229,11 +229,12 @@ void renderGame(GameState* game, float deltaTime)
         if(micChanged)
         {
             printf("Mic Device Changed\n");
-            setAudioInputDevice(0);
+            setAudioInputDevice(selectedRecordingDevice);
         }
-        if(ImGui::Button("Listen", ImVec2(60, 20)))
+
+        bool listenChanged = ImGui::Checkbox("Listen", &listening);
+        if(listenChanged)
         {
-            listening = !listening;
             listenToInput(listening);
         }
 
@@ -245,6 +246,7 @@ void renderGame(GameState* game, float deltaTime)
         {
             printf("Speaker Device Changed\n");
         }
+
         ImGui::Button("Play test sound", ImVec2(120, 20));
     }
 
@@ -339,7 +341,7 @@ int main(int argc, char* argv[])
         SDL_Quit();
         return 1;
     }
-    enableMicrophone(false);
+    //enableMicrophone(false);
 
     // Initialize enet
     if(enet_initialize() != 0)
@@ -376,9 +378,6 @@ int main(int argc, char* argv[])
         performanceCounter = newPerfCount;
 
         float deltaTime = ((float)deltaPerfCount)/((float)performanceFreq);
-#if 0
-        printf("Our new frame is %d samples after our old one\n", (int)(deltaTime*48000));
-#endif
 
         // Handle input
         SDL_Event e;
@@ -415,12 +414,7 @@ int main(int argc, char* argv[])
         // Send network output data
         if(game.micEnabled && game.connected)
         {
-#if 0
-            int audioFrames = micBufferLen;
-            fillAudioBuffer(micBufferLen, micBuffer);
-#else
             int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
-#endif
             int encodedBufferLength = micBufferLen;
             uint8_t* encodedBuffer = new uint8_t[encodedBufferLength];
             int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
