@@ -17,6 +17,7 @@
 #include "audio.h"
 #include "graphics.h"
 #include "graphicsutil.h"
+#include "network_common.h"
 
 /*
 TODO: (In No particular order)
@@ -38,10 +39,6 @@ TODO: (In No particular order)
 
 // Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
 // ^ "An Introduction to Video Compression in C/C++", uses ffmpeg to codec things with SDL
-
-#define NETDATA_TYPE_AUDIO 0x01
-#define NETDATA_TYPE_VIDEO 0x02
-#define NETDATA_TYPE_META  0x04
 
 struct GameState
 {
@@ -98,7 +95,7 @@ ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
     ENetPacket* newPacket = enet_packet_create(0, 9+dataLength, ENET_PACKET_FLAG_UNSEQUENCED);
     uint32_t dataTime = 0; // TODO
 
-    newPacket->data[0] = NETDATA_TYPE_AUDIO;
+    newPacket->data[0] = NET_MSGTYPE_AUDIO;
     *((uint32_t*)(newPacket->data+1)) = htonl(dataTime);
     *((uint32_t*)(newPacket->data+5)) = htonl(dataLength);
     memcpy(newPacket->data+9, data, dataLength);
@@ -420,7 +417,7 @@ int main(int argc, char* argv[])
             int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
             printf("Send %d bytes of audio\n", audioBytes);
-            ENetPacket* outPacket = createPacket(NETDATA_TYPE_AUDIO, audioBytes, encodedBuffer);
+            ENetPacket* outPacket = createPacket(NET_MSGTYPE_AUDIO, audioBytes, encodedBuffer);
             enet_peer_send(game.netPeer, 0, outPacket);
 
             delete[] encodedBuffer;
@@ -449,7 +446,7 @@ int main(int argc, char* argv[])
                     uint32_t dataLength = ntohl(*((uint32_t*)(netEvent.packet->data+5)));
                     uint8_t* data = netEvent.packet->data+9;
 
-                    if(dataType == NETDATA_TYPE_AUDIO)
+                    if(dataType == NET_MSGTYPE_AUDIO)
                     {
                         float* decodedAudio = new float[micBufferLen];
                         int decodedFrames = decodePacket(dataLength, data, micBufferLen, decodedAudio);

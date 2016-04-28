@@ -2,7 +2,7 @@
 
 #include "enet/enet.h"
 
-#define MAX_CLIENTS 8
+#include "network_common.h"
 
 int main(int argc, char** argv)
 {
