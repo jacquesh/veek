@@ -83,7 +83,7 @@ ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
     ENetPacket* newPacket = enet_packet_create(0, 9+dataLength, ENET_PACKET_FLAG_UNSEQUENCED);
     uint32_t dataTime = 0; // TODO
 
-    newPacket->data[0] = NET_MSGTYPE_AUDIO;
+    newPacket->data[0] = packetType;
     *((uint32_t*)(newPacket->data+1)) = htonl(dataTime);
     *((uint32_t*)(newPacket->data+5)) = htonl(dataLength);
     memcpy(newPacket->data+9, data, dataLength);
@@ -442,8 +442,8 @@ int main(int argc, char* argv[])
 
                 case ENET_EVENT_TYPE_RECEIVE:
                 {
-                    printf("Received %llu bytes\n", netEvent.packet->dataLength);
                     uint8_t dataType = *netEvent.packet->data;
+                    printf("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
                     uint32_t dataTime = ntohl(*((uint32_t*)(netEvent.packet->data+1)));
                     uint32_t dataLength = ntohl(*((uint32_t*)(netEvent.packet->data+5)));
                     uint8_t* data = netEvent.packet->data+9;
