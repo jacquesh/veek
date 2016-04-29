@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <time.h>
+
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_version.h>
@@ -19,7 +22,6 @@
 /*
 TODO: (In No particular order)
 - Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
-- Send peer data over the network (count, names, (dis)connect events etc)
 - Scale to more clients than just 2, IE allow each client to distinguish who each packet of
     video/audio is coming from, highlight them when they're speaking etc
 - Check what happens when you join the server in the middle of a conversation/after a bunch of
@@ -38,18 +40,23 @@ TODO: (In No particular order)
 - Try to shrink distributable down to a single exe (so statically link everything possible)
 - Add screen-sharing support
 - Find some automated way to do builds that require modifying the build settings of dependencies
+- Stop trusting data that we receive over the network (IE might get malicious packets that make us read/write too far and corrupt memory, or allocate too much etc)
+- Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
 */
-
-// Video compression reading: http://www.forejune.co/vcompress/appendix.pdf
-// ^ "An Introduction to Video Compression in C/C++", uses ffmpeg to codec things with SDL
 
 struct UserData
 {
     bool connected;
+
+    int nameLength;
+    char* name;
 };
 
 struct GameState
 {
+    char* name;
+    uint8_t nameLength;
+
     GLuint cameraTexture;
 
     bool cameraEnabled;
@@ -83,19 +90,6 @@ void fillAudioBuffer(int length, float* buffer)
     }
 }
 
-ENetPacket* createPacket(uint8_t packetType, uint32_t dataLength, uint8_t* data)
-{
-    ENetPacket* newPacket = enet_packet_create(0, 9+dataLength, ENET_PACKET_FLAG_UNSEQUENCED);
-    uint32_t dataTime = 0; // TODO
-
-    newPacket->data[0] = packetType;
-    *((uint32_t*)(newPacket->data+1)) = htonl(dataTime);
-    *((uint32_t*)(newPacket->data+5)) = htonl(dataLength);
-    memcpy(newPacket->data+9, data, dataLength);
-
-    return newPacket;
-}
-
 void initGame(GameState* game)
 {
     glGenTextures(1, &game->cameraTexture);
@@ -122,9 +116,14 @@ void initGame(GameState* game)
                  GL_RGB, GL_UNSIGNED_BYTE, &testImagePixel);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    game->users[0].connected = true;
-    game->users[1].connected = true;
-    game->users[2].connected = true;
+    srand((uint32_t)time(0));
+    game->nameLength = 5;
+    game->name = new char[game->nameLength+1];
+    for(int i=0; i<game->nameLength; ++i)
+    {
+        game->name[i] = 'a' + (rand() % 26);
+    }
+    game->name[game->nameLength] = 0;
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -165,6 +164,7 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
+    ImGui::Text("You are: %s", game->name);
     ImGui::Text("%.1fms", deltaTime*1000.0f);
     bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
     if(cameraToggled)
@@ -211,22 +211,29 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Button("Play test sound", ImVec2(120, 20));
     }
 
-    if(ImGui::Button("Connect", ImVec2(60,20)))
+    if(game->connected)
     {
-        printf("Connect\n");
-        ENetAddress peerAddr = {};
-#if 1
-        enet_address_set_host(&peerAddr, "localhost");
-#else
-        enet_address_set_host(&peerAddr, "139.59.166.106");
-#endif
-        peerAddr.port = 12345;
-
-        game->netHost = enet_host_create(0, 1, 2, 0,0);
-        game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
-        if(!game->netHost)
+        ImGui::Text("Connected");
+    }
+    else
+    {
+        if(ImGui::Button("Connect", ImVec2(60,20)))
         {
-            printf("Unable to create client\n");
+            printf("Connect\n");
+            ENetAddress peerAddr = {};
+#if 1
+            enet_address_set_host(&peerAddr, "localhost");
+#else
+            enet_address_set_host(&peerAddr, "139.59.166.106");
+#endif
+            peerAddr.port = 12345;
+
+            game->netHost = enet_host_create(0, 1, 2, 0,0);
+            game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
+            if(!game->netHost)
+            {
+                printf("Unable to create client\n");
+            }
         }
     }
 
@@ -420,7 +427,10 @@ int main(int argc, char* argv[])
                 if(game.connected)
                 {
                     int videoBytes = cameraWidth*cameraHeight*3;
-                    ENetPacket* packet = createPacket(NET_MSGTYPE_VIDEO, videoBytes, pixelValues);
+                    ENetPacket* packet = enet_packet_create(0, videoBytes+1,
+                                                            ENET_PACKET_FLAG_UNSEQUENCED);
+                    *packet->data = NET_MSGTYPE_VIDEO;
+                    memcpy(packet->data+1, pixelValues, videoBytes);
                     enet_peer_send(game.netPeer, 0, packet);
                 }
 #endif
@@ -438,7 +448,10 @@ int main(int argc, char* argv[])
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
                 printf("Send %d bytes of audio\n", audioBytes);
-                ENetPacket* outPacket = createPacket(NET_MSGTYPE_AUDIO, audioBytes, encodedBuffer);
+                ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
+                                                           ENET_PACKET_FLAG_UNSEQUENCED);
+                outPacket->data[0] = NET_MSGTYPE_AUDIO;
+                memcpy(outPacket->data+1, encodedBuffer, audioBytes);
                 enet_peer_send(game.netPeer, 0, outPacket);
 
                 delete[] encodedBuffer;
@@ -454,35 +467,93 @@ int main(int argc, char* argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                 {
                     printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                    if(game.netPeer)
-                    {
-                        game.connected = true;
-                    }
+                    game.connected = true;
+
+                    uint32_t dataTime = 0; // TODO
+                    ENetPacket* initPacket = enet_packet_create(0, 2+game.nameLength,
+                                                                ENET_PACKET_FLAG_UNSEQUENCED);
+                    initPacket->data[0] = NET_MSGTYPE_INIT_DATA;
+                    *(initPacket->data+1) = game.nameLength;
+                    memcpy(initPacket->data+2, game.name, game.nameLength);
+                    enet_peer_send(game.netPeer, 0, initPacket);
                 } break;
 
                 case ENET_EVENT_TYPE_RECEIVE:
                 {
                     uint8_t dataType = *netEvent.packet->data;
+                    uint8_t* data = netEvent.packet->data+1;
+                    int dataLength = netEvent.packet->dataLength-1;
                     printf("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
-                    uint32_t dataTime = ntohl(*((uint32_t*)(netEvent.packet->data+1)));
-                    uint32_t dataLength = ntohl(*((uint32_t*)(netEvent.packet->data+5)));
-                    uint8_t* data = netEvent.packet->data+9;
 
-                    if(dataType == NET_MSGTYPE_AUDIO)
+                    switch(dataType)
                     {
-                        float* decodedAudio = new float[micBufferLen];
-                        int decodedFrames = decodePacket(dataLength, data, micBufferLen, decodedAudio);
-                        writeAudioOutputBuffer(decodedFrames, decodedAudio);
+                        // TODO: As mentioned elsewhere, we need to stop trusting network input
+                        //       In particular we should check that the clients being described
+                        //       are now overriding others (which will also cause it to leak
+                        //       the space allocated for the name)
+                        case NET_MSGTYPE_INIT_DATA:
+                        {
+                            uint8_t clientCount = *data;
+                            printf("There are %d connected clients\n", clientCount);
+                            data += 1;
+                            for(uint8_t i=0; i<clientCount; ++i)
+                            {
+                                uint8_t index = *data;
+                                uint8_t nameLength = *(data+1);
+                                char* name = new char[nameLength+1];
+                                memcpy(name, data+2, nameLength);
+                                name[nameLength] = 0;
+                                data += 2+nameLength;
+
+                                // TODO: What happens if a client disconnects as we connect and we
+                                //       only receive the init_data after the disconnect event?
+                                game.users[index].connected = true;
+                                game.users[index].nameLength = nameLength;
+                                game.users[index].name = name;
+                                printf("%s\n", name);
+                            }
+                        } break;
+                        case NET_MSGTYPE_CLIENT_CONNECT:
+                        {
+                            uint8_t index = *data;
+                            uint8_t nameLength = *(data+1);
+                            game.users[index].connected = true;
+                            game.users[index].nameLength = index;
+                            game.users[index].name = new char[nameLength+1];
+                            memcpy(game.users[index].name, data+2, nameLength);
+                            game.users[index].name[nameLength] = 0;
+                            printf("%s connected\n", game.users[index].name);
+                        } break;
+                        case NET_MSGTYPE_CLIENT_DISCONNECT:
+                        {
+                            uint8_t index = *data;
+                            printf("%s disconnected\n", game.users[index].name);
+                            delete[] game.users[index].name; // TODO: Again, network security
+                            game.users[index].connected = false;
+                            game.users[index].nameLength = 0;
+                            game.users[index].name = 0;
+                        } break;
+                        case NET_MSGTYPE_AUDIO:
+                        {
+                            float* decodedAudio = new float[micBufferLen];
+                            int decodedFrames = decodePacket(dataLength, data,
+                                                             micBufferLen, decodedAudio);
+                            writeAudioOutputBuffer(decodedFrames, decodedAudio);
+                        } break;
+                        case NET_MSGTYPE_VIDEO:
+                        {
+                            // TODO
+#if 0
+                            memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
+                            glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
+                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                                         cameraWidth, cameraHeight, 0,
+                                         GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+                            glBindTexture(GL_TEXTURE_2D, 0);
+#endif
+                        } break;
                     }
 
-#if 0
-                    memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
-                    glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                 cameraWidth, cameraHeight, 0,
-                                 GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-#endif
                     enet_packet_destroy(netEvent.packet);
                 } break;
 
