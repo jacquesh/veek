@@ -18,16 +18,16 @@
 
 /*
 TODO: (In No particular order)
+- Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
 - Send peer data over the network (count, names, (dis)connect events etc)
 - Scale to more clients than just 2, IE allow each client to distinguish who each packet of
-    video/audio is coming from, highlight them when they're speaking, allow for rooms/channels etc
+    video/audio is coming from, highlight them when they're speaking etc
 - Check what happens when you join the server in the middle of a conversation/after a bunch of
     data has been transfered, because the codecs are stateful so we might have to do some
     shenanigans to make sure that it can handle that and setup the correct state to continue
 - Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
 - Add rendering of all connected peers (video feed, or a square/base image)
 - Add different voice-activation methods (continuous, threshold, push-to-talk)
-- Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
 - Get rid of the libsoundio max-CPU
 - Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
 - Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard)
@@ -64,6 +64,8 @@ struct GameState
 };
 
 GLuint pixelTexture;
+uint32_t micBufferLen;
+float* micBuffer;
 
 float currentTimef = 0.0f;
 void fillAudioBuffer(int length, float* buffer)
@@ -152,6 +154,7 @@ void renderGame(GameState* game, float deltaTime)
         connectedUserIndex += 1;
     }
 
+    // Options window
     ImVec2 windowLoc(0.0f, 0.0f);
     ImVec2 windowSize(300.0f, 400.f);
     int UIFlags = ImGuiWindowFlags_NoMove |
@@ -226,6 +229,30 @@ void renderGame(GameState* game, float deltaTime)
             printf("Unable to create client\n");
         }
     }
+
+    ImGui::End();
+
+    // Stats window
+    windowLoc = ImVec2(20.0f, 440.0f);
+    windowSize = ImVec2(600.0f, 20.f);
+    UIFlags = ImGuiWindowFlags_NoMove |
+              ImGuiWindowFlags_NoResize |
+              ImGuiWindowFlags_NoTitleBar |
+              ImGuiWindowFlags_NoSavedSettings;
+    ImGui::Begin("Stats", 0, UIFlags);
+    ImGui::SetWindowPos(windowLoc);
+    ImGui::SetWindowSize(windowSize);
+    const char* textOverlay = 0;
+    ImVec2 sizeArg(-1, 0);
+
+    float rms = 0.0f;
+    for(uint32_t i=0; i<micBufferLen; ++i)
+    {
+        rms += micBuffer[i]*micBuffer[i];
+    }
+    rms /= micBufferLen;
+    rms = sqrtf(rms);
+    ImGui::ProgressBar(rms, sizeArg, textOverlay);
 
     ImGui::End();
 }
@@ -323,8 +350,8 @@ int main(int argc, char* argv[])
     uint64_t tickDuration = performanceFreq/tickRate;
     uint64_t nextTickTime = performanceCounter;
 
-    uint32_t micBufferLen = 2410;
-    float* micBuffer = new float[micBufferLen];
+    micBufferLen = 2410;
+    micBuffer = new float[micBufferLen];
     GameState game = {};
     initGame(&game);
 
