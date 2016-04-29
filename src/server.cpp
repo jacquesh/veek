@@ -60,13 +60,14 @@ int main(int argc, char** argv)
                     ENetPacket* newPacket = enet_packet_create(netEvent.packet->data,
                                                                netEvent.packet->dataLength,
                                                                ENET_PACKET_FLAG_UNSEQUENCED);
+                    // TODO: This is wrong, because it will probably destroy the packet after sending
                     for(int i=0; i<NET_MAX_CLIENTS; ++i)
                     {
                         if(i == peerIndex)
                             continue;
-                        if(!peers[peerIndex])
+                        if(!peers[i])
                             continue;
-                        enet_peer_send(peers[peerIndex], 0, newPacket);
+                        enet_peer_send(peers[i], 0, newPacket);
                     }
                     enet_packet_destroy(netEvent.packet);
                 } break;
