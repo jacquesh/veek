@@ -29,7 +29,7 @@ public:
     void advanceReadPointer(int increment);
 
     // Returns the number of items that are available for reading in the buffer
-    int available();
+    int count();
 
     // Returns the number of items that can be written without passing the read pointer
     int free();

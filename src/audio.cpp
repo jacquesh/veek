@@ -97,7 +97,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
     SDL_LockMutex(audioOutMutex);
-    int framesAvailable = outBuffer->available();
+    int framesAvailable = outBuffer->count();
     int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
     //printf("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
@@ -119,7 +119,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             sourceBuffer = inBuffer;
         }
 
-        framesAvailable = sourceBuffer->available();
+        framesAvailable = sourceBuffer->count();
         framesAvailable = min(framesAvailable, frameCount);
         for(int frame=0; frame<framesAvailable; ++frame)
         {
@@ -273,7 +273,7 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     //       we're currently doing
     // TODO: Should we return the number of samples written including or excluding the channel count?
     int samplesToWrite = targetBufferLength;
-    int samplesAvailable = inBuffer->available();
+    int samplesAvailable = inBuffer->count();
     if(samplesAvailable < samplesToWrite)
         samplesToWrite = samplesAvailable;
  

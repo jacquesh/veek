@@ -83,7 +83,7 @@ void RingBuffer::advanceReadPointer(int increment)
     readIndex = (readIndex+increment)%capacity;
 }
 
-int RingBuffer::available()
+int RingBuffer::count()
 {
     int result;
     if(writeIndex >= readIndex)
@@ -99,6 +99,6 @@ int RingBuffer::available()
 
 int RingBuffer::free()
 {
-    int result = capacity - available();
+    int result = capacity - count();
     return result;
 }
