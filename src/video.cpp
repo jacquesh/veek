@@ -6,6 +6,8 @@
 #include "daala/daalaenc.h"
 #include "daala/daaladec.h"
 
+// https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
+
 int deviceCount;
 
 bool cameraEnabled = false;
@@ -87,24 +89,38 @@ bool initVideo()
     captureParams.mHeight = cameraHeight;
     captureParams.mTargetBuf = new int[cameraWidth*cameraHeight];
 
-#if 0
     daala_log_init();
     daala_info encoderInfo;
     daala_info_init(&encoderInfo);
     encoderInfo.pic_width = 320;
     encoderInfo.pic_height = 240;
-    encoderInfo.bitdepth_mode = OD_BITDEPTH_MODE_8;
-    encoderInfo.timebase_numerator = ;
-    encoderInfo.timebase_denominator = ;
-    encoderInfo.frame_duration = ;
-    encoderInfo.aspect_numerator = ;
-    encoderInfo.aspect_denominator = ;
-    encoderInfo.full_precision_references = ;
-    encoderInfo.nplanes = ;
-    encoderInfo.keyframe_rate = ;
+    //encoderInfo.bitdepth_mode = OD_BITDEPTH_MODE_8; // NOTE: This is set by info_init
+    encoderInfo.timebase_numerator = 20; // 20fps
+    encoderInfo.timebase_denominator = 0;
+    encoderInfo.frame_duration = 1;
+    encoderInfo.pixel_aspect_numerator = 4;
+    encoderInfo.pixel_aspect_denominator = 3;
+    encoderInfo.full_precision_references = 0;
+    encoderInfo.nplanes = 3;
+    encoderInfo.plane_info[0].xdec = 0;
+    encoderInfo.plane_info[0].ydec = 0;
+    encoderInfo.plane_info[1].xdec = 1;
+    encoderInfo.plane_info[1].ydec = 1;
+    encoderInfo.plane_info[2].xdec = 1;
+    encoderInfo.plane_info[2].ydec = 1;
+    encoderInfo.plane_info[3].xdec = 0;
+    encoderInfo.plane_info[3].ydec = 0;
+    encoderInfo.keyframe_rate = 256;
 
     daala_enc_ctx* encoderContext = daala_encode_create(&encoderInfo);
-#endif
+    daala_comment comment;
+    daala_comment_init(&comment);
+    daala_packet packet;
+
+    while(daala_encode_flush_header(encoderContext, &comment, &packet) > 0)
+    {
+        //daala_comment_clear(&comment);
+    }
 
     return true;
 }
