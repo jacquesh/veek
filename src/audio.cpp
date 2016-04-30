@@ -10,6 +10,7 @@
 #include "opus/opus.h"
 
 #include "vecmath.h"
+#include "ringbuffer.h"
 
 // TODO: Allow runtime switching of the recording/playback devices.
 //       are things that libsoundio provides as a layer on top?
@@ -28,12 +29,12 @@ OpusDecoder* decoder;
 
 SoundIoDevice* inDevice;
 SoundIoInStream* inStream;
-SoundIoRingBuffer* inBuffer;
+RingBuffer* inBuffer;
 SDL_mutex* audioInMutex;
 
 SoundIoDevice* outDevice;
 SoundIoOutStream* outStream;
-SoundIoRingBuffer* outBuffer;
+RingBuffer* outBuffer;
 SDL_mutex* audioOutMutex;
 
 void printDevice(SoundIoDevice* device)
@@ -77,9 +78,8 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
-            float* writePtr = (float*)soundio_ring_buffer_write_ptr(inBuffer);
-            *writePtr = val;
-            soundio_ring_buffer_advance_write_ptr(inBuffer, sizeof(float));
+            inBuffer->write(val);
+            inBuffer->advanceWritePointer(1);
             // TODO: Handle the layout (which we might force to be mono? see the initialization)
             /*
             for(int channel=0; channel<channelCount; ++channel)
@@ -97,7 +97,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
     SDL_LockMutex(audioOutMutex);
-    int framesAvailable = soundio_ring_buffer_fill_count(outBuffer)/sizeof(float);
+    int framesAvailable = outBuffer->available();
     int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
     //printf("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
@@ -113,23 +113,18 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             break;
         }
 
-        SoundIoRingBuffer* sourceBuffer = outBuffer;
+        RingBuffer* sourceBuffer = outBuffer;
         if(audioState.isListeningToInput)
         {
             sourceBuffer = inBuffer;
         }
 
-        framesAvailable = soundio_ring_buffer_fill_count(sourceBuffer)/sizeof(float);
+        framesAvailable = sourceBuffer->available();
         framesAvailable = min(framesAvailable, frameCount);
         for(int frame=0; frame<framesAvailable; ++frame)
         {
-            if(soundio_ring_buffer_fill_count(sourceBuffer) <= 0)
-            {
-                printf("Error - No data in the ringbuffer!\n");
-            }
-            float* readPtr = (float*)soundio_ring_buffer_read_ptr(sourceBuffer);
-            float val = *readPtr;
-            soundio_ring_buffer_advance_read_ptr(sourceBuffer, sizeof(float));
+            float val = sourceBuffer->read();
+            sourceBuffer->advanceReadPointer(1);
 
             for(int channel=0; channel<channelCount; ++channel)
             {
@@ -255,19 +250,16 @@ int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
     SDL_LockMutex(audioOutMutex);
     // TODO: Consider the number of channels
     int samplesToWrite = sourceBufferLength;
-    int ringBufferFreeSpace = soundio_ring_buffer_free_count(outBuffer)/sizeof(float);
+    int ringBufferFreeSpace = outBuffer->free();
     if(samplesToWrite > ringBufferFreeSpace)
     {
         samplesToWrite = ringBufferFreeSpace;
     }
     //printf("Write %d samples\n", samplesToWrite);
 
-    for(int i=0; i<samplesToWrite; ++i)
-    {
-        float* writePtr = (float*)soundio_ring_buffer_write_ptr(outBuffer);
-        *writePtr = sourceBufferPtr[i];
-        soundio_ring_buffer_advance_write_ptr(outBuffer, sizeof(float));
-    }
+    outBuffer->write(samplesToWrite, sourceBufferPtr);
+    outBuffer->advanceWritePointer(samplesToWrite);
+
     SDL_UnlockMutex(audioOutMutex);
 
     return samplesToWrite;
@@ -281,18 +273,13 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     //       we're currently doing
     // TODO: Should we return the number of samples written including or excluding the channel count?
     int samplesToWrite = targetBufferLength;
-    int samplesAvailable = soundio_ring_buffer_fill_count(inBuffer)/sizeof(float);
+    int samplesAvailable = inBuffer->available();
     if(samplesAvailable < samplesToWrite)
         samplesToWrite = samplesAvailable;
+ 
+    inBuffer->read(samplesToWrite, targetBufferPtr);
+    inBuffer->advanceReadPointer(samplesToWrite);
 
-    for(int sample=0; sample<samplesToWrite; ++sample)
-    {
-        float* readPtr = (float*)soundio_ring_buffer_read_ptr(inBuffer);
-        float val = *readPtr;
-        soundio_ring_buffer_advance_read_ptr(inBuffer, sizeof(float));
-
-        targetBufferPtr[sample] = val;
-    }
     SDL_UnlockMutex(audioInMutex);
 
     return samplesToWrite;
@@ -374,6 +361,29 @@ void setAudioOutputDevice(int newOutputDevice)
 
 bool initAudio()
 {
+    RingBuffer* rbuf = new RingBuffer(10);
+    for(int i=0; i<2; ++i)
+    {
+        rbuf->write((float)i);
+        rbuf->advanceWritePointer(1);
+    }
+    float valsLeft[] = {3.14f, 4.21f, 5.12f};
+    rbuf->write(3, valsLeft);
+    rbuf->advanceWritePointer(3);
+
+    for(int i=0; i<3; ++i)
+    {
+        printf("%.2f\n", rbuf->read());
+        rbuf->advanceReadPointer(1);
+    }
+
+    rbuf->write(11.11f);
+    rbuf->advanceWritePointer(1);
+    float outVals[3];
+    rbuf->read(3, outVals);
+    rbuf->advanceReadPointer(3);
+
+
     // Initialize SoundIO
     soundio = soundio_create();
     if(!soundio)
@@ -436,7 +446,7 @@ bool initAudio()
             soundio_device_unref(device);
         }
     }
-    inBuffer = soundio_ring_buffer_create(soundio, 48000*sizeof(float));
+    inBuffer = new RingBuffer(48000);
     audioInMutex = SDL_CreateMutex();
 
     // Setup output
@@ -475,7 +485,7 @@ bool initAudio()
             soundio_device_unref(device);
         }
     }
-    outBuffer = soundio_ring_buffer_create(soundio, 48000*sizeof(float));
+    outBuffer = new RingBuffer(48000);
     audioOutMutex = SDL_CreateMutex();
 
     setAudioInputDevice(audioState.defaultInputDevice);
@@ -490,7 +500,7 @@ void deinitAudio()
 
     soundio_instream_pause(inStream, true);
     soundio_instream_destroy(inStream);
-    soundio_ring_buffer_destroy(inBuffer);
+    delete inBuffer;
     SDL_DestroyMutex(audioInMutex);
     for(int i=0; i<audioState.inputDeviceCount; ++i)
     {
@@ -499,7 +509,7 @@ void deinitAudio()
 
     soundio_outstream_pause(outStream, true);
     soundio_outstream_destroy(outStream);
-    soundio_ring_buffer_destroy(outBuffer);
+    delete outBuffer;
     SDL_DestroyMutex(audioOutMutex);
     for(int i=0; i<audioState.outputDeviceCount; ++i)
     {

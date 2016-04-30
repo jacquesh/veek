@@ -31,6 +31,9 @@ public:
     // Returns the number of items that are available for reading in the buffer
     int available();
 
+    // Returns the number of items that can be written without passing the read pointer
+    int free();
+
 private:
     int capacity;
     float* buffer;

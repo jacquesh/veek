@@ -1,5 +1,7 @@
 #include "ringbuffer.h"
 
+#include <assert.h>
+
 RingBuffer::RingBuffer(int size)
     : capacity(size)
 {
@@ -16,17 +18,17 @@ RingBuffer::~RingBuffer()
 void RingBuffer::write(float val)
 {
     buffer[writeIndex] = val;
-    writeIndex = (writeIndex+1)%capacity;
 }
 
 void RingBuffer::write(int valCount, float* vals)
 {
+    assert(free() >= valCount);
+
     int contiguousFreeSpace = capacity - writeIndex;
     if(contiguousFreeSpace > valCount)
     {
         for(int i=0; i<valCount; ++i)
             buffer[writeIndex+i] = vals[i];
-        writeIndex += valCount;
     }
     else
     {
@@ -36,13 +38,12 @@ void RingBuffer::write(int valCount, float* vals)
         int wrappedValCount = valCount - contiguousFreeSpace;
         for(int i=0; i<wrappedValCount; ++i)
             buffer[i] = vals[contiguousFreeSpace+i];
-
-        writeIndex = wrappedValCount;
     }
 }
 
 void RingBuffer::advanceWritePointer(int increment)
 {
+    assert(increment <= capacity);
     writeIndex = (writeIndex+increment)%capacity;
 }
 
@@ -93,5 +94,11 @@ int RingBuffer::available()
     {
         result = (capacity - readIndex) + writeIndex;
     }
+    return result;
+}
+
+int RingBuffer::free()
+{
+    int result = capacity - available();
     return result;
 }
