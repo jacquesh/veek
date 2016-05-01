@@ -128,6 +128,8 @@ void initGame(GameState* game)
 
 void renderGame(GameState* game, float deltaTime)
 {
+    glClear(GL_COLOR_BUFFER_BIT);
+
     Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
     Vector2 screenSize((float)screenWidth, (float)screenHeight);
     Vector2 cameraPosition = screenSize * 0.5f;
