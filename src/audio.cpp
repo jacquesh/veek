@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <assert.h>
 
 #include "SDL_mutex.h"
 
@@ -59,6 +60,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
     //printf("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
+    assert(channelCount == 1); // NOTE: We assume all audio input is MONO, which should always we the case if we didn't get an error during initialization since we specifically ask for MONO
     SoundIoChannelArea* inArea;
 
     // TODO: Check the free space in inBuffer
@@ -75,17 +77,12 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 
         for(int frame=0; frame<frameCount; ++frame)
         {
+            // NOTE: We assume here that our input stream is MONO, see start of this function
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
             inBuffer->write(val);
             inBuffer->advanceWritePointer(1);
-            // TODO: Handle the layout (which we might force to be mono? see the initialization)
-            /*
-            for(int channel=0; channel<channelCount; ++channel)
-            {
-            }
-            */
         }
 
         soundio_instream_end_read(stream);
@@ -305,6 +302,7 @@ void setAudioInputDevice(int newInputDevice)
     {
         soundio_instream_destroy(inStream);
     }
+    const SoundIoChannelLayout* monoLayout = soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdMono);
 
     audioState.currentInputDevice = newInputDevice;
     inDevice = audioState.inputDeviceList[audioState.currentInputDevice];
@@ -314,6 +312,7 @@ void setAudioInputDevice(int newInputDevice)
     inStream->error_callback = inErrorCallback;
     inStream->sample_rate = 48000;
     inStream->format = SoundIoFormatFloat32NE;
+    inStream->layout = *monoLayout;
     // TODO: Set all the other options, in particular can we force it to be mono?
     //       Surely we never get more than mono data from a single microphone by definition?
 
