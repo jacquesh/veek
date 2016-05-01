@@ -184,7 +184,7 @@ int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
     int sourceLengthRemaining = sourceLength;
     int targetLengthRemaining = targetLength;
 
-    while((sourceLengthRemaining > sizeof(int)) && (targetLengthRemaining > frameSize))
+    while((sourceLengthRemaining >= sizeof(int)) && (targetLengthRemaining >= frameSize))
     {
         int packetLength = *((int*)sourceBuffer); // TODO: Byte order checking/swapping
 
@@ -222,7 +222,7 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
     int targetLengthRemaining = targetLength;
 
     // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
-    while((sourceLengthRemaining > frameSize) && (targetLengthRemaining > frameSize))
+    while((sourceLengthRemaining >= frameSize) && (targetLengthRemaining >= frameSize))
     {
         // TODO: Multiple channels, this currently assumes a single channel
         int packetLength = opus_encode_float(encoder,
