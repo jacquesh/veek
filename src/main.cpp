@@ -26,7 +26,6 @@ TODO: (In No particular order)
 - Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
 - Add rendering of all connected peers (video feed, or a square/base image)
 - Add different voice-activation methods (continuous, threshold, push-to-talk)
-- Get rid of the libsoundio max-CPU
 - Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
 
 - Scale to more clients than just 2, IE allow each client to distinguish who each packet of video/audio is coming from, highlight them when they're speaking etc

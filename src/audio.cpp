@@ -313,8 +313,7 @@ void setAudioInputDevice(int newInputDevice)
     inStream->sample_rate = 48000;
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = *monoLayout;
-    // TODO: Set all the other options, in particular can we force it to be mono?
-    //       Surely we never get more than mono data from a single microphone by definition?
+    inStream->software_latency = 0.005f; // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
 
     int openError = soundio_instream_open(inStream);
     if(openError != SoundIoErrorNone)
