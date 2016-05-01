@@ -14,14 +14,8 @@
 #include "ringbuffer.h"
 
 // TODO: Allow runtime switching of the recording/playback devices.
-//       are things that libsoundio provides as a layer on top?
 // TODO: The decoder states that we need to call decode with empty values for every lost packet
 //       We do actually keep track of time but we have yet to use that to check for packet loss
-//
-// TODO: It might be worthwhile using our own ring buffer (we need mutexes anyways, better
-//       information about how large of a block of data we can write at a time etc)
-//       Also I dunno if libsoundio uses atomics outside of the ringbuffer, if not we can remove that
-//       and then we can compile it ourselves? Seems weird, I dunno
 AudioData audioState = {};
 
 SoundIo* soundio;
