@@ -44,6 +44,9 @@ TODO: (In No particular order)
 - Try to shrink distributable down to a single exe (so statically link everything possible)
 */
 
+
+const char* SERVER_HOST = "localhost";
+
 struct UserData
 {
     bool connected;
@@ -62,7 +65,7 @@ struct GameState
     bool cameraEnabled;
     bool micEnabled;
 
-    bool connected;
+    NetConnectionState connState;
     ENetHost* netHost;
     ENetPeer* netPeer;
 
@@ -92,6 +95,7 @@ void fillAudioBuffer(int length, float* buffer)
 
 void initGame(GameState* game)
 {
+    game->connState = NET_CONNSTATE_DISCONNECTED;
     glGenTextures(1, &game->cameraTexture);
     glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -213,32 +217,41 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Button("Play test sound", ImVec2(120, 20));
     }
 
-    if(game->connected)
+    switch(game->connState)
     {
-        ImGui::Text("Connected");
-    }
-    else
-    {
-        if(ImGui::Button("Connect", ImVec2(60,20)))
+        case NET_CONNSTATE_DISCONNECTED:
         {
-            printf("Connect\n");
-            ENetAddress peerAddr = {};
-#if 1
-            enet_address_set_host(&peerAddr, "localhost");
-#else
-            enet_address_set_host(&peerAddr, "139.59.166.106");
-#endif
-            peerAddr.port = 12345;
-
-            game->netHost = enet_host_create(0, 1, 2, 0,0);
-            game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
-            if(!game->netHost)
+            if(ImGui::Button("Connect", ImVec2(60,20)))
             {
-                printf("Unable to create client\n");
-            }
-        }
-    }
+                game->connState = NET_CONNSTATE_CONNECTING;
+                ENetAddress peerAddr = {};
+                enet_address_set_host(&peerAddr, SERVER_HOST);
+                peerAddr.port = NET_PORT;
 
+                game->netHost = enet_host_create(0, 1, 2, 0,0);
+                game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
+                if(!game->netHost)
+                {
+                    printf("Unable to create client\n");
+                }
+            }
+        } break;
+
+        case NET_CONNSTATE_CONNECTING:
+        {
+            ImGui::Text("Connecting...");
+        } break;
+
+        case NET_CONNSTATE_CONNECTED:
+        {
+            if(ImGui::Button("Disconnect", ImVec2(80,20)))
+            {
+                game->connState = NET_CONNSTATE_DISCONNECTED;
+                enet_peer_disconnect_now(game->netPeer, 0);
+                game->netPeer = 0;
+            }
+        } break;
+    }
     ImGui::End();
 
     // Stats window
@@ -440,7 +453,7 @@ int main(int argc, char* argv[])
         }
 
         // Send network output data
-        if(game.connected)
+        if(game.connState == NET_CONNSTATE_CONNECTED)
         {
             if(game.micEnabled)
             {
@@ -469,7 +482,7 @@ int main(int argc, char* argv[])
                 case ENET_EVENT_TYPE_CONNECT:
                 {
                     printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                    game.connected = true;
+                    game.connState = NET_CONNSTATE_CONNECTED;
 
                     uint32_t dataTime = 0; // TODO
                     ENetPacket* initPacket = enet_packet_create(0, 2+game.nameLength,

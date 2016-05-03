@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 
     ENetAddress addr = {};
     addr.host = ENET_HOST_ANY;
-    addr.port = 12345;
+    addr.port = NET_PORT;
     ENetHost* netHost = enet_host_create(&addr, NET_MAX_CLIENTS, 2, 0,0);
 
     bool running = true;
