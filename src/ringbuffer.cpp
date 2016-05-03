@@ -24,13 +24,13 @@ RingBuffer::~RingBuffer()
     delete[] buffer;
 }
 
-void RingBuffer::write(float val)
-{
-    buffer[writeIndex] = val;
-}
-
 void RingBuffer::write(int valCount, float* vals)
 {
+    int readOverflow = free() - valCount;
+    if(readOverflow < 0)
+    {
+        advanceReadPointer(-readOverflow);
+    }
     assert(free() >= valCount);
 
     int contiguousFreeSpace = capacity - writeIndex;
@@ -55,12 +55,6 @@ void RingBuffer::advanceWritePointer(int increment)
     assert(increment <= capacity);
     writeIndex = (writeIndex+increment)%capacity;
     _count += increment;
-}
-
-float RingBuffer::read()
-{
-    float val = buffer[readIndex];
-    return val;
 }
 
 void RingBuffer::read(int valCount, float* vals)

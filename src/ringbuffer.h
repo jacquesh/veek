@@ -11,15 +11,8 @@ public:
     RingBuffer(int size);
     ~RingBuffer();
 
-    // Write a single value into the buffer
-    void write(float val);
-
     // Write an array of values into the buffer
     void write(int valCount, float* vals);
-
-
-    // Read a single value out of the buffer
-    float read();
 
     // Read an array of values out of the buffer, writing them into the given vals array
     void read(int valCount, float* vals);
