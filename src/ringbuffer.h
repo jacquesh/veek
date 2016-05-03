@@ -36,6 +36,7 @@ public:
 
 private:
     int capacity;
+    int _count;
     float* buffer;
 
     int readIndex;
