@@ -49,12 +49,15 @@ void printDevice(SoundIoDevice* device)
 
 void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
-    // TODO: Wut? If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
+    // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
+    //       get an error during initialization since we specifically ask for MONO
+    int channelCount = stream->layout.channel_count;
+    assert(channelCount == 1);
+
+    // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
     //printf("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
-    int channelCount = stream->layout.channel_count;
-    assert(channelCount == 1); // NOTE: We assume all audio input is MONO, which should always we the case if we didn't get an error during initialization since we specifically ask for MONO
     SoundIoChannelArea* inArea;
 
     // TODO: Check the free space in inBuffer
@@ -71,7 +74,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 
         for(int frame=0; frame<frameCount; ++frame)
         {
-            // NOTE: We assume here that our input stream is MONO, see start of this function
+            // NOTE: We assume here that our input stream is MONO, see assertions above
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
@@ -262,7 +265,6 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
     //       to be a single sample from a single channel, but its important to note that that is what
     //       we're currently doing
-    // TODO: Should we return the number of samples written including or excluding the channel count?
     int samplesToWrite = targetBufferLength;
     int samplesAvailable = inBuffer->count();
     if(samplesAvailable < samplesToWrite)
