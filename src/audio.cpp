@@ -353,29 +353,6 @@ void setAudioOutputDevice(int newOutputDevice)
 
 bool initAudio()
 {
-    RingBuffer* rbuf = new RingBuffer(10);
-    for(int i=0; i<2; ++i)
-    {
-        rbuf->write((float)i);
-        rbuf->advanceWritePointer(1);
-    }
-    float valsLeft[] = {3.14f, 4.21f, 5.12f};
-    rbuf->write(3, valsLeft);
-    rbuf->advanceWritePointer(3);
-
-    for(int i=0; i<3; ++i)
-    {
-        printf("%.2f\n", rbuf->read());
-        rbuf->advanceReadPointer(1);
-    }
-
-    rbuf->write(11.11f);
-    rbuf->advanceWritePointer(1);
-    float outVals[3];
-    rbuf->read(3, outVals);
-    rbuf->advanceReadPointer(3);
-
-
     // Initialize SoundIO
     soundio = soundio_create();
     if(!soundio)
