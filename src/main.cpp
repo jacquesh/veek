@@ -93,9 +93,38 @@ void fillAudioBuffer(int length, float* buffer)
     }
 }
 
+void readSettings(GameState* game, const char* fileName)
+{
+    if(game->name)
+    {
+        delete[] game->name;
+    }
+
+    FILE* settingsFile = fopen(fileName, "r");
+    if(settingsFile)
+    {
+        char settingsBuffer[256];
+        size_t nameLength = fread(settingsBuffer, 1, 256, settingsFile);
+        game->nameLength = nameLength;
+        game->name = new char[nameLength+1];
+        memcpy(game->name, settingsBuffer, nameLength);
+        game->name[game->nameLength] = 0;
+    }
+    else
+    {
+        game->nameLength = 11;
+        game->name = new char[game->nameLength+1];
+        const char* defaultName = "UnnamedUser";
+        memcpy(game->name, defaultName, game->nameLength);
+        game->name[game->nameLength] = 0;
+    }
+}
+
 void initGame(GameState* game)
 {
     game->connState = NET_CONNSTATE_DISCONNECTED;
+    game->micEnabled = true;
+
     glGenTextures(1, &game->cameraTexture);
     glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -120,14 +149,7 @@ void initGame(GameState* game)
                  GL_RGB, GL_UNSIGNED_BYTE, &testImagePixel);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    srand((uint32_t)time(0));
-    game->nameLength = 5;
-    game->name = new char[game->nameLength+1];
-    for(int i=0; i<game->nameLength; ++i)
-    {
-        game->name[i] = 'a' + (rand() % 26);
-    }
-    game->name[game->nameLength] = 0;
+    readSettings(game, "settings");
 }
 
 void renderGame(GameState* game, float deltaTime)
