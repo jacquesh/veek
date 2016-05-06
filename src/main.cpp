@@ -12,6 +12,7 @@
 
 #include "enet/enet.h"
 
+#include "common.h"
 #include "vecmath.h"
 #include "audio.h"
 #include "video.h"
@@ -44,6 +45,11 @@ TODO: (In No particular order)
 - Try to shrink distributable down to a single exe (so statically link everything possible)
 */
 
+#include "ringbuffer.h"
+extern RingBuffer* inBuffer;
+extern RingBuffer* outBuffer;
+extern SDL_mutex* audioInMutex;
+extern SDL_mutex* audioOutMutex;
 
 const char* SERVER_HOST = "localhost";
 
@@ -58,7 +64,7 @@ struct UserData
 struct GameState
 {
     char* name;
-    uint8_t nameLength;
+    uint8 nameLength;
 
     GLuint cameraTexture;
 
@@ -73,11 +79,10 @@ struct GameState
     UserData users[NET_MAX_CLIENTS];
 };
 
-const uint8_t roomNameLength = 128;
-char roomName[roomNameLength];
+char roomName[MAX_ROOM_NAME_LENGTH];
 
 GLuint pixelTexture;
-uint32_t micBufferLen;
+uint32 micBufferLen;
 float* micBuffer;
 
 float currentTimef = 0.0f;
@@ -106,9 +111,9 @@ void readSettings(GameState* game, const char* fileName)
     FILE* settingsFile = fopen(fileName, "r");
     if(settingsFile)
     {
-        char settingsBuffer[256];
-        size_t settingsBytes = fread(settingsBuffer, 1, 256, settingsFile);
-        game->nameLength = (uint8_t)settingsBytes;
+        char settingsBuffer[MAX_USER_NAME_LENGTH];
+        size_t settingsBytes = fread(settingsBuffer, 1, MAX_USER_NAME_LENGTH, settingsFile);
+        game->nameLength = (uint8)settingsBytes;
         game->name = new char[settingsBytes+1];
         memcpy(game->name, settingsBuffer, game->nameLength);
         game->name[game->nameLength] = 0;
@@ -153,7 +158,7 @@ void initGame(GameState* game)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     readSettings(game, "settings");
-    memset(roomName, 0, roomNameLength);
+    memset(roomName, 0, MAX_ROOM_NAME_LENGTH);
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -253,7 +258,7 @@ void renderGame(GameState* game, float deltaTime)
         {
             ImGui::Text("Room:");
             ImGui::SameLine();
-            ImGui::InputText("##roomToJoin", roomName, roomNameLength);
+            ImGui::InputText("##roomToJoin", roomName, MAX_ROOM_NAME_LENGTH);
 
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
@@ -289,8 +294,8 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::End();
 
     // Stats window
-    windowLoc = ImVec2(20.0f, 440.0f);
-    windowSize = ImVec2(600.0f, 20.f);
+    windowLoc = ImVec2(20.0f, 420.0f);
+    windowSize = ImVec2(600.0f, 60.f);
     UIFlags = ImGuiWindowFlags_NoMove |
               ImGuiWindowFlags_NoResize |
               ImGuiWindowFlags_NoTitleBar |
@@ -302,13 +307,18 @@ void renderGame(GameState* game, float deltaTime)
     ImVec2 sizeArg(-1, 0);
 
     float rms = 0.0f;
-    for(uint32_t i=0; i<micBufferLen; ++i)
+    for(uint32 i=0; i<micBufferLen; ++i)
     {
         rms += micBuffer[i]*micBuffer[i];
     }
     rms /= micBufferLen;
     rms = sqrtf(rms);
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
+    SDL_LockMutex(audioInMutex);
+    ImGui::Text("inBuffer: %05d/%d", inBuffer->count(), 48000);
+    ImGui::SameLine();
+    ImGui::Text("outBuffer: %05d/%d", outBuffer->count(), 48000);
+    SDL_UnlockMutex(audioInMutex);
 
     ImGui::End();
 }
@@ -399,14 +409,14 @@ int main(int argc, char* argv[])
     }
 
     // Initialize game
-    uint64_t performanceFreq = SDL_GetPerformanceFrequency();
-    uint64_t performanceCounter = SDL_GetPerformanceCounter();
+    uint64 performanceFreq = SDL_GetPerformanceFrequency();
+    uint64 performanceCounter = SDL_GetPerformanceCounter();
 
-    uint64_t tickRate = 20;
-    uint64_t tickDuration = performanceFreq/tickRate;
-    uint64_t nextTickTime = performanceCounter;
+    uint64 tickRate = 20;
+    uint64 tickDuration = performanceFreq/tickRate;
+    uint64 nextTickTime = performanceCounter;
 
-    micBufferLen = 2410;
+    micBufferLen = 2400;
     micBuffer = new float[micBufferLen];
     GameState game = {};
     initGame(&game);
@@ -419,8 +429,8 @@ int main(int argc, char* argv[])
     {
         nextTickTime += tickDuration;
 
-        uint64_t newPerfCount = SDL_GetPerformanceCounter();
-        uint64_t deltaPerfCount = newPerfCount - performanceCounter;
+        uint64 newPerfCount = SDL_GetPerformanceCounter();
+        uint64 deltaPerfCount = newPerfCount - performanceCounter;
         performanceCounter = newPerfCount;
 
         float deltaTime = ((float)deltaPerfCount)/((float)performanceFreq);
@@ -465,7 +475,7 @@ int main(int argc, char* argv[])
             //       stuff down into the "Send network output data" section
             if(checkForNewVideoFrame())
             {
-                uint8_t* pixelValues = currentVideoFrame();
+                uint8* pixelValues = currentVideoFrame();
                 glBindTexture(GL_TEXTURE_2D, game.cameraTexture);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                              cameraWidth, cameraHeight, 0,
@@ -493,10 +503,10 @@ int main(int argc, char* argv[])
             {
                 int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
                 int encodedBufferLength = micBufferLen;
-                uint8_t* encodedBuffer = new uint8_t[encodedBufferLength];
+                uint8* encodedBuffer = new uint8[encodedBufferLength];
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
-                printf("Send %d bytes of audio\n", audioBytes);
+                //printf("Send %d samples of audio\n", micBufferLen);
                 ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
@@ -518,7 +528,8 @@ int main(int argc, char* argv[])
                     printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                     game.connState = NET_CONNSTATE_CONNECTED;
 
-                    uint32_t dataTime = 0; // TODO
+                    uint32 dataTime = 0; // TODO
+                    uint8 roomNameLength = (uint8)strlen(roomName);
                     ENetPacket* initPacket = enet_packet_create(0, 3+game.nameLength+roomNameLength,
                                                                 ENET_PACKET_FLAG_UNSEQUENCED);
                     initPacket->data[0] = NET_MSGTYPE_INIT_DATA;
@@ -531,8 +542,8 @@ int main(int argc, char* argv[])
 
                 case ENET_EVENT_TYPE_RECEIVE:
                 {
-                    uint8_t dataType = *netEvent.packet->data;
-                    uint8_t* data = netEvent.packet->data+1;
+                    uint8 dataType = *netEvent.packet->data;
+                    uint8* data = netEvent.packet->data+1;
                     int dataLength = netEvent.packet->dataLength-1;
                     printf("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
 
@@ -544,13 +555,13 @@ int main(int argc, char* argv[])
                         //       the space allocated for the name)
                         case NET_MSGTYPE_INIT_DATA:
                         {
-                            uint8_t clientCount = *data;
+                            uint8 clientCount = *data;
                             printf("There are %d connected clients\n", clientCount);
                             data += 1;
-                            for(uint8_t i=0; i<clientCount; ++i)
+                            for(uint8 i=0; i<clientCount; ++i)
                             {
-                                uint8_t index = *data;
-                                uint8_t nameLength = *(data+1);
+                                uint8 index = *data;
+                                uint8 nameLength = *(data+1);
                                 char* name = new char[nameLength+1];
                                 memcpy(name, data+2, nameLength);
                                 name[nameLength] = 0;
@@ -566,8 +577,8 @@ int main(int argc, char* argv[])
                         } break;
                         case NET_MSGTYPE_CLIENT_CONNECT:
                         {
-                            uint8_t index = *data;
-                            uint8_t nameLength = *(data+1);
+                            uint8 index = *data;
+                            uint8 nameLength = *(data+1);
                             game.users[index].connected = true;
                             game.users[index].nameLength = index;
                             game.users[index].name = new char[nameLength+1];
@@ -577,7 +588,7 @@ int main(int argc, char* argv[])
                         } break;
                         case NET_MSGTYPE_CLIENT_DISCONNECT:
                         {
-                            uint8_t index = *data;
+                            uint8 index = *data;
                             printf("%s disconnected\n", game.users[index].name);
                             delete[] game.users[index].name; // TODO: Again, network security
                             game.users[index].connected = false;
@@ -589,6 +600,7 @@ int main(int argc, char* argv[])
                             float* decodedAudio = new float[micBufferLen];
                             int decodedFrames = decodePacket(dataLength, data,
                                                              micBufferLen, decodedAudio);
+                            printf("Received %d samples\n", decodedFrames);
                             writeAudioOutputBuffer(decodedFrames, decodedAudio);
                         } break;
                         case NET_MSGTYPE_VIDEO:
@@ -635,7 +647,7 @@ int main(int argc, char* argv[])
         {
             deltaPerfCount = nextTickTime - newPerfCount;
             float sleepSeconds = (float)deltaPerfCount/(float)performanceFreq;
-            uint32_t sleepMS = (uint32_t)(sleepSeconds*1000);
+            uint32 sleepMS = (uint32)(sleepSeconds*1000);
             SDL_Delay(sleepMS);
         }
     }
