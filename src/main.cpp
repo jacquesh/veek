@@ -73,6 +73,9 @@ struct GameState
     UserData users[NET_MAX_CLIENTS];
 };
 
+const uint8_t roomNameLength = 128;
+char roomName[roomNameLength];
+
 GLuint pixelTexture;
 uint32_t micBufferLen;
 float* micBuffer;
@@ -104,10 +107,10 @@ void readSettings(GameState* game, const char* fileName)
     if(settingsFile)
     {
         char settingsBuffer[256];
-        size_t nameLength = fread(settingsBuffer, 1, 256, settingsFile);
-        game->nameLength = nameLength;
-        game->name = new char[nameLength+1];
-        memcpy(game->name, settingsBuffer, nameLength);
+        size_t settingsBytes = fread(settingsBuffer, 1, 256, settingsFile);
+        game->nameLength = (uint8_t)settingsBytes;
+        game->name = new char[settingsBytes+1];
+        memcpy(game->name, settingsBuffer, game->nameLength);
         game->name[game->nameLength] = 0;
     }
     else
@@ -150,6 +153,7 @@ void initGame(GameState* game)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     readSettings(game, "settings");
+    memset(roomName, 0, roomNameLength);
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -194,16 +198,19 @@ void renderGame(GameState* game, float deltaTime)
 
     ImGui::Text("You are: %s", game->name);
     ImGui::Text("%.1fms", deltaTime*1000.0f);
-    bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
-    if(cameraToggled)
+    if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
-        enableCamera(game->cameraEnabled);
+        bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
+        if(cameraToggled)
+        {
+            enableCamera(game->cameraEnabled);
+        }
     }
 
     static bool listening = false;
     static int selectedRecordingDevice = 0;
     static int selectedPlaybackDevice = 0;
-    if(ImGui::CollapsingHeader("Audio", 0, true, true))
+    if(ImGui::CollapsingHeader("Audio", 0, true, false))
     {
         bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
         if(micToggled)
@@ -239,10 +246,15 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Button("Play test sound", ImVec2(120, 20));
     }
 
+    ImGui::Separator();
     switch(game->connState)
     {
         case NET_CONNSTATE_DISCONNECTED:
         {
+            ImGui::Text("Room:");
+            ImGui::SameLine();
+            ImGui::InputText("##roomToJoin", roomName, roomNameLength);
+
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
                 game->connState = NET_CONNSTATE_CONNECTING;
@@ -507,11 +519,13 @@ int main(int argc, char* argv[])
                     game.connState = NET_CONNSTATE_CONNECTED;
 
                     uint32_t dataTime = 0; // TODO
-                    ENetPacket* initPacket = enet_packet_create(0, 2+game.nameLength,
+                    ENetPacket* initPacket = enet_packet_create(0, 3+game.nameLength+roomNameLength,
                                                                 ENET_PACKET_FLAG_UNSEQUENCED);
                     initPacket->data[0] = NET_MSGTYPE_INIT_DATA;
                     *(initPacket->data+1) = game.nameLength;
-                    memcpy(initPacket->data+2, game.name, game.nameLength);
+                    *(initPacket->data+2) = roomNameLength;
+                    memcpy(initPacket->data+3, game.name, game.nameLength);
+                    memcpy(initPacket->data+3+game.nameLength, roomName, roomNameLength);
                     enet_peer_send(game.netPeer, 0, initPacket);
                 } break;
 
