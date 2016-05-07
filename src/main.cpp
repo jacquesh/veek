@@ -51,7 +51,7 @@ extern RingBuffer* outBuffer;
 extern SDL_mutex* audioInMutex;
 extern SDL_mutex* audioOutMutex;
 
-const char* SERVER_HOST = "localhost";
+const char* SERVER_HOST = "169.0.251.244";
 
 struct UserData
 {
@@ -63,7 +63,7 @@ struct UserData
 
 struct GameState
 {
-    char* name;
+    char name[MAX_USER_NAME_LENGTH];
     uint8 nameLength;
 
     GLuint cameraTexture;
@@ -103,25 +103,19 @@ void fillAudioBuffer(int length, float* buffer)
 
 void readSettings(GameState* game, const char* fileName)
 {
-    if(game->name)
-    {
-        delete[] game->name;
-    }
-
     FILE* settingsFile = fopen(fileName, "r");
     if(settingsFile)
     {
+        // TODO: Expand this to include other options, check that fields do not overflow etc
         char settingsBuffer[MAX_USER_NAME_LENGTH];
         size_t settingsBytes = fread(settingsBuffer, 1, MAX_USER_NAME_LENGTH, settingsFile);
         game->nameLength = (uint8)settingsBytes;
-        game->name = new char[settingsBytes+1];
         memcpy(game->name, settingsBuffer, game->nameLength);
         game->name[game->nameLength] = 0;
     }
     else
     {
         game->nameLength = 11;
-        game->name = new char[game->nameLength+1];
         const char* defaultName = "UnnamedUser";
         memcpy(game->name, defaultName, game->nameLength);
         game->name[game->nameLength] = 0;
@@ -201,7 +195,27 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
-    ImGui::Text("You are: %s", game->name);
+    if(game->connState == NET_CONNSTATE_DISCONNECTED)
+    {
+        ImGui::Text("You are:");
+        ImGui::SameLine();
+        if(ImGui::InputText("##userNameField", game->name, MAX_USER_NAME_LENGTH))
+        {
+            printf("Name changed\n");
+            for(uint8 i=0; i<MAX_USER_NAME_LENGTH; ++i)
+            {
+                if(game->name[i] == 0)
+                {
+                    game->nameLength = i;
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        ImGui::Text("You are: %s", game->name);
+    }
     ImGui::Text("%.1fms", deltaTime*1000.0f);
     if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
@@ -511,7 +525,7 @@ int main(int argc, char* argv[])
                 uint8* encodedBuffer = new uint8[encodedBufferLength];
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
-                //printf("Send %d samples of audio\n", micBufferLen);
+                //printf("Send %d bytes of audio\n", audioBytes);
                 ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
