@@ -79,7 +79,7 @@ struct GameState
     UserData users[NET_MAX_CLIENTS];
 };
 
-char roomName[MAX_ROOM_NAME_LENGTH];
+uint8 roomId;
 
 GLuint pixelTexture;
 uint32 micBufferLen;
@@ -158,7 +158,7 @@ void initGame(GameState* game)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     readSettings(game, "settings");
-    memset(roomName, 0, MAX_ROOM_NAME_LENGTH);
+    roomId = 0;
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -258,7 +258,12 @@ void renderGame(GameState* game, float deltaTime)
         {
             ImGui::Text("Room:");
             ImGui::SameLine();
-            ImGui::InputText("##roomToJoin", roomName, MAX_ROOM_NAME_LENGTH);
+            int roomId32 = (int)roomId;
+            if(ImGui::InputInt("##roomToJoin", &roomId32, 1, 10))
+            {
+                roomId32 = clamp(roomId32, 0, UINT8_MAX);
+                roomId = (uint8)(roomId32 & 0xFF);
+            }
 
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
@@ -529,14 +534,12 @@ int main(int argc, char* argv[])
                     game.connState = NET_CONNSTATE_CONNECTED;
 
                     uint32 dataTime = 0; // TODO
-                    uint8 roomNameLength = (uint8)strlen(roomName);
-                    ENetPacket* initPacket = enet_packet_create(0, 3+game.nameLength+roomNameLength,
+                    ENetPacket* initPacket = enet_packet_create(0, 3+game.nameLength,
                                                                 ENET_PACKET_FLAG_UNSEQUENCED);
                     initPacket->data[0] = NET_MSGTYPE_INIT_DATA;
-                    *(initPacket->data+1) = game.nameLength;
-                    *(initPacket->data+2) = roomNameLength;
+                    *(initPacket->data+1) = roomId;
+                    *(initPacket->data+2) = game.nameLength;
                     memcpy(initPacket->data+3, game.name, game.nameLength);
-                    memcpy(initPacket->data+3+game.nameLength, roomName, roomNameLength);
                     enet_peer_send(game.netPeer, 0, initPacket);
                 } break;
 

@@ -10,6 +10,7 @@ struct ClientData
     ENetPeer* netPeer;
 
     bool initialized;
+    uint8 roomId;
     uint8 nameLength;
     char* name;
 };
@@ -71,13 +72,15 @@ int main(int argc, char** argv)
                     if(packetType == NET_MSGTYPE_INIT_DATA)
                     {
                         // Add the new client to the list
-                        uint8 nameLength = *(packetData+1);
+                        uint8 roomId = *(packetData+1);
+                        uint8 nameLength = *(packetData+2);
                         char* name = new char[nameLength+1];
-                        memcpy(name, packetData+2, nameLength);
+                        memcpy(name, packetData+3, nameLength);
                         name[nameLength] = 0;
+                        clients[peerIndex].roomId = roomId;
                         clients[peerIndex].nameLength = nameLength;
                         clients[peerIndex].name = name;
-                        printf("Initialization received for %s\n", name);
+                        printf("Initialization received for %s in room %d\n", name, roomId);
                         enet_packet_destroy(netEvent.packet);
 
                         // Tell the new client about all other clients
@@ -85,7 +88,8 @@ int main(int argc, char** argv)
                         uint8 clientCount = 0;
                         for(int i=0; i<NET_MAX_CLIENTS; ++i)
                         {
-                            if((i == peerIndex) || (!clients[i].netPeer))
+                            if((i == peerIndex) || (!clients[i].netPeer)
+                                    || (clients[i].roomId != roomId))
                                 continue;
                             replyLength += 2 + clients[i].nameLength;
                             clientCount += 1;
@@ -97,7 +101,8 @@ int main(int argc, char** argv)
                         replyData += 2;
                         for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
                         {
-                            if((i == peerIndex) || (!clients[i].netPeer))
+                            if((i == peerIndex) || (!clients[i].netPeer)
+                                    || (clients[i].roomId != roomId))
                                 continue;
                             *replyData = i;
                             *(replyData+1) = clients[i].nameLength;
@@ -109,7 +114,8 @@ int main(int argc, char** argv)
                         // Tell all other clients about the new client
                         for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
                         {
-                            if((i == peerIndex) || (!clients[i].netPeer))
+                            if((i == peerIndex) || (!clients[i].netPeer)
+                                    || (clients[i].roomId != roomId))
                                 continue;
                             ENetPacket* newClientNotifyPacket = enet_packet_create(0,3+nameLength, ENET_PACKET_FLAG_UNSEQUENCED);
                             uint8* notifyData = newClientNotifyPacket->data;
@@ -128,9 +134,8 @@ int main(int argc, char** argv)
                     // TODO: This is wrong, because it will probably destroy the packet after sending
                     for(int i=0; i<NET_MAX_CLIENTS; ++i)
                     {
-                        if(i == peerIndex)
-                            continue;
-                        if(!clients[i].netPeer)
+                        if((i == peerIndex) || (!clients[i].netPeer)
+                                || (clients[i].roomId != clients[peerIndex].roomId))
                             continue;
                         enet_peer_send(clients[i].netPeer, 0, newPacket);
                     }
