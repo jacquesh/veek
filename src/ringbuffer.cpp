@@ -3,12 +3,6 @@
 #include <assert.h>
 
 // TODO: Modify count correctly when you cross the wrap around/pass the read ptr
-// TODO: Modify the read ptr when the write pointer passes it.
-//       So if we write 6 bytes into a buffer of length 4 without
-//       reading anything, then the read pointer needs to be at 2
-//       and not at 0, we don't want to suddenly jump forwards and
-//       then have it skip back later when it reaches the write ptr
-
 
 RingBuffer::RingBuffer(int size)
     : capacity(size)
@@ -91,16 +85,6 @@ void RingBuffer::advanceReadPointer(int increment)
 int RingBuffer::count()
 {
     return _count;
-    int result;
-    if(writeIndex >= readIndex)
-    {
-        result = writeIndex - readIndex;
-    }
-    else
-    {
-        result = (capacity - readIndex) + writeIndex;
-    }
-    return result;
 }
 
 int RingBuffer::free()
