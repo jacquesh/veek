@@ -6,6 +6,8 @@
 #include "daala/daalaenc.h"
 #include "daala/daaladec.h"
 
+#include "common.h"
+
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 
 int deviceCount;
@@ -18,7 +20,7 @@ SimpleCapParams captureParams;
 int cameraWidth = 320;
 int cameraHeight = 240;
 int pixelBytes = 0;
-uint8_t* pixelValues = 0;
+uint8* pixelValues = 0;
 
 void enableCamera(bool enabled)
 {
@@ -27,7 +29,7 @@ void enableCamera(bool enabled)
     {
         char deviceName[256];
         getCaptureDeviceName(cameraDevice, deviceName, 256);
-        printf("Initializing %s\n", deviceName);
+        log("Initializing %s\n", deviceName);
 
         initCapture(cameraDevice, &captureParams);
         doCapture(cameraDevice);
@@ -49,11 +51,11 @@ bool checkForNewVideoFrame()
             {
                 int targetBufferIndex = y*cameraWidth+ x;
                 int pixelVal = captureParams.mTargetBuf[targetBufferIndex];
-                uint8_t* pixel = (uint8_t*)&pixelVal;
-                uint8_t red   = pixel[0];
-                uint8_t green = pixel[1];
-                uint8_t blue  = pixel[2];
-                uint8_t alpha = pixel[3];
+                uint8* pixel = (uint8*)&pixelVal;
+                uint8 red   = pixel[0];
+                uint8 green = pixel[1];
+                uint8 blue  = pixel[2];
+                uint8 alpha = pixel[3];
 
                 int pixelIndex = (cameraHeight-y)*cameraWidth+ x;
                 pixelValues[3*pixelIndex + 0] = blue;
@@ -66,7 +68,7 @@ bool checkForNewVideoFrame()
     return result;
 }
 
-uint8_t* currentVideoFrame()
+uint8* currentVideoFrame()
 {
     return pixelValues;
 }
@@ -74,10 +76,10 @@ uint8_t* currentVideoFrame()
 bool initVideo()
 {
     pixelBytes = cameraWidth*cameraHeight*3;
-    pixelValues = new uint8_t[pixelBytes];
+    pixelValues = new uint8[pixelBytes];
 
     deviceCount = setupESCAPI();
-    printf("%d video input devices available.\n", deviceCount);
+    log("%d video input devices available.\n", deviceCount);
     if(deviceCount == 0)
     {
         return false;

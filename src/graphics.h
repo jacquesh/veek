@@ -1,9 +1,6 @@
 #ifndef _RENDER_H
 #define _RENDER_H
 
-#include <stdio.h>
-
-#include <SDL.h>
 #include <GL/gl3w.h>
 
 #include "vecmath.h"

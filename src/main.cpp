@@ -201,7 +201,7 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::SameLine();
         if(ImGui::InputText("##userNameField", game->name, MAX_USER_NAME_LENGTH))
         {
-            printf("Name changed\n");
+            log("Name changed\n");
             for(uint8 i=0; i<MAX_USER_NAME_LENGTH; ++i)
             {
                 if(game->name[i] == 0)
@@ -243,7 +243,7 @@ void renderGame(GameState* game, float deltaTime)
                                        audioState.inputDeviceCount);
         if(micChanged)
         {
-            printf("Mic Device Changed\n");
+            log("Mic Device Changed\n");
             setAudioInputDevice(selectedRecordingDevice);
         }
 
@@ -259,7 +259,7 @@ void renderGame(GameState* game, float deltaTime)
                                            audioState.outputDeviceCount);
         if(speakerChanged)
         {
-            printf("Speaker Device Changed\n");
+            log("Speaker Device Changed\n");
         }
 
         ImGui::Button("Play test sound", ImVec2(120, 20));
@@ -290,7 +290,7 @@ void renderGame(GameState* game, float deltaTime)
                 game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
                 if(!game->netHost)
                 {
-                    printf("Unable to create client\n");
+                    log("Unable to create client\n");
                 }
             }
         } break;
@@ -350,14 +350,14 @@ void cleanupGame(GameState* game)
 int main(int argc, char* argv[])
 {
     // Create Window
-    printf("Initializing SDL version %d.%d.%d\n",
+    log("Initializing SDL version %d.%d.%d\n",
             SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
 
     if(SDL_Init(SDL_INIT_VIDEO) != 0)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
                                  "Unable to initialize SDL", 0);
-        printf("Error when trying to initialize SDL: %s\n", SDL_GetError());
+        log("Error when trying to initialize SDL: %s\n", SDL_GetError());
         return 1;
     }
 
@@ -377,24 +377,21 @@ int main(int argc, char* argv[])
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
                                  "Unable to create window!", 0);
-        printf("Error when trying to create SDL Window: %s\n", SDL_GetError());
+        log("Error when trying to create SDL Window: %s\n", SDL_GetError());
 
         SDL_Quit();
         return 1;
     }
 
     // Initialize OpenGL
+    log("Initializing OpenGL...\n");
     SDL_GLContext glc = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, glc);
     if(!initGraphics())
     {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
-                                 "Unable to initialize OpenGL!", 0);
         SDL_Quit();
         return 1;
     }
-    printf("Initialized OpenGL %s with support for GLSL %s\n",
-            glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
 
     updateWindowSize(initialWindowWidth, initialWindowHeight);
     ImGui_ImplSdlGL3_Init(window);
@@ -402,18 +399,20 @@ int main(int argc, char* argv[])
     imguiIO.IniFilename = 0;
 
     // Initialize libsoundio
+    log("Initializing audio input/output subsystem...\n");
     if(!initAudio())
     {
-        printf("Unable to initialize audio subsystem\n");
+        log("Unable to initialize audio subsystem\n");
         SDL_Quit();
         return 1;
     }
     //enableMicrophone(false);
 
     // Initialize escapi
+    log("Initializing video input subsystem...\n");
     if(!initVideo())
     {
-        printf("Unable to initialize camera video subsystem\n");
+        log("Unable to initialize camera video subsystem\n");
         SDL_Quit();
         return 1;
     }
@@ -421,7 +420,7 @@ int main(int argc, char* argv[])
     // Initialize enet
     if(enet_initialize() != 0)
     {
-        printf("Unable to initialize enet!\n");
+        log("Unable to initialize enet!\n");
         SDL_Quit();
         // TODO: Should probably kill OpenAL as well
         return 1;
@@ -443,7 +442,7 @@ int main(int argc, char* argv[])
     bool running = true;
 
     glPrintError(true);
-    printf("Setup complete, start running...\n");
+    log("Setup complete, start running...\n");
     while(running)
     {
         nextTickTime += tickDuration;
@@ -525,7 +524,7 @@ int main(int argc, char* argv[])
                 uint8* encodedBuffer = new uint8[encodedBufferLength];
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
-                //printf("Send %d bytes of audio\n", audioBytes);
+                //log("Send %d bytes of audio\n", audioBytes);
                 ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
@@ -544,7 +543,7 @@ int main(int argc, char* argv[])
             {
                 case ENET_EVENT_TYPE_CONNECT:
                 {
-                    printf("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    log("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                     game.connState = NET_CONNSTATE_CONNECTED;
 
                     uint32 dataTime = 0; // TODO
@@ -562,7 +561,7 @@ int main(int argc, char* argv[])
                     uint8 dataType = *netEvent.packet->data;
                     uint8* data = netEvent.packet->data+1;
                     int dataLength = netEvent.packet->dataLength-1;
-                    printf("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
+                    log("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
 
                     switch(dataType)
                     {
@@ -573,7 +572,7 @@ int main(int argc, char* argv[])
                         case NET_MSGTYPE_INIT_DATA:
                         {
                             uint8 clientCount = *data;
-                            printf("There are %d connected clients\n", clientCount);
+                            log("There are %d connected clients\n", clientCount);
                             data += 1;
                             for(uint8 i=0; i<clientCount; ++i)
                             {
@@ -589,7 +588,7 @@ int main(int argc, char* argv[])
                                 game.users[index].connected = true;
                                 game.users[index].nameLength = nameLength;
                                 game.users[index].name = name;
-                                printf("%s\n", name);
+                                log("%s\n", name);
                             }
                         } break;
                         case NET_MSGTYPE_CLIENT_CONNECT:
@@ -601,12 +600,12 @@ int main(int argc, char* argv[])
                             game.users[index].name = new char[nameLength+1];
                             memcpy(game.users[index].name, data+2, nameLength);
                             game.users[index].name[nameLength] = 0;
-                            printf("%s connected\n", game.users[index].name);
+                            log("%s connected\n", game.users[index].name);
                         } break;
                         case NET_MSGTYPE_CLIENT_DISCONNECT:
                         {
                             uint8 index = *data;
-                            printf("%s disconnected\n", game.users[index].name);
+                            log("%s disconnected\n", game.users[index].name);
                             delete[] game.users[index].name; // TODO: Again, network security
                             game.users[index].connected = false;
                             game.users[index].nameLength = 0;
@@ -617,7 +616,7 @@ int main(int argc, char* argv[])
                             float* decodedAudio = new float[micBufferLen];
                             int decodedFrames = decodePacket(dataLength, data,
                                                              micBufferLen, decodedAudio);
-                            printf("Received %d samples\n", decodedFrames);
+                            log("Received %d samples\n", decodedFrames);
                             writeAudioOutputBuffer(decodedFrames, decodedAudio);
                         } break;
                         case NET_MSGTYPE_VIDEO:
@@ -639,7 +638,7 @@ int main(int argc, char* argv[])
 
                 case ENET_EVENT_TYPE_DISCONNECT:
                 {
-                    printf("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    log("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                 } break;
             }
         }

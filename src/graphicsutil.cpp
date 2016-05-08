@@ -1,11 +1,11 @@
 #include "graphicsutil.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <GL/gl3w.h>
 
-void __glPrintError(const char* file, int line, bool alwaysPrint)
+#include "common.h"
+#include "graphics.h"
+
+void glPrintError(bool alwaysPrint)
 {
   GLenum error = glGetError();
   const char* errorStr;
@@ -36,7 +36,7 @@ void __glPrintError(const char* file, int line, bool alwaysPrint)
           break;
       }
 
-      fprintf(stderr, "(%s:%d) OpenGL error: %s\n", file, line, errorStr);
+      log("OpenGL error: %s\n", errorStr);
   }
 }
 
@@ -72,7 +72,7 @@ GLuint loadShaderProgramFromString(const char* vertShaderStr,
         GLsizei logLength = 0;
         GLchar message[1024];
         glGetProgramInfoLog(program, 1024, &logLength, message);
-        printf("Error: %s\n", message);
+        log("Error: %s\n", message);
 
         glDeleteProgram(program);
         return 0;

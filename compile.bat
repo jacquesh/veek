@@ -3,7 +3,7 @@ set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\graphicsutil.cpp ..
 set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MDd
 set IncludeDirs= -I..\src -I..\include -I..\dge
 
-set EnetLibs=..\lib\enet64.lib ws2_32.lib winmm.lib
+set EnetLibs=..\lib\enet.lib ws2_32.lib winmm.lib
 set OpusLibs=..\lib\opus.lib ..\lib\celt.lib ..\lib\silk_common.lib ..\lib\silk_fixed.lib ..\lib\silk_float.lib
 set DaalaLibs=..\lib\LibDaalaBase.lib ..\lib\libdaaladec.lib ..\lib\libdaalaenc.lib
 set LinkLibs= OpenGL32.lib SDL2.lib ..\lib\escapi.lib  %EnetLibs% %OpusLibs% %DaalaLibs% ..\lib\libsoundio.dll.a

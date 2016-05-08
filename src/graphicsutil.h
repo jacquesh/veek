@@ -3,8 +3,7 @@
 
 #include <GL/gl3w.h>
 
-#define glPrintError(alwaysPrint) __glPrintError(__FILE__, __LINE__, alwaysPrint)
-void __glPrintError(const char* file, int line, bool alwaysPrint);
+void glPrintError(bool alwaysPrint);
 
 GLuint loadShaderFromString(const char* shaderStr, GLenum shaderType);
 GLuint loadShaderProgramFromString(const char* vertShaderStr, const char* fragShaderStr);

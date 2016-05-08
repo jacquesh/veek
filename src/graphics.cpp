@@ -1,5 +1,8 @@
 #include "graphics.h"
 
+#include <SDL.h>
+
+#include "common.h"
 #include "graphicsutil.h"
 #include "vecmath.h"
 
@@ -18,6 +21,7 @@ bool initGraphics()
 {
     if(gl3wInit())
     {
+        log("Unable to initialize OpenGL\n");
         return false;
     }
     SDL_GL_SetSwapInterval(0);
@@ -62,6 +66,8 @@ bool initGraphics()
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    log("Initialized OpenGL %s with support for GLSL %s\n",
+            glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION));
     return true;
 }
 
