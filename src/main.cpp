@@ -420,6 +420,7 @@ int main(int argc, char* argv[])
     if(!initAudio())
     {
         log("Unable to initialize audio subsystem\n");
+        deinitGraphics();
         glfwTerminate();
         return 1;
     }
@@ -430,6 +431,8 @@ int main(int argc, char* argv[])
     if(!initVideo())
     {
         log("Unable to initialize camera video subsystem\n");
+        deinitAudio();
+        deinitGraphics();
         glfwTerminate();
         return 1;
     }
@@ -438,8 +441,10 @@ int main(int argc, char* argv[])
     if(enet_initialize() != 0)
     {
         log("Unable to initialize enet!\n");
+        deinitVideo();
+        deinitAudio();
+        deinitGraphics();
         glfwTerminate();
-        // TODO: Should probably kill OpenAL as well
         return 1;
     }
 
