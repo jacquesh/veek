@@ -1,18 +1,17 @@
 #include <stdio.h>
 #include <time.h>
-
-#define SDL_MAIN_HANDLED
-#include <SDL.h>
-#include <SDL_version.h>
+#include <math.h>
 
 #include "imgui.h"
-#include "imgui_impl_sdl_gl3.h"
+#include "imgui_impl_glfw_gl3.h"
 
 #include <GL/gl3w.h>
 
+#include "GLFW/glfw3.h"
 #include "enet/enet.h"
 
 #include "common.h"
+#include "platform.h"
 #include "vecmath.h"
 #include "audio.h"
 #include "video.h"
@@ -48,10 +47,10 @@ TODO: (In No particular order)
 #include "ringbuffer.h"
 extern RingBuffer* inBuffer;
 extern RingBuffer* outBuffer;
-extern SDL_mutex* audioInMutex;
-extern SDL_mutex* audioOutMutex;
+extern Mutex* audioInMutex;
+extern Mutex* audioOutMutex;
 
-const char* SERVER_HOST = "169.0.251.244";
+const char* SERVER_HOST = "localhost";
 
 struct UserData
 {
@@ -79,6 +78,7 @@ struct GameState
     UserData users[NET_MAX_CLIENTS];
 };
 
+bool running;
 uint8 roomId;
 
 GLuint pixelTexture;
@@ -333,11 +333,11 @@ void renderGame(GameState* game, float deltaTime)
     rms /= micBufferLen;
     rms = sqrtf(rms);
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
-    SDL_LockMutex(audioInMutex);
+    lockMutex(audioInMutex);
     ImGui::Text("inBuffer: %05d/%d", inBuffer->count(), 48000);
     ImGui::SameLine();
     ImGui::Text("outBuffer: %05d/%d", outBuffer->count(), 48000);
-    SDL_UnlockMutex(audioInMutex);
+    unlockMutex(audioInMutex);
 
     ImGui::End();
 }
@@ -346,55 +346,72 @@ void cleanupGame(GameState* game)
 {
 }
 
+void windowResizeCallback(GLFWwindow* window, int newWidth, int newHeight)
+{
+    updateWindowSize(newWidth, newHeight);
+}
+
+void windowCloseRequestCallback(GLFWwindow* window)
+{
+    running = false;
+}
+
+void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if((action == GLFW_PRESS) && (key == GLFW_KEY_ESCAPE))
+        running = false;
+    else
+        ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
+}
 
 int main(int argc, char* argv[])
 {
     // Create Window
-    log("Initializing SDL version %d.%d.%d\n",
-            SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+    // TODO: Possibly use glfwGetVersionString
+    log("Initializing GLFW version %d.%d.%d\n",
+            GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION);
 
-    if(SDL_Init(SDL_INIT_VIDEO) != 0)
+    if(!glfwInit())
     {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
-                                 "Unable to initialize SDL", 0);
-        log("Error when trying to initialize SDL: %s\n", SDL_GetError());
+        log("Error when trying to initialize GLFW\n");
         return 1;
     }
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
-                        SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     int initialWindowWidth = 640;
     int initialWindowHeight = 480;
-    SDL_Window* window = SDL_CreateWindow("Webcam Test",
-                                          SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          initialWindowWidth, initialWindowHeight,
-                                          SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    GLFWwindow* window = glfwCreateWindow(initialWindowWidth, initialWindowHeight,
+                                          "Veek", 0, 0);
     if(!window)
     {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Initialization Error",
-                                 "Unable to create window!", 0);
-        log("Error when trying to create SDL Window: %s\n", SDL_GetError());
-
-        SDL_Quit();
+        log("Error when trying to create GLFW Window\n");
+        glfwTerminate();
         return 1;
     }
+    glfwSetWindowSizeCallback(window, windowResizeCallback);
+    glfwSetWindowCloseCallback(window, windowCloseRequestCallback);
+    glfwSetKeyCallback(window, keyEventCallback);
+    glfwSetCharCallback(window, ImGui_ImplGlfwGL3_CharCallback);
+    glfwSetScrollCallback(window, ImGui_ImplGlfwGL3_ScrollCallback);
+    glfwSetMouseButtonCallback(window, ImGui_ImplGlfwGL3_MouseButtonCallback);
 
     // Initialize OpenGL
     log("Initializing OpenGL...\n");
-    SDL_GLContext glc = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, glc);
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(0);
     if(!initGraphics())
     {
-        SDL_Quit();
+        glfwTerminate();
         return 1;
     }
 
     updateWindowSize(initialWindowWidth, initialWindowHeight);
-    ImGui_ImplSdlGL3_Init(window);
+    ImGui_ImplGlfwGL3_Init(window, false);
     ImGuiIO& imguiIO = ImGui::GetIO();
     imguiIO.IniFilename = 0;
 
@@ -403,7 +420,7 @@ int main(int argc, char* argv[])
     if(!initAudio())
     {
         log("Unable to initialize audio subsystem\n");
-        SDL_Quit();
+        glfwTerminate();
         return 1;
     }
     //enableMicrophone(false);
@@ -413,7 +430,7 @@ int main(int argc, char* argv[])
     if(!initVideo())
     {
         log("Unable to initialize camera video subsystem\n");
-        SDL_Quit();
+        glfwTerminate();
         return 1;
     }
 
@@ -421,25 +438,23 @@ int main(int argc, char* argv[])
     if(enet_initialize() != 0)
     {
         log("Unable to initialize enet!\n");
-        SDL_Quit();
+        glfwTerminate();
         // TODO: Should probably kill OpenAL as well
         return 1;
     }
 
     // Initialize game
-    uint64 performanceFreq = SDL_GetPerformanceFrequency();
-    uint64 performanceCounter = SDL_GetPerformanceCounter();
-
-    uint64 tickRate = 20;
-    uint64 tickDuration = performanceFreq/tickRate;
-    uint64 nextTickTime = performanceCounter;
+    double tickRate = 20;
+    double tickDuration = 1.0/tickRate;
+    double currentTime = glfwGetTime();
+    double nextTickTime = currentTime;
 
     micBufferLen = 2400;
     micBuffer = new float[micBufferLen];
     GameState game = {};
     initGame(&game);
 
-    bool running = true;
+    running = true;
 
     glPrintError(true);
     log("Setup complete, start running...\n");
@@ -447,43 +462,12 @@ int main(int argc, char* argv[])
     {
         nextTickTime += tickDuration;
 
-        uint64 newPerfCount = SDL_GetPerformanceCounter();
-        uint64 deltaPerfCount = newPerfCount - performanceCounter;
-        performanceCounter = newPerfCount;
-
-        float deltaTime = ((float)deltaPerfCount)/((float)performanceFreq);
+        double newTime = glfwGetTime();
+        float deltaTime = (float)(newTime - currentTime);
+        currentTime = newTime;
 
         // Handle input
-        SDL_Event e;
-        while (SDL_PollEvent(&e))
-        {
-            ImGui_ImplSdlGL3_ProcessEvent(&e);
-            switch (e.type)
-            {
-                case SDL_QUIT:
-                {
-                    running = false;
-                } break;
-                case SDL_KEYDOWN:
-                {
-                    if(e.key.keysym.sym == SDLK_ESCAPE)
-                        running = false;
-                } break;
-                case SDL_WINDOWEVENT:
-                {
-                    switch(e.window.event)
-                    {
-                        case SDL_WINDOWEVENT_RESIZED:
-                        case SDL_WINDOWEVENT_SIZE_CHANGED:
-                        {
-                            int newWidth = e.window.data1;
-                            int newHeight = e.window.data2;
-                            updateWindowSize(newWidth, newHeight);
-                        } break;
-                    }
-                } break;
-            }
-        }
+        glfwPollEvents();
 
         // Update the camera (uploading the new texture to the GPU if there is one)
         if(game.cameraEnabled)
@@ -650,21 +634,20 @@ int main(int argc, char* argv[])
 #endif
 
         // Rendering
-        ImGui_ImplSdlGL3_NewFrame(window);
+        ImGui_ImplGlfwGL3_NewFrame();
         renderGame(&game, deltaTime);
         ImGui::Render();
 
-        SDL_GL_SwapWindow(window);
+        glfwSwapBuffers(window);
         glPrintError(false);
 
         // Sleep till next scheduled update
-        newPerfCount = SDL_GetPerformanceCounter();
-        if(newPerfCount < nextTickTime)
+        newTime = glfwGetTime();
+        if(newTime < nextTickTime)
         {
-            deltaPerfCount = nextTickTime - newPerfCount;
-            float sleepSeconds = (float)deltaPerfCount/(float)performanceFreq;
+            double sleepSeconds = nextTickTime - newTime;
             uint32 sleepMS = (uint32)(sleepSeconds*1000);
-            SDL_Delay(sleepMS);
+            sleep(sleepMS);
         }
     }
 
@@ -680,10 +663,10 @@ int main(int argc, char* argv[])
 
     deinitVideo();
     deinitAudio();
-    ImGui_ImplSdlGL3_Shutdown();
+    ImGui_ImplGlfwGL3_Shutdown();
     deinitGraphics();
 
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    glfwDestroyWindow(window);
+    glfwTerminate();
     return 0;
 }

@@ -1,7 +1,5 @@
 #include "graphics.h"
 
-#include <SDL.h>
-
 #include "common.h"
 #include "graphicsutil.h"
 #include "vecmath.h"
@@ -24,7 +22,6 @@ bool initGraphics()
         log("Unable to initialize OpenGL\n");
         return false;
     }
-    SDL_GL_SetSwapInterval(0);
 
     // Load shader
     glGenVertexArrays(1, &spriteVAO);
