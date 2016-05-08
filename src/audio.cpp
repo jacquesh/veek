@@ -10,6 +10,7 @@
 #include "soundio/soundio.h"
 #include "opus/opus.h"
 
+#include "common.h"
 #include "vecmath.h"
 #include "ringbuffer.h"
 
@@ -35,16 +36,16 @@ SDL_mutex* audioOutMutex;
 void printDevice(SoundIoDevice* device)
 {
     const char* rawStr = device->is_raw ? "(RAW)" : "";
-    printf("%s%s\n", device->name, rawStr);
+    log("%s%s\n", device->name, rawStr);
     if(device->probe_error != SoundIoErrorNone)
     {
-        printf("Probe Error: %s\n", soundio_strerror(device->probe_error));
+        log("Probe Error: %s\n", soundio_strerror(device->probe_error));
         return;
     }
-    printf("  Channel count: %d\n", device->current_layout.channel_count);
-    printf("  Sample Rate: %d\n", device->sample_rate_current);
-    printf("  Latency: %0.8f - %0.8f\n", device->software_latency_min, device->software_latency_max);
-    printf("      Now: %0.8f\n", device->software_latency_current);
+    log("  Channel count: %d\n", device->current_layout.channel_count);
+    log("  Sample Rate: %d\n", device->sample_rate_current);
+    log("  Latency: %0.8f - %0.8f\n", device->software_latency_min, device->software_latency_max);
+    log("      Now: %0.8f\n", device->software_latency_current);
 }
 
 void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
@@ -57,7 +58,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
-    //printf("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
+    //log("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     SoundIoChannelArea* inArea;
 
     // TODO: Check the free space in inBuffer
@@ -68,7 +69,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
         int readError = soundio_instream_begin_read(stream, &inArea, &frameCount);
         if(readError)
         {
-            printf("Read error\n");
+            log("Read error\n");
             break;
         }
 
@@ -78,7 +79,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
-            inBuffer->write(val);
+            inBuffer->write(1, &val);
             inBuffer->advanceWritePointer(1);
         }
 
@@ -93,7 +94,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     SDL_LockMutex(audioOutMutex);
     int framesAvailable = outBuffer->count();
     int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
-    //printf("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
+    //log("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
 
@@ -103,7 +104,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
         int writeError = soundio_outstream_begin_write(stream, &outArea, &frameCount);
         if(writeError)
         {
-            printf("Write error\n");
+            log("Write error\n");
             break;
         }
 
@@ -117,7 +118,8 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
         framesAvailable = min(framesAvailable, frameCount);
         for(int frame=0; frame<framesAvailable; ++frame)
         {
-            float val = sourceBuffer->read();
+            float val;
+            sourceBuffer->read(1, &val);
             sourceBuffer->advanceReadPointer(1);
 
             for(int channel=0; channel<channelCount; ++channel)
@@ -146,22 +148,22 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
 void inOverflowCallback(SoundIoInStream* stream)
 {
-    printf("Input underflow!\n");
+    log("Input underflow!\n");
 }
 
 void outUnderflowCallback(SoundIoOutStream* stream)
 {
-    printf("Output underflow!\n");
+    log("Output underflow!\n");
 }
 
 void inErrorCallback(SoundIoInStream* stream, int error)
 {
-    printf("Input error: %s\n", soundio_strerror(error));
+    log("Input error: %s\n", soundio_strerror(error));
 }
 
 void outErrorCallback(SoundIoOutStream* stream, int error)
 {
-    printf("Output error: %s\n", soundio_strerror(error));
+    log("Output error: %s\n", soundio_strerror(error));
 }
 
 void listenToInput(bool listening)
@@ -189,7 +191,7 @@ int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
                                               correctErrors);
         if(framesDecoded < 0)
         {
-            printf("Error decoding audio data. Error %d\n", framesDecoded);
+            log("Error decoding audio data. Error %d\n", framesDecoded);
             break;
         }
 
@@ -225,7 +227,7 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
         *((int*)targetBuffer) = packetLength; // TODO: Byte order checking/swapping
         if(packetLength < 0)
         {
-            printf("Error encoding audio. Error code %d\n", packetLength);
+            log("Error encoding audio. Error code %d\n", packetLength);
             break;
         }
 
@@ -242,14 +244,13 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
 int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
 {
     SDL_LockMutex(audioOutMutex);
-    // TODO: Consider the number of channels
     int samplesToWrite = sourceBufferLength;
     int ringBufferFreeSpace = outBuffer->free();
     if(samplesToWrite > ringBufferFreeSpace)
     {
         samplesToWrite = ringBufferFreeSpace;
     }
-    //printf("Write %d samples\n", samplesToWrite);
+    //log("Write %d samples\n", samplesToWrite);
 
     outBuffer->write(samplesToWrite, sourceBufferPtr);
     outBuffer->advanceWritePointer(samplesToWrite);
@@ -269,7 +270,7 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     int samplesAvailable = inBuffer->count();
     if(samplesAvailable < samplesToWrite)
         samplesToWrite = samplesAvailable;
- 
+
     inBuffer->read(samplesToWrite, targetBufferPtr);
     inBuffer->advanceReadPointer(samplesToWrite);
 
@@ -281,14 +282,31 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 void enableMicrophone(bool enabled)
 {
     if(enabled)
-        printf("Mic on\n");
+        log("Mic on\n");
     else
-        printf("Mic off\n");
+        log("Mic off\n");
     int error = soundio_instream_pause(inStream, !enabled);
     if(error)
     {
-        printf("Error enabling microhpone\n");
+        log("Error enabling microhpone\n");
     }
+}
+
+void backendDisconnectCallback(SoundIo* sio, int error)
+{
+    log("SoundIo backend disconnected: %s\n", soundio_strerror(error));
+    // TODO: This runs immediately on flush_events on pIjIn's PC, it crashes if we do not
+    //       specify this callback (which is probably correct, what is the appropriate response
+    //       here even?)
+}
+
+void devicesChangeCallback(SoundIo* sio)
+{
+    // TODO
+    int inputDeviceCount = soundio_input_device_count(sio);
+    int outputDeviceCount = soundio_output_device_count(sio);
+    log("SoundIo device list updated - %d input, %d output devices\n",
+            inputDeviceCount, outputDeviceCount);
 }
 
 void setAudioInputDevice(int newInputDevice)
@@ -314,12 +332,12 @@ void setAudioInputDevice(int newInputDevice)
     int openError = soundio_instream_open(inStream);
     if(openError != SoundIoErrorNone)
     {
-        printf("Error opening input stream: %s\n", soundio_strerror(openError));
+        log("Error opening input stream: %s\n", soundio_strerror(openError));
     }
     int startError = soundio_instream_start(inStream);
     if(startError != SoundIoErrorNone)
     {
-        printf("Error starting input stream: %s\n", soundio_strerror(startError));
+        log("Error starting input stream: %s\n", soundio_strerror(startError));
     }
 }
 
@@ -344,41 +362,63 @@ void setAudioOutputDevice(int newOutputDevice)
     int openError = soundio_outstream_open(outStream);
     if(openError != SoundIoErrorNone)
     {
-        printf("Error opening output stream: %s\n", soundio_strerror(openError));
+        log("Error opening output stream: %s\n", soundio_strerror(openError));
     }
     int startError = soundio_outstream_start(outStream);
     if(startError != SoundIoErrorNone)
     {
-        printf("Error starting output stream: %s\n", soundio_strerror(openError));
+        log("Error starting output stream: %s\n", soundio_strerror(openError));
     }
 }
 
 bool initAudio()
 {
     // Initialize SoundIO
+    log("Initializing libsoundio %s\n", soundio_version_string());
     soundio = soundio_create();
     if(!soundio)
     {
+        log("Unable to create libsoundio context\n");
         return false;
     }
+    soundio->on_devices_change = devicesChangeCallback;
+    soundio->on_backend_disconnect = backendDisconnectCallback;
+    log("libsoundio initialized, connecting backend...\n");
+
+
     int connectError = soundio_connect(soundio);
     if(connectError)
     {
+        log("Unable to connect to libsoundio backend %s: %s\n",
+                soundio_backend_name(soundio->current_backend), soundio_strerror(connectError));
+        soundio_destroy(soundio);
         return false;
     }
+    log("Backend %s connected\n", soundio_backend_name(soundio->current_backend));
     soundio_flush_events(soundio);
+    log("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
-    //       48000 Hz is probably VERY excessive
 
-    printf("Initializing %s\n", opus_get_version_string());
+    log("Initializing %s\n", opus_get_version_string());
     int opusError;
     opus_int32 opusSampleRate = 48000;
     int opusChannels = 1;
     int opusApplication = OPUS_APPLICATION_VOIP;
     encoder = opus_encoder_create(opusSampleRate, opusChannels, opusApplication, &opusError);
-    printf("Opus Error from encoder creation: %d\n", opusError);
+    log("Opus Error from encoder creation: %d\n", opusError);
     decoder = opus_decoder_create(opusSampleRate, opusChannels, &opusError);
-    printf("Opus Error from decoder creation: %d\n", opusError);
+    log("Opus Error from decoder creation: %d\n", opusError);
+
+    opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(6));
+    opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
+    opus_encoder_ctl(encoder, OPUS_SET_APPLICATION(OPUS_APPLICATION_VOIP));
+    //opus_encoder_ctl(encoder, OPUS_SET_BITRATE(OPUS_BITRATE_MAX));
+
+    opus_int32 complexity;
+    opus_int32 bitrate;
+    opus_encoder_ctl(encoder, OPUS_GET_COMPLEXITY(&complexity));
+    opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
+    log("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
     // Setup input
     int defaultInputDevice = soundio_default_input_device_index(soundio);
@@ -417,7 +457,7 @@ bool initAudio()
             soundio_device_unref(device);
         }
     }
-    inBuffer = new RingBuffer(48000);
+    inBuffer = new RingBuffer(2400);
     audioInMutex = SDL_CreateMutex();
 
     // Setup output
