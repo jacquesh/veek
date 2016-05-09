@@ -10,17 +10,17 @@
 
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 
-int deviceCount;
+static int deviceCount;
 
-bool cameraEnabled = false;
-int cameraDevice;
-SimpleCapParams captureParams;
+static bool cameraEnabled = false;
+static int cameraDevice;
+static SimpleCapParams captureParams;
 
 
-int cameraWidth = 320;
+int cameraWidth = 320; // TODO: We probably also want these to be static
 int cameraHeight = 240;
-int pixelBytes = 0;
-uint8* pixelValues = 0;
+static int pixelBytes = 0;
+static uint8* pixelValues = 0;
 
 void enableCamera(bool enabled)
 {

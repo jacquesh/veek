@@ -18,17 +18,17 @@
 //       We do actually keep track of time but we have yet to use that to check for packet loss
 AudioData audioState = {};
 
-SoundIo* soundio;
-OpusEncoder* encoder;
-OpusDecoder* decoder;
+static SoundIo* soundio;
+static OpusEncoder* encoder;
+static OpusDecoder* decoder;
 
-SoundIoDevice* inDevice;
-SoundIoInStream* inStream;
-RingBuffer* inBuffer;
-Mutex* audioInMutex;
+static SoundIoDevice* inDevice;
+static SoundIoInStream* inStream;
+RingBuffer* inBuffer; // TODO: These should probably be static but at the moment we use them for
+Mutex* audioInMutex;  //       the microphone volume bars
 
-SoundIoDevice* outDevice;
-SoundIoOutStream* outStream;
+static SoundIoDevice* outDevice;
+static SoundIoOutStream* outStream;
 RingBuffer* outBuffer;
 Mutex* audioOutMutex;
 

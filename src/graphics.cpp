@@ -4,14 +4,14 @@
 #include "graphicsutil.h"
 #include "vecmath.h"
 
-GLuint spriteVAO;
-GLuint spriteShader;
-GLuint indexBuffer;
-GLuint vertexLocBuffer;
-GLuint texCoordBuffer;
-
 int screenWidth;
 int screenHeight;
+
+static GLuint spriteVAO;
+static GLuint spriteShader;
+static GLuint indexBuffer;
+static GLuint vertexLocBuffer;
+static GLuint texCoordBuffer;
 
 #include "shaders.cpp"
 

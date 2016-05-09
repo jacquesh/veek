@@ -50,7 +50,7 @@ extern RingBuffer* outBuffer;
 extern Mutex* audioInMutex;
 extern Mutex* audioOutMutex;
 
-const char* SERVER_HOST = "localhost";
+static const char* SERVER_HOST = "localhost";
 
 struct UserData
 {
@@ -78,14 +78,17 @@ struct GameState
     UserData users[NET_MAX_CLIENTS];
 };
 
-bool running;
-uint8 roomId;
+static bool running;
+extern int screenWidth;
+extern int screenHeight;
 
-GLuint pixelTexture;
-uint32 micBufferLen;
-float* micBuffer;
+static uint8 roomId;
 
-float currentTimef = 0.0f;
+static GLuint pixelTexture;
+static uint32 micBufferLen;
+static float* micBuffer;
+
+static float currentTimef = 0.0f;
 void fillAudioBuffer(int length, float* buffer)
 {
     float pi = 3.1415927f;
@@ -313,8 +316,11 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::End();
 
     // Stats window
-    windowLoc = ImVec2(20.0f, 420.0f);
-    windowSize = ImVec2(600.0f, 60.f);
+    float volumeBarPadding = 20.0f;
+    float volumeBarYOffset = 80.0f;
+    windowLoc = ImVec2(volumeBarPadding, (float)screenHeight - volumeBarYOffset);
+    windowSize = ImVec2((float)screenWidth - 2.0f*volumeBarPadding,
+                        volumeBarYOffset - volumeBarPadding);
     UIFlags = ImGuiWindowFlags_NoMove |
               ImGuiWindowFlags_NoResize |
               ImGuiWindowFlags_NoTitleBar |
@@ -364,7 +370,7 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
         ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
 }
 
-int main(int argc, char* argv[])
+int main()
 {
     // Create Window
     // TODO: Possibly use glfwGetVersionString
