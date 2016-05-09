@@ -1,4 +1,6 @@
 /* Extremely Simple Capture API */
+#ifndef _ESCAPI_H
+#define _ESCAPI_H
 
 struct SimpleCapParams
 {
@@ -108,4 +110,6 @@ extern getCapturePropertyAutoProc getCapturePropertyAuto;
 extern setCapturePropertyProc setCaptureProperty;
 extern getCaptureErrorLineProc getCaptureErrorLine;
 extern getCaptureErrorCodeProc getCaptureErrorCode;
+#endif
+
 #endif
