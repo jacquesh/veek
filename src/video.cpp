@@ -16,7 +16,6 @@ static bool cameraEnabled = false;
 static int cameraDevice;
 static SimpleCapParams captureParams;
 
-
 int cameraWidth = 320; // TODO: We probably also want these to be static
 int cameraHeight = 240;
 static int pixelBytes = 0;
@@ -57,7 +56,7 @@ bool checkForNewVideoFrame()
                 uint8 blue  = pixel[2];
                 uint8 alpha = pixel[3];
 
-                int pixelIndex = (cameraHeight-y)*cameraWidth+ x;
+                int pixelIndex = (cameraHeight-y-1)*cameraWidth+ x;
                 pixelValues[3*pixelIndex + 0] = blue;
                 pixelValues[3*pixelIndex + 1] = green;
                 pixelValues[3*pixelIndex + 2] = red;
