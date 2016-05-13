@@ -1,7 +1,7 @@
-/* Extremely Simple Capture API */
 #ifndef _ESCAPI_H
 #define _ESCAPI_H
 
+/* Extremely Simple Capture API */
 struct SimpleCapParams
 {
 	/* Target buffer. 
@@ -112,4 +112,4 @@ extern getCaptureErrorLineProc getCaptureErrorLine;
 extern getCaptureErrorCodeProc getCaptureErrorCode;
 #endif
 
-#endif
+#endif // _ESCAPI_H
