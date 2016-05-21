@@ -1,11 +1,15 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "escapi.h"
-#include "daala/codec.h"
-#include "daala/daalaenc.h"
-#include "daala/daaladec.h"
+
+#include "ogg/ogg.h"
+#include "theora/codec.h"
+#include "theora/theora.h"
+#include "theora/theoraenc.h"
+#include "theora/theoradec.h"
 
 #include "common.h"
 
@@ -21,6 +25,9 @@ int cameraWidth = 320; // TODO: We probably also want these to be static
 int cameraHeight = 240;
 static int pixelBytes = 0;
 static uint8* pixelValues = 0;
+
+static th_enc_ctx* encoderContext;
+static th_dec_ctx* decoderContext;
 
 void enableCamera(bool enabled)
 {
@@ -73,7 +80,41 @@ uint8* currentVideoFrame()
     return pixelValues;
 }
 
-static void copyDaalaPacket(daala_packet& out, daala_packet& in)
+void encodeRGBImage(uint8* inputData)
+{
+    th_ycbcr_buffer img;
+    for(int i=0; i<3; i++)
+    {
+        img[i].width = 320;
+        img[i].height = 240;
+        img[i].stride = img[i].width;
+        img[i].data = new uint8[img[i].width*img[i].height];
+        for(int y=0; y<img[i].height; y++)
+        {
+            for(int x=0; x<img[i].width; x++)
+            {
+                int pixelIndex = y*img[i].width + x;
+                img[i].data[pixelIndex] = inputData[pixelIndex];
+            }
+        }
+    }
+
+    ogg_packet packet;
+    int result = th_encode_ycbcr_in(encoderContext, img);
+    while(true){
+        result = th_encode_packetout(encoderContext, 0, &packet);
+        if(result <= 0)
+            break;
+    }
+    log("%d Video Output bytes\n", packet.bytes);
+
+    for(int i=0; i<3; i++)
+    {
+        delete[] img[i].data;
+    }
+}
+
+static void copyTheoraPacket(ogg_packet& out, ogg_packet& in)
 {
     out.packet = new uint8[in.bytes];
     memcpy(out.packet, in.packet, in.bytes);
@@ -102,107 +143,95 @@ bool initVideo()
     captureParams.mHeight = cameraHeight;
     captureParams.mTargetBuf = new int[cameraWidth*cameraHeight];
 
-    daala_log_init();
-
-    // Init daala encoder
-    daala_info encoderInfo;
-    daala_info_init(&encoderInfo);
+    // Initialize theora encoder
+    th_info encoderInfo;
+    th_info_init(&encoderInfo);
+    encoderInfo.pic_x = 0;
+    encoderInfo.pic_y = 0;
     encoderInfo.pic_width = 320;
     encoderInfo.pic_height = 240;
-    //encoderInfo.bitdepth_mode = OD_BITDEPTH_MODE_8; // NOTE: This is set by info_init
-    encoderInfo.timebase_numerator = 20; // 20fps
-    encoderInfo.timebase_denominator = 0;
-    encoderInfo.frame_duration = 1;
-    encoderInfo.pixel_aspect_numerator = 4;
-    encoderInfo.pixel_aspect_denominator = 3;
-    encoderInfo.full_precision_references = 0;
-    encoderInfo.nplanes = 1;
-    encoderInfo.plane_info[0].xdec = 0;
-    encoderInfo.plane_info[0].ydec = 0;
-    encoderInfo.keyframe_rate = 256;
+    encoderInfo.frame_width = 320;
+    encoderInfo.frame_height = 240;
+    encoderInfo.pixel_fmt = TH_PF_444;
+    encoderInfo.colorspace = TH_CS_UNSPECIFIED;
+    encoderInfo.quality = 32;
+    encoderInfo.fps_numerator = 20;
+    encoderInfo.fps_denominator = 1;
+    encoderInfo.aspect_numerator = 1;
+    encoderInfo.aspect_denominator = 1;
 
-    daala_enc_ctx* encoderContext = daala_encode_create(&encoderInfo);
-    daala_comment comment;
-    daala_comment_init(&comment);
-    daala_packet headerPackets[3];
-    daala_packet tempPacket;
+    encoderContext = th_encode_alloc(&encoderInfo);
+    th_comment comment;
+    th_comment_init(&comment);
+    ogg_packet tempPacket;
+    ogg_packet headerPackets[3];
+    int headerPacketIndex = 0;
     // NOTE: We need to copy each packet as we get to if we want to store it for later because
     //       the packet data is stored in a buffer that is owned by daala and gets re-used each
     //       time, meaning that if we DONT copy, the other headers will have their data overwritten
-    if(daala_encode_flush_header(encoderContext, &comment, &tempPacket) <= 0)
+    while(th_encode_flushheader(encoderContext, &comment, &tempPacket) > 0)
     {
-        log("Interal Daala error\n");
-    }
-    copyDaalaPacket(headerPackets[0], tempPacket);
-
-    int headerPacketIndex = 1;
-    while(daala_encode_flush_header(encoderContext, &comment, &tempPacket) > 0)
-    {
-        copyDaalaPacket(headerPackets[headerPacketIndex], tempPacket);
+        th_comment_clear(&comment);
+        copyTheoraPacket(headerPackets[headerPacketIndex], tempPacket);
         headerPacketIndex++;
+        log("Output theora header packet\n");
     }
-    log("%d header packets created\n", headerPacketIndex);
+    assert(headerPacketIndex == 3);
 
-    // Init daala decoder
-    daala_info decoderInfo;
-    daala_info_init(&decoderInfo);
-    //daala_comment comment;
-    daala_comment_init(&comment);
-    daala_setup_info* setupInfo = NULL;
+    // Initialize theora decoder
+    th_info decoderInfo;
+    th_info_init(&decoderInfo);
+    //th_comment comment;
+    th_comment_init(&comment);
+    th_setup_info* setupInfo = NULL;
     for(int i=0; i<3; i++)
     {
-        int headersRemaining = daala_decode_header_in(&decoderInfo, &comment,
-                                                      &setupInfo, &(headerPackets[i]));
+        int headersRemaining = th_decode_headerin(&decoderInfo, &comment,
+                                                  &setupInfo, &headerPackets[i]);
         log("Headers left to decode: %d\n", headersRemaining);
         if(headersRemaining < 0)
             break;
     }
-    daala_comment_clear(&comment);
-    daala_dec_ctx* decoderContext = daala_decode_create(&decoderInfo, setupInfo);
-    daala_setup_free(setupInfo);
+    th_comment_clear(&comment);
+    decoderContext = th_decode_alloc(&decoderInfo, setupInfo);
+    th_setup_free(setupInfo);
 
-    // Encode example frame
-    daala_image img;
-    img.width = 320;
-    img.height = 240;
-    img.nplanes = 1;
-    img.planes[0].xdec = 0;
-    img.planes[0].ydec = 0;
-    img.planes[0].bitdepth = 8;
-    img.planes[0].xstride = 1;
-    img.planes[0].ystride = 320;
-    img.planes[0].data = new uint8[img.width*img.height];
-    for(int y=0; y<img.height; y++)
+    // Encode example image
+    th_ycbcr_buffer img;
+    for(int i=0; i<3; i++)
     {
-        for(int x=0; x<img.width; x++)
+        img[i].width = 320;
+        img[i].height = 240;
+        img[i].stride = img[i].width;
+        img[i].data = new uint8[img[i].width*img[i].height];
+        for(int y=0; y<img[i].height; y++)
         {
-            size_t pixelIndex = y*img.width + x;
-            img.planes[0].data[pixelIndex] = 128;
+            for(int x=0; x<img[i].width; x++)
+            {
+                int pixelIndex = y*img[i].width + x;
+                img[i].data[pixelIndex] = 128;
+            }
         }
     }
 
-    int result = daala_encode_img_in(encoderContext, &img, 0);
-    log("Image Encoding Result = %d\n", result);
+    int result;
 
-    daala_packet packet; 
+    ogg_packet packet;
+    result = th_encode_ycbcr_in(encoderContext, img);
+    log("Image encoding result = %d\n", result);
     while(true){
-        result = daala_encode_packet_out(encoderContext, 0, &packet);
-        log("Video Packet Output Result = %d\n", result);
+        result = th_encode_packetout(encoderContext, 0, &packet);
+        log("Video packet output result = %d\n", result);
         if(result <= 0)
             break;
     }
+    log("%d Output bytes\n", packet.bytes);
 
-    // Decode Example Frame
-    result = daala_decode_packet_in(decoderContext, &packet);
-    log("Video Packet Input Result = %d\n", result);
+    result = th_decode_packetin(decoderContext, &packet, 0);
+    log("Video packet output result = %d\n", result);
 
-    while(true)
-    {
-        result = daala_decode_img_out(decoderContext, &img);
-        log("Image Decoding Result = %d\n", result);
-        if(result <= 0)
-            break;
-    }
+    result = th_decode_ycbcr_out(decoderContext, img);
+    log("Image decoding result = %d\n", result);
 
     return true;
 }

@@ -9,8 +9,8 @@ set IncludeDirs= -I..\include
 set GLFWLibs=..\lib\glfw3.lib gdi32.lib shell32.lib
 set EnetLibs=..\lib\enet.lib ws2_32.lib winmm.lib
 set OpusLibs=..\lib\opus.lib ..\lib\celt.lib ..\lib\silk_common.lib ..\lib\silk_fixed.lib ..\lib\silk_float.lib
-set DaalaLibs=..\lib\LibDaalaBase.lib ..\lib\libdaaladec.lib ..\lib\libdaalaenc.lib
-set LinkLibs= OpenGL32.lib ..\lib\escapi.lib %GLFWLibs% %EnetLibs% %OpusLibs% %DaalaLibs% ..\lib\libsoundio.dll.a
+set TheoraLibs=..\lib\libtheora_static.lib ..\lib\libogg_static.lib
+set LinkLibs= OpenGL32.lib ..\lib\escapi.lib %GLFWLibs% %EnetLibs% %OpusLibs% %TheoraLibs% ..\lib\libsoundio.dll.a
 
 pushd build
 cl %CompileFlags% %CompileFiles% %IncludeDirs% -link %LinkLibs% -INCREMENTAL:NO -OUT:main.exe
