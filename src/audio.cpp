@@ -281,9 +281,13 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 void enableMicrophone(bool enabled)
 {
     if(enabled)
+    {
         log("Mic on\n");
+    }
     else
+    {
         log("Mic off\n");
+    }
     int error = soundio_instream_pause(inStream, !enabled);
     if(error)
     {
