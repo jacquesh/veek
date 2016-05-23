@@ -3,13 +3,23 @@
 #include <string.h>
 #include <assert.h>
 
-#include "escapi.h"
-
 #include "ogg/ogg.h"
 #include "theora/codec.h"
 #include "theora/theora.h"
 #include "theora/theoraenc.h"
 #include "theora/theoradec.h"
+
+#include "escapi.h"
+
+#ifdef DEBUG_VIDEO_IMAGE_OUTPUT
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#endif
+
+#ifdef DEBUG_VIDEO_VIDEO_OUTPUT
+#include <time.h>
+#include <stdlib.h> // For srand/rand
+#endif
 
 #include "common.h"
 
@@ -28,6 +38,14 @@ static uint8* pixelValues = 0;
 
 static th_enc_ctx* encoderContext;
 static th_dec_ctx* decoderContext;
+
+static th_ycbcr_buffer encodingImage;
+static th_ycbcr_buffer decodingImage;
+
+#ifdef DEBUG_VIDEO_VIDEO_OUTPUT
+static FILE* ogvOutputFile;
+static ogg_stream_state ogvOutputStream;
+#endif
 
 void enableCamera(bool enabled)
 {
@@ -80,38 +98,156 @@ uint8* currentVideoFrame()
     return pixelValues;
 }
 
-void encodeRGBImage(uint8* inputData)
+int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
 {
-    th_ycbcr_buffer img;
-    for(int i=0; i<3; i++)
+    // TODO: Support other/variable image sizes
+    assert(inputLength == 320*240*3);
+
+#ifdef DEBUG_VIDEO_IMAGE_OUTPUT
+    char outpngName[64];
+    static int pngIndex = 0;
+    if(pngIndex <= 4096)
     {
-        img[i].width = 320;
-        img[i].height = 240;
-        img[i].stride = img[i].width;
-        img[i].data = new uint8[img[i].width*img[i].height];
-        for(int y=0; y<img[i].height; y++)
+        pngIndex++;
+        sprintf(outpngName, "webcam_capture_%04d.png", pngIndex);
+        int success = stbi_write_png(outpngName, 320, 240, 3, pixelValues, 320*3);
+    }
+#endif
+
+    // Convert RGB image to Y'CbCr
+    for(int y=0; y<encodingImage[0].height; y++)
+    {
+        for(int x=0; x<encodingImage[0].width; x++)
         {
-            for(int x=0; x<img[i].width; x++)
-            {
-                int pixelIndex = y*img[i].width + x;
-                img[i].data[pixelIndex] = inputData[pixelIndex];
-            }
+            // TODO: We're assuming here that each image plane has the same size
+            int pixelIndex = y*encodingImage[0].width + x;
+            uint8 r = inputBuffer[3*pixelIndex + 0];
+            uint8 g = inputBuffer[3*pixelIndex + 1];
+            uint8 b = inputBuffer[3*pixelIndex + 2];
+
+            uint8 YPrime = (uint8)(0.299f*r + 0.587f*g + 0.114f*b);
+            uint8 Cb = (uint8)((0.436f*255.0f - 0.14713f*r - 0.28886f*g + 0.436f*g)/0.872f);
+            uint8 Cr = (uint8)((0.615f*255.0f + 0.615f*r - 0.51499f*g - 0.10001f*g)/1.230f);
+            //log("%d-%d-%d\n", YPrime, Cb, Cr);
+            //YPrime = r; Cb = g; Cr = b;
+
+            int outPixelIndex = (encodingImage[0].height-y-1)*encodingImage[0].width + x;
+            encodingImage[0].data[outPixelIndex] = YPrime;
+            encodingImage[1].data[outPixelIndex] = Cb;
+            encodingImage[2].data[outPixelIndex] = Cr;
         }
     }
 
+    // Encode image
+    int bytesWritten = 0;
+    uint8* bufferPtr = outputBuffer;
+
     ogg_packet packet;
-    int result = th_encode_ycbcr_in(encoderContext, img);
-    while(true){
+    int result = th_encode_ycbcr_in(encoderContext, encodingImage);
+    if(result < 0)
+    {
+        log("ERROR: Image encoding failed with code %d\n", result);
+        return 0;
+    }
+
+    int packetsExtracted = 0;
+    while(true)
+    {
         result = th_encode_packetout(encoderContext, 0, &packet);
         if(result <= 0)
             break;
-    }
-    log("%d Video Output bytes\n", packet.bytes);
 
-    for(int i=0; i<3; i++)
-    {
-        delete[] img[i].data;
+        packetsExtracted += 1;
+        log("%d Video Output bytes\n", packet.bytes);
+        // Write to output buffer
+        // TODO: For now we're just assuming that the buffer has enough space, in future
+        //       we probably want to handle it by just storing the packet and checking next time
+        //       before we actually do any encoding, filling in any old frames
+        assert(outputLength - bytesWritten >= sizeof(int32)+packet.bytes);
+        *((int32*)bufferPtr) = packet.bytes;
+        memcpy(bufferPtr+sizeof(int32), packet.packet, packet.bytes);
+
+        bytesWritten += sizeof(int32) + packet.bytes;
+        bufferPtr += sizeof(int32) + packet.bytes;
+
+#ifdef DEBUG_VIDEO_VIDEO_OUTPUT
+        // TODO: Write encoded images out to an ogv file
+        ogg_page page;
+        ogg_stream_packetin(&ogvOutputStream, &packet);
+        while(ogg_stream_pageout(&ogvOutputStream, &page))
+        {
+            fwrite(page.header, page.header_len, 1, ogvOutputFile);
+            fwrite(page.body, page.body_len, 1, ogvOutputFile);
+        }
+#endif
     }
+
+    if(packetsExtracted != 1)
+    {
+        log("Extracted %d video packets\n", packetsExtracted);
+    }
+    return bytesWritten;
+}
+
+int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
+{
+    // TODO: Support other image sizes
+    assert(outputLength == 320*240*3);
+
+    int inBytesRemaining = inputLength;
+    ogg_packet packet;
+
+    while(inBytesRemaining > 0)
+    {
+        // NOTE: decode_packetin does not appear to use any members of packet other than
+        //       packet.bytes and packet.packet
+        packet.bytes = *((int32*)inputBuffer);
+        packet.packet = inputBuffer + sizeof(int32);
+
+        int result = th_decode_packetin(decoderContext, &packet, 0);
+        if(result < 0)
+        {
+            log("ERROR: Video packet decode failed with code: %d\n", result);
+            return 0;
+        }
+
+        // TODO: Can we ever get more than one image out here?
+        result = th_decode_ycbcr_out(decoderContext, decodingImage);
+        if(result < 0)
+        {
+            log("ERROR: Video frame extraction failed with code: %d\n", result);
+            return 0;
+        }
+
+        int imageWidth = decodingImage[0].width;
+        int imageHeight = decodingImage[0].height;
+        for(int y=0; y<imageHeight; y++)
+        {
+            for(int x=0; x<imageWidth; x++)
+            {
+                int pixelIndex = y*imageWidth + x;
+                outputBuffer[3*pixelIndex + 0] = decodingImage[0].data[pixelIndex];
+                outputBuffer[3*pixelIndex + 1] = decodingImage[1].data[pixelIndex];
+                outputBuffer[3*pixelIndex + 2] = decodingImage[2].data[pixelIndex];
+            }
+        }
+        inBytesRemaining -= imageWidth*imageHeight*3;
+    }
+
+#if 0
+    for(int y=0; y<240; y++)
+    {
+        for(int x=0; x<320; x++)
+        {
+            // TODO: We're assuming here that each image plane has the same size
+            int pixelIndex = y*encodingImage[0].width + x;
+            outputBuffer[3*pixelIndex + 0] = 255;//inputBuffer[3*pixelIndex + 0];
+            outputBuffer[3*pixelIndex + 1] = (uint8)(x*(255.0f/320.0f));//inputBuffer[3*pixelIndex + 1];
+            outputBuffer[3*pixelIndex + 2] = (uint8)(y*(255.0f/240.0f));//inputBuffer[3*pixelIndex + 2];
+        }
+    }
+#endif
+    return 0;
 }
 
 static void copyTheoraPacket(ogg_packet& out, ogg_packet& in)
@@ -150,33 +286,46 @@ bool initVideo()
     encoderInfo.pic_y = 0;
     encoderInfo.pic_width = 320;
     encoderInfo.pic_height = 240;
-    encoderInfo.frame_width = 320;
-    encoderInfo.frame_height = 240;
+    encoderInfo.frame_width = 320; // Must be a multiple of 16
+    encoderInfo.frame_height = 240;// Must be a multiple of 16
     encoderInfo.pixel_fmt = TH_PF_444;
     encoderInfo.colorspace = TH_CS_UNSPECIFIED;
-    encoderInfo.quality = 32;
-    encoderInfo.fps_numerator = 20;
+    encoderInfo.quality = 48;
+    encoderInfo.target_bitrate=  -1;
+    encoderInfo.fps_numerator = 24;
     encoderInfo.fps_denominator = 1;
-    encoderInfo.aspect_numerator = 1;
-    encoderInfo.aspect_denominator = 1;
+    encoderInfo.aspect_numerator = 0;
+    encoderInfo.aspect_denominator = 0;
+    //encoderInfo.keyframe_granule_shift=...; // TODO
 
     encoderContext = th_encode_alloc(&encoderInfo);
+    th_info_clear(&encoderInfo);
+
     th_comment comment;
     th_comment_init(&comment);
     ogg_packet tempPacket;
     ogg_packet headerPackets[3];
-    int headerPacketIndex = 0;
+    int headerPacketCount = 0;
     // NOTE: We need to copy each packet as we get to if we want to store it for later because
     //       the packet data is stored in a buffer that is owned by daala and gets re-used each
     //       time, meaning that if we DONT copy, the other headers will have their data overwritten
     while(th_encode_flushheader(encoderContext, &comment, &tempPacket) > 0)
     {
         th_comment_clear(&comment);
-        copyTheoraPacket(headerPackets[headerPacketIndex], tempPacket);
-        headerPacketIndex++;
+        copyTheoraPacket(headerPackets[headerPacketCount], tempPacket);
+        headerPacketCount++;
         log("Output theora header packet\n");
     }
-    assert(headerPacketIndex == 3);
+    assert(headerPacketCount == 3);
+
+    // TODO: Support other image sizes
+    for(int i=0; i<3; i++)
+    {
+        encodingImage[i].width = 320;
+        encodingImage[i].height = 240;
+        encodingImage[i].stride = encodingImage[i].width;
+        encodingImage[i].data = new uint8[encodingImage[i].width*encodingImage[i].height];
+    }
 
     // Initialize theora decoder
     th_info decoderInfo;
@@ -196,42 +345,50 @@ bool initVideo()
     decoderContext = th_decode_alloc(&decoderInfo, setupInfo);
     th_setup_free(setupInfo);
 
-    // Encode example image
-    th_ycbcr_buffer img;
+    // TODO: Support other image size
     for(int i=0; i<3; i++)
     {
-        img[i].width = 320;
-        img[i].height = 240;
-        img[i].stride = img[i].width;
-        img[i].data = new uint8[img[i].width*img[i].height];
-        for(int y=0; y<img[i].height; y++)
+        decodingImage[i].width = 320;
+        decodingImage[i].height = 240;
+        decodingImage[i].stride = decodingImage[i].width;
+        decodingImage[i].data = new uint8[decodingImage[i].width*decodingImage[i].height];
+    }
+
+#ifdef DEBUG_VIDEO_VIDEO_OUTPUT
+    ogvOutputFile = fopen("encoding_output_video.ogv", "wb");
+    if(!ogvOutputFile)
+    {
+        log("Error: Unable to open ogg video output file\n");
+        return false;
+    }
+
+    srand(time(NULL));
+    if(ogg_stream_init(&ogvOutputStream, rand()))
+    {
+        log("Error: Unable to create ogg video output stream\n");
+        return false;
+    }
+
+    // TODO: The example calls this separately for the first packet, does it get its own page?
+    ogg_page headerPage;
+    for(int headerIndex=0; headerIndex<headerPacketCount; headerIndex++)
+    {
+        ogg_stream_packetin(&ogvOutputStream, &headerPackets[headerIndex]);
+        if(ogg_stream_pageout(&ogvOutputStream, &headerPage))
         {
-            for(int x=0; x<img[i].width; x++)
-            {
-                int pixelIndex = y*img[i].width + x;
-                img[i].data[pixelIndex] = 128;
-            }
+            fwrite(headerPage.header, headerPage.header_len, 1, ogvOutputFile);
+            fwrite(headerPage.body, headerPage.body_len, 1, ogvOutputFile);
         }
     }
 
-    int result;
-
-    ogg_packet packet;
-    result = th_encode_ycbcr_in(encoderContext, img);
-    log("Image encoding result = %d\n", result);
-    while(true){
-        result = th_encode_packetout(encoderContext, 0, &packet);
-        log("Video packet output result = %d\n", result);
-        if(result <= 0)
-            break;
+    // NOTE: We flush any remaining header data here so that the first set of actual data
+    //       starts on a new page, as per the ogg spec
+    while(ogg_stream_flush(&ogvOutputStream, &headerPage))
+    {
+        fwrite(headerPage.header, headerPage.header_len, 1, ogvOutputFile);
+        fwrite(headerPage.body, headerPage.body_len, 1, ogvOutputFile);
     }
-    log("%d Output bytes\n", packet.bytes);
-
-    result = th_decode_packetin(decoderContext, &packet, 0);
-    log("Video packet output result = %d\n", result);
-
-    result = th_decode_ycbcr_out(decoderContext, img);
-    log("Image decoding result = %d\n", result);
+#endif
 
     return true;
 }
@@ -241,4 +398,28 @@ void deinitVideo()
     enableCamera(false);
     delete[] pixelValues;
     delete[] captureParams.mTargetBuf;
+
+    th_encode_free(encoderContext);
+    th_decode_free(decoderContext);
+    for(int i=0; i<3; i++)
+    {
+        delete[] encodingImage[i].data;
+        delete[] decodingImage[i].data;
+    }
+
+#ifdef DEBUG_VIDEO_VIDEO_OUTPUT
+    ogg_page outputPage;
+    if(ogg_stream_flush(&ogvOutputStream, &outputPage))
+    {
+        fwrite(outputPage.header, outputPage.header_len, 1, ogvOutputFile);
+        fwrite(outputPage.body, outputPage.body_len, 1, ogvOutputFile);
+    }
+    ogg_stream_clear(&ogvOutputStream);
+
+    if(ogvOutputFile)
+    {
+        fflush(ogvOutputFile);
+        fclose(ogvOutputFile);
+    }
+#endif
 }

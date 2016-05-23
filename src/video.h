@@ -14,6 +14,7 @@ void enableCamera(bool enabled);
 bool checkForNewVideoFrame();
 uint8_t* currentVideoFrame();
 
-void encodeRGBImage(uint8* inputData);
+int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer);
+int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer);
 
 #endif
