@@ -132,13 +132,9 @@ int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
             uint8 Cb = (uint8)(128 - 0.148f*r - 0.291f*g + 0.439f*b);
             uint8 Cr = (uint8)(128 + 0.439f*r - 0.368f*g - 0.071f*b);
 #endif
-            //log("%d-%d-%d\n", YPrime, Cb, Cr);
-            //YPrime = r; Cb = g; Cr = b;
-
-            int outPixelIndex = (encodingImage[0].height-y-1)*encodingImage[0].width + x;
-            encodingImage[0].data[outPixelIndex] = YPrime;
-            encodingImage[1].data[outPixelIndex] = Cb;
-            encodingImage[2].data[outPixelIndex] = Cr;
+            *(encodingImage[0].data + y*encodingImage[0].stride + x) = YPrime;
+            *(encodingImage[1].data + y*encodingImage[1].stride + x) = Cb;
+            *(encodingImage[2].data + y*encodingImage[2].stride + x) = Cr;
         }
     }
 
@@ -349,15 +345,6 @@ bool initVideo()
     decoderContext = th_decode_alloc(&decoderInfo, setupInfo);
     th_setup_free(setupInfo);
 
-    // TODO: Support other image size
-    for(int i=0; i<3; i++)
-    {
-        decodingImage[i].width = 320;
-        decodingImage[i].height = 240;
-        decodingImage[i].stride = decodingImage[i].width;
-        decodingImage[i].data = new uint8[decodingImage[i].width*decodingImage[i].height];
-    }
-
 #ifdef DEBUG_VIDEO_VIDEO_OUTPUT
     ogvOutputFile = fopen("encoding_output_video.ogv", "wb");
     if(!ogvOutputFile)
@@ -403,13 +390,12 @@ void deinitVideo()
     delete[] pixelValues;
     delete[] captureParams.mTargetBuf;
 
-    th_encode_free(encoderContext);
-    th_decode_free(decoderContext);
     for(int i=0; i<3; i++)
     {
         delete[] encodingImage[i].data;
-        delete[] decodingImage[i].data;
     }
+    th_encode_free(encoderContext);
+    th_decode_free(decoderContext);
 
 #ifdef DEBUG_VIDEO_VIDEO_OUTPUT
     ogg_page outputPage;
