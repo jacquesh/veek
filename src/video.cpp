@@ -3,9 +3,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "ogg/ogg.h"
-#include "theora/codec.h"
-#include "theora/theora.h"
 #include "theora/theoraenc.h"
 #include "theora/theoradec.h"
 
@@ -125,9 +122,16 @@ int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
             uint8 g = inputBuffer[3*pixelIndex + 1];
             uint8 b = inputBuffer[3*pixelIndex + 2];
 
+            // TODO: Read http://www.equasys.de/colorconversion.html
+#if 0
             uint8 YPrime = (uint8)(0.299f*r + 0.587f*g + 0.114f*b);
-            uint8 Cb = (uint8)((0.436f*255.0f - 0.14713f*r - 0.28886f*g + 0.436f*g)/0.872f);
-            uint8 Cr = (uint8)((0.615f*255.0f + 0.615f*r - 0.51499f*g - 0.10001f*g)/1.230f);
+            uint8 Cb = (uint8)((0.436f*255.0f - 0.14713f*r - 0.28886f*g + 0.436f*b)/0.872f);
+            uint8 Cr = (uint8)((0.615f*255.0f + 0.615f*r - 0.51499f*g - 0.10001f*b)/1.230f);
+#else
+            uint8 YPrime = (uint8)(16 + 0.257f*r + 0.504f*g + 0.098f*b);
+            uint8 Cb = (uint8)(128 - 0.148f*r - 0.291f*g + 0.439f*b);
+            uint8 Cr = (uint8)(128 + 0.439f*r - 0.368f*g - 0.071f*b);
+#endif
             //log("%d-%d-%d\n", YPrime, Cb, Cr);
             //YPrime = r; Cb = g; Cr = b;
 
@@ -158,7 +162,6 @@ int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
             break;
 
         packetsExtracted += 1;
-        log("%d Video Output bytes\n", packet.bytes);
         // Write to output buffer
         // TODO: For now we're just assuming that the buffer has enough space, in future
         //       we probably want to handle it by just storing the packet and checking next time
@@ -182,11 +185,16 @@ int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
 #endif
     }
 
-    if(packetsExtracted != 1)
-    {
-        log("Extracted %d video packets\n", packetsExtracted);
-    }
     return bytesWritten;
+}
+
+static float clamp(float x)
+{
+    if(x < 0.0f)
+        return 0.0f;
+    else if(x > 255.0f)
+        return 255.0f;
+    return x;
 }
 
 int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
@@ -225,28 +233,24 @@ int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
         {
             for(int x=0; x<imageWidth; x++)
             {
-                int pixelIndex = y*imageWidth + x;
-                outputBuffer[3*pixelIndex + 0] = decodingImage[0].data[pixelIndex];
-                outputBuffer[3*pixelIndex + 1] = decodingImage[1].data[pixelIndex];
-                outputBuffer[3*pixelIndex + 2] = decodingImage[2].data[pixelIndex];
+                int pixelIndex = y*imageWidth+ x;
+                uint8 Y = *(decodingImage[0].data + y*decodingImage[0].stride + x);
+                uint8 Cb= *(decodingImage[1].data + y*decodingImage[1].stride + x);
+                uint8 Cr= *(decodingImage[2].data + y*decodingImage[2].stride + x);
+                float YNew = (float)Y - 16.0f;
+                float CbNew= (float)Cb - 128.0f;
+                float CrNew= (float)Cr - 128.0f;
+                uint8 r = (uint8)clamp(1.164f*YNew + 0.000f*CbNew + 1.596f*CrNew);
+                uint8 g = (uint8)clamp(1.164f*YNew - 0.392f*CbNew - 0.813f*CrNew);
+                uint8 b = (uint8)clamp(1.164f*YNew + 2.017f*CbNew + 0.000f*CrNew);
+
+                outputBuffer[3*pixelIndex + 0] = r;
+                outputBuffer[3*pixelIndex + 1] = g;
+                outputBuffer[3*pixelIndex + 2] = b;
             }
         }
         inBytesRemaining -= imageWidth*imageHeight*3;
     }
-
-#if 0
-    for(int y=0; y<240; y++)
-    {
-        for(int x=0; x<320; x++)
-        {
-            // TODO: We're assuming here that each image plane has the same size
-            int pixelIndex = y*encodingImage[0].width + x;
-            outputBuffer[3*pixelIndex + 0] = 255;//inputBuffer[3*pixelIndex + 0];
-            outputBuffer[3*pixelIndex + 1] = (uint8)(x*(255.0f/320.0f));//inputBuffer[3*pixelIndex + 1];
-            outputBuffer[3*pixelIndex + 2] = (uint8)(y*(255.0f/240.0f));//inputBuffer[3*pixelIndex + 2];
-        }
-    }
-#endif
     return 0;
 }
 

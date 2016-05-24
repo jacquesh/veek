@@ -34,9 +34,7 @@ TODO: (In No particular order)
 - Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
 - Bundle packets together, its probably not worth sending lots of tiny packets for every little thing, we'd be better of splitting the network layer out to its own thread so it can send/receive at whatever rate it pleases and transparently pack packets together
 
-- Add video compression (via xip.org/daala, H.264 is what Twitch/Youtube/everybody uses apparently but getting a library for that is hard)
-- Look into x265 (http://x265.org/) which can be freely used in projects licenses with GPL (v2?, read the FAQ)
-- Look into WebM (http://www.webmproject.org/code/) which is completely free (some dude on a forum claimed that daala is really slow compared to x265 and WebM)
+- Add support for non-320x240 video input/output sizes
 - Add screen-sharing support
 - Access camera image size properties (escapi resizes to whatever you ask for, which is bad, I don't want that, I want to resize it myself (or at least know what the original size was))
 
@@ -85,6 +83,8 @@ extern int screenHeight;
 static uint8 roomId;
 
 static GLuint pixelTexture;
+static GLuint netcamTexture;
+
 static uint32 micBufferLen;
 static float* micBuffer;
 
@@ -140,6 +140,16 @@ void initGame(GameState* game)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    glGenTextures(1, &netcamTexture);
+    glBindTexture(GL_TEXTURE_2D, netcamTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     unsigned char testImagePixel[] = {255, 255, 255};
     glGenTextures(1, &pixelTexture);
     glBindTexture(GL_TEXTURE_2D, pixelTexture);
@@ -177,11 +187,13 @@ void renderGame(GameState* game, float deltaTime)
         Vector2 position((float)(cameraWidth + connectedUserIndex*userWidth), cameraPosition.y);
         if((userIndex == 0) && (game->cameraEnabled))
         {
+            // TODO: This doesn't work, the render at the top of this function is doing it
             renderTexture(game->cameraTexture, position, size, 1.0f);
         }
         else
         {
-            renderTexture(pixelTexture, position, size, 1.0f);
+            //renderTexture(pixelTexture, position, size, 1.0f);
+            renderTexture(netcamTexture, position, size, 1.0f);
         }
 
         connectedUserIndex += 1;
@@ -495,17 +507,20 @@ int main()
                              GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                 glBindTexture(GL_TEXTURE_2D, 0);
 
-#if 0
-                if(game.connected)
+                if(game.connState == NET_CONNSTATE_CONNECTED)
                 {
-                    int videoBytes = cameraWidth*cameraHeight*3;
+                    static uint8* encodedPixels = new uint8[320*240*3];
+                    int videoBytes = encodeRGBImage(320*240*3, pixelValues,
+                                                    320*240*3, encodedPixels);
+                    log("Encoded %d video bytes\n", videoBytes);
+                    //delete[] encodedPixels;
+
                     ENetPacket* packet = enet_packet_create(0, videoBytes+1,
                                                             ENET_PACKET_FLAG_UNSEQUENCED);
                     *packet->data = NET_MSGTYPE_VIDEO;
-                    memcpy(packet->data+1, pixelValues, videoBytes);
+                    memcpy(packet->data+1, encodedPixels, videoBytes);
                     enet_peer_send(game.netPeer, 0, packet);
                 }
-#endif
             }
         }
 
@@ -616,15 +631,14 @@ int main()
                         } break;
                         case NET_MSGTYPE_VIDEO:
                         {
-                            // TODO
-#if 0
-                            memcpy(pixelValues, netEvent.packet->data, netEvent.packet->dataLength);
-                            glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
+                            static uint8* pixelValues = new uint8[320*240*8];
+                            decodeRGBImage(dataLength, data, 320*240*3, pixelValues);
+                            glBindTexture(GL_TEXTURE_2D, netcamTexture);
                             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                                          cameraWidth, cameraHeight, 0,
                                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                             glBindTexture(GL_TEXTURE_2D, 0);
-#endif
+                            log("Received %d bytes of video frame\n", dataLength);
                         } break;
                     }
 
