@@ -384,11 +384,8 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 int main()
 {
-    // Create Window
-    // TODO: Possibly use glfwGetVersionString
-    log("Initializing GLFW version %d.%d.%d\n",
-            GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION);
 
+    log("Initializing GLFW version %s\n", glfwGetVersionString());
     if(!glfwInit())
     {
         log("Error when trying to initialize GLFW\n");

@@ -428,7 +428,6 @@ bool initAudio()
     soundio->on_backend_disconnect = backendDisconnectCallback;
     log("libsoundio initialized, connecting backend...\n");
 
-
     int connectError = soundio_connect(soundio);
     if(connectError)
     {

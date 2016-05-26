@@ -346,7 +346,7 @@ bool initVideo()
     th_setup_free(setupInfo);
 
 #ifdef DEBUG_VIDEO_VIDEO_OUTPUT
-    ogvOutputFile = fopen("encoding_output_video.ogv", "wb");
+    ogvOutputFile = fopen("debug_videoinput.ogv", "wb");
     if(!ogvOutputFile)
     {
         log("Error: Unable to open ogg video output file\n");
