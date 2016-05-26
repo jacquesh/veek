@@ -386,6 +386,7 @@ bool initVideo()
 
 void deinitVideo()
 {
+    log("Deinitialize video subsystem\n");
     enableCamera(false);
     delete[] pixelValues;
     delete[] captureParams.mTargetBuf;

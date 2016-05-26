@@ -70,6 +70,7 @@ bool initGraphics()
 
 void deinitGraphics()
 {
+    log("Deinitialize graphics subsystem\n");
 }
 
 void updateWindowSize(int newWidth, int newHeight)

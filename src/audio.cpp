@@ -560,6 +560,7 @@ bool initAudio()
 
 void deinitAudio()
 {
+    log("Deinitialize audio subsystem\n");
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
 

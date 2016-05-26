@@ -418,7 +418,6 @@ int main()
     glfwSetScrollCallback(window, ImGui_ImplGlfwGL3_ScrollCallback);
     glfwSetMouseButtonCallback(window, ImGui_ImplGlfwGL3_MouseButtonCallback);
 
-    // Initialize OpenGL
     log("Initializing OpenGL...\n");
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
@@ -427,13 +426,11 @@ int main()
         glfwTerminate();
         return 1;
     }
-
     updateWindowSize(initialWindowWidth, initialWindowHeight);
     ImGui_ImplGlfwGL3_Init(window, false);
     ImGuiIO& imguiIO = ImGui::GetIO();
     imguiIO.IniFilename = 0;
 
-    // Initialize libsoundio
     log("Initializing audio input/output subsystem...\n");
     if(!initAudio())
     {
@@ -442,9 +439,7 @@ int main()
         glfwTerminate();
         return 1;
     }
-    //enableMicrophone(false);
 
-    // Initialize escapi
     log("Initializing video input subsystem...\n");
     if(!initVideo())
     {
@@ -455,7 +450,6 @@ int main()
         return 1;
     }
 
-    // Initialize enet
     if(enet_initialize() != 0)
     {
         log("Unable to initialize enet!\n");
@@ -676,6 +670,7 @@ int main()
         }
     }
 
+    log("Stop running, begin deinitialization\n");
     if(game.netPeer)
     {
         enet_peer_disconnect_now(game.netPeer, 0);
@@ -684,6 +679,7 @@ int main()
     delete[] micBuffer;
     cleanupGame(&game);
 
+    log("Deinitialize enet\n");
     enet_deinitialize();
 
     deinitVideo();
@@ -691,6 +687,7 @@ int main()
     ImGui_ImplGlfwGL3_Shutdown();
     deinitGraphics();
 
+    log("Destroy window\n");
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
