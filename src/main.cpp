@@ -530,11 +530,12 @@ int main()
         }
 
         // Send network output data
-        if(game.connState == NET_CONNSTATE_CONNECTED)
+        if(game.micEnabled)
         {
-            if(game.micEnabled)
+            int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
+
+            if(game.connState == NET_CONNSTATE_CONNECTED)
             {
-                int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
                 int encodedBufferLength = micBufferLen;
                 uint8* encodedBuffer = new uint8[encodedBufferLength];
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
