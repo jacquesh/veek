@@ -31,8 +31,8 @@ extern AudioData audioState; // TODO: We probably want to only have SOME of this
 bool initAudio();
 void deinitAudio();
 
-void setAudioInputDevice(int newInputDevice);
-void setAudioOutputDevice(int newOutputDevice);
+bool setAudioInputDevice(int newInputDevice);
+bool setAudioOutputDevice(int newOutputDevice);
 
 void listenToInput(bool listen);
 void enableMicrophone(bool enabled);

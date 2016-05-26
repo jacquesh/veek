@@ -32,19 +32,33 @@ static SoundIoOutStream* outStream;
 RingBuffer* outBuffer;
 Mutex* audioOutMutex;
 
-void printDevice(SoundIoDevice* device)
+static void printDevice(SoundIoDevice* device, bool isDefault)
 {
-    const char* rawStr = device->is_raw ? "(RAW)" : "";
-    log("%s%s\n", device->name, rawStr);
+    const char* rawStr = device->is_raw ? "(RAW) " : "";
+    const char* defaultStr = isDefault ? "(DEFAULT)" : "";
+    log("%s %s%s\n", device->name, rawStr, defaultStr);
     if(device->probe_error != SoundIoErrorNone)
     {
         log("Probe Error: %s\n", soundio_strerror(device->probe_error));
         return;
     }
-    log("  Channel count: %d\n", device->current_layout.channel_count);
-    log("  Sample Rate: %d\n", device->sample_rate_current);
-    log("  Latency: %0.8f - %0.8f\n", device->software_latency_min, device->software_latency_max);
-    log("      Now: %0.8f\n", device->software_latency_current);
+    log("  Sample Rate: %d - %d (Currently %d)\n",
+            device->sample_rates->min, device->sample_rates->max, device->sample_rate_current);
+    log("  Latency: %0.8f - %0.8f (Currently %0.8f)\n",
+            device->software_latency_min, device->software_latency_max,
+            device->software_latency_current);
+
+    log("  %d layouts supported:\n", device->layout_count);
+    for(int layoutIndex=0; layoutIndex<device->layout_count; layoutIndex++)
+    {
+        log("    %s\n", device->layouts[layoutIndex].name);
+    }
+
+    log("  %d formats supported:\n", device->format_count);
+    for(int formatIndex=0; formatIndex<device->format_count; formatIndex++)
+    {
+        log("    %s\n", soundio_format_string(device->formats[formatIndex]));
+    }
 }
 
 void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
@@ -312,7 +326,7 @@ void devicesChangeCallback(SoundIo* sio)
             inputDeviceCount, outputDeviceCount);
 }
 
-void setAudioInputDevice(int newInputDevice)
+bool setAudioInputDevice(int newInputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
     if(inStream)
@@ -327,24 +341,38 @@ void setAudioInputDevice(int newInputDevice)
     inStream->read_callback = inReadCallback;
     inStream->overflow_callback = inOverflowCallback;
     inStream->error_callback = inErrorCallback;
-    inStream->sample_rate = 48000;
+    inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 48000);
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = *monoLayout;
     inStream->software_latency = 0.005f; // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
+    // TODO: We probably want to check to make sure we don't set this to a value lower than the
+    //       minimum latency for the current device
 
     int openError = soundio_instream_open(inStream);
     if(openError != SoundIoErrorNone)
     {
         log("Error opening input stream: %s\n", soundio_strerror(openError));
+        soundio_instream_destroy(inStream);
+        return false;
     }
     int startError = soundio_instream_start(inStream);
     if(startError != SoundIoErrorNone)
     {
         log("Error starting input stream: %s\n", soundio_strerror(startError));
+        soundio_instream_destroy(inStream);
+        return false;
     }
+
+    const char* rawStr = inDevice->is_raw ? "(RAW) " : "";
+    log("Successfully opened audio input device: %s %s\n", inDevice->name, rawStr);
+    log("  Sample Rate: %d\n", inDevice->sample_rate_current);
+    log("  Latency: %0.8f\n", inDevice->software_latency_current);
+    log("  Layout: %s\n", inDevice->current_layout.name);
+    log("  Format: %s\n", soundio_format_string(inDevice->current_format));
+    return true;
 }
 
-void setAudioOutputDevice(int newOutputDevice)
+bool setAudioOutputDevice(int newOutputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
     if(outStream)
@@ -358,7 +386,7 @@ void setAudioOutputDevice(int newOutputDevice)
     outStream->write_callback = outWriteCallback;
     outStream->underflow_callback = outUnderflowCallback;
     outStream->error_callback = outErrorCallback;
-    outStream->sample_rate = 48000;
+    outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, 48000);
     outStream->format = SoundIoFormatFloat32NE;
     // TODO: Set all the other options
 
@@ -366,12 +394,24 @@ void setAudioOutputDevice(int newOutputDevice)
     if(openError != SoundIoErrorNone)
     {
         log("Error opening output stream: %s\n", soundio_strerror(openError));
+        soundio_outstream_destroy(outStream);
+        return false;
     }
     int startError = soundio_outstream_start(outStream);
     if(startError != SoundIoErrorNone)
     {
         log("Error starting output stream: %s\n", soundio_strerror(openError));
+        soundio_outstream_destroy(outStream);
+        return false;
     }
+
+    const char* rawStr = outDevice->is_raw ? "(RAW) " : "";
+    log("Successfully opened audio output device: %s %s\n", outDevice->name, rawStr);
+    log("  Sample Rate: %d\n", outDevice->sample_rate_current);
+    log("  Latency: %0.8f\n", outDevice->software_latency_current);
+    log("  Layout: %s\n", outDevice->current_layout.name);
+    log("  Format: %s\n", soundio_format_string(outDevice->current_format));
+    return true;
 }
 
 bool initAudio()
@@ -424,13 +464,15 @@ bool initAudio()
     log("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
     // Setup input
+    log("Setup audio input\n");
     int defaultInputDevice = soundio_default_input_device_index(soundio);
     int inputDeviceCount = soundio_input_device_count(soundio);
     int managedInputDeviceCount = 0;
     for(int i=0; i<inputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_input_device(soundio, i);
-        printDevice(device);
+        bool isDefault = (i == defaultInputDevice);
+        printDevice(device, isDefault);
         if(!device->is_raw)
         {
             managedInputDeviceCount += 1;
@@ -464,12 +506,15 @@ bool initAudio()
     audioInMutex = createMutex();
 
     // Setup output
+    log("Setup audio output\n");
     int defaultOutputDevice = soundio_default_output_device_index(soundio);
     int outputDeviceCount = soundio_output_device_count(soundio);
     int managedOutputDeviceCount = 0;
     for(int i=0; i<outputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_output_device(soundio, i);
+        bool isDefault = (i == defaultInputDevice);
+        printDevice(device, isDefault);
         if(!device->is_raw)
         {
             managedOutputDeviceCount += 1;
@@ -502,8 +547,14 @@ bool initAudio()
     outBuffer = new RingBuffer(48000);
     audioOutMutex = createMutex();
 
-    setAudioInputDevice(audioState.defaultInputDevice);
-    setAudioOutputDevice(audioState.defaultOutputDevice);
+    if(!setAudioInputDevice(audioState.defaultInputDevice))
+    {
+        return false;
+    }
+    if(!setAudioOutputDevice(audioState.defaultOutputDevice))
+    {
+        return false;
+    }
     return true;
 }
 
