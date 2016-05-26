@@ -20,26 +20,40 @@
 #include "network_common.h"
 
 /*
-TODO: (In No particular order)
-- Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
-- Check what happens when you join the server in the middle of a conversation/after a bunch of data has been transfered, because the codecs are stateful so we might have to do some shenanigans to make sure that it can handle that and setup the correct state to continue
-- Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
-- Add rendering of all connected peers (video feed, or a square/base image)
-- Add different voice-activation methods (continuous, threshold, push-to-talk)
-- Add multithreading (will be necessary for compression/decompression, possibly also for networkthings)
+TODO:
+- Bugs/increments of current functionality:
+    - Add rendering of all connected peers (video feed, or a square/base image)
+    - Synchronize audio/video (or check that it is synchronized)
+    - Scale to more clients than just 2, IE allow each client to distinguish who each packet of video/audio is coming from, highlight them when they're speaking etc
+        - Add an audio/video decoder for every client (not just one)
+    - Add proper support for different sample rates (opus needs to know the sample rate at construction for example) because not everybody supports 44100 and 48000 (Tim's laptop only supports 44.1kHz, mine only supports 48kHz)
+    - Check what happens when you join the server in the middle of a conversation/after a bunch of data has been transfered, because the codecs are stateful so we might have to do some shenanigans to make sure that it can handle that and setup the correct state to continue
+    - Stop trusting data that we receive over the network (IE might get malicious packets that make us read/write too far and corrupt memory, or allocate too much etc)
+    - Bundle packets together, its probably not worth sending lots of tiny packets for every little thing, we'd be better of splitting the network layer out to its own thread so it can send/receive at whatever rate it pleases and transparently pack packets together
+    - Access camera image size properties (escapi resizes to whatever you ask for, which is bad, I don't want that, I want to resize it myself (or at least know what the original size was))
+        - Add support for non-320x240 video input/output sizes
 
-- Scale to more clients than just 2, IE allow each client to distinguish who each packet of video/audio is coming from, highlight them when they're speaking etc
-- Add server matching (IE you connect to a server, give a username and a channel-password to join, or ask for a channel name to be created, or whatever.)
-- Stop trusting data that we receive over the network (IE might get malicious packets that make us read/write too far and corrupt memory, or allocate too much etc)
-- Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
-- Bundle packets together, its probably not worth sending lots of tiny packets for every little thing, we'd be better of splitting the network layer out to its own thread so it can send/receive at whatever rate it pleases and transparently pack packets together
+- New functionality:
+    - Add a "voice volume bar" (like what you get in TS when you test your voice, that shows loudness)
+    - Add a display of the ping to the server, as well as incoming/outgoing packet loss etc
+    - Add different voice-activation methods (continuous, threshold, push-to-talk)
+    - Add text chat
+    - Add an options screen (which is where we can put all the voice-activation stuff, and the mic volume editing etc)
+    - Add a "mirror" window which can be dragged around (as in skype) which shows a small version of your own video output stream
+    - Add audio debug output to file
+    - Add linux support
+    - Upgrade server rooms from integers in the range 0-255 inclusive, to string names
+    - Add screen-sharing support
+    - Switch to webm/libvpx instead of theora, its newer and more active
 
-- Add support for non-320x240 video input/output sizes
-- Add screen-sharing support
-- Access camera image size properties (escapi resizes to whatever you ask for, which is bad, I don't want that, I want to resize it myself (or at least know what the original size was))
+- Code/Developer specific:
+    - Find some automated way to do builds that require modifying the build settings of dependencies
+    - Try to shrink distributable down to a single exe (so statically link everything possible)
+        - Read http://www.codeproject.com/Articles/15156/Tiny-C-Runtime-Library
+        - Read http://www.catch22.net/tuts/reducing-executable-size
 
-- Find some automated way to do builds that require modifying the build settings of dependencies
-- Try to shrink distributable down to a single exe (so statically link everything possible)
+- Misc:
+    - Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
 */
 
 #include "ringbuffer.h"
