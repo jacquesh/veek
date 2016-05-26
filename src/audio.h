@@ -10,16 +10,12 @@ struct AudioData
     int inputDeviceCount;
     SoundIoDevice** inputDeviceList;
     char** inputDeviceNames;
-    int defaultInputDevice;
     int currentInputDevice;
-    bool inputEnabled;
 
     int outputDeviceCount;
     SoundIoDevice** outputDeviceList;
     char** outputDeviceNames;
-    int defaultOutputDevice;
     int currentOutputDevice;
-    int outputEnabled;
 
     bool isListeningToInput;
 };

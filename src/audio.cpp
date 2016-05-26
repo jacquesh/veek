@@ -18,19 +18,19 @@
 //       We do actually keep track of time but we have yet to use that to check for packet loss
 AudioData audioState = {};
 
-static SoundIo* soundio;
-static OpusEncoder* encoder;
-static OpusDecoder* decoder;
+static SoundIo* soundio = 0;
+static OpusEncoder* encoder = 0;
+static OpusDecoder* decoder = 0;
 
-static SoundIoDevice* inDevice;
-static SoundIoInStream* inStream;
-RingBuffer* inBuffer; // TODO: These should probably be static but at the moment we use them for
-Mutex* audioInMutex;  //       the microphone volume bars
+static SoundIoDevice* inDevice = 0;
+static SoundIoInStream* inStream = 0;
+RingBuffer* inBuffer = 0; // TODO: These should probably be static but at the moment we use them for
+Mutex* audioInMutex = 0;  //       the microphone volume bars
 
-static SoundIoDevice* outDevice;
-static SoundIoOutStream* outStream;
-RingBuffer* outBuffer;
-Mutex* audioOutMutex;
+static SoundIoDevice* outDevice = 0;
+static SoundIoOutStream* outStream = 0;
+RingBuffer* outBuffer = 0;
+Mutex* audioOutMutex = 0;
 
 static void printDevice(SoundIoDevice* device, bool isDefault)
 {
@@ -309,23 +309,6 @@ void enableMicrophone(bool enabled)
     }
 }
 
-void backendDisconnectCallback(SoundIo* sio, int error)
-{
-    log("SoundIo backend disconnected: %s\n", soundio_strerror(error));
-    // TODO: This runs immediately on flush_events on pIjIn's PC, it crashes if we do not
-    //       specify this callback (which is probably correct, what is the appropriate response
-    //       here even?)
-}
-
-void devicesChangeCallback(SoundIo* sio)
-{
-    // TODO
-    int inputDeviceCount = soundio_input_device_count(sio);
-    int outputDeviceCount = soundio_output_device_count(sio);
-    log("SoundIo device list updated - %d input, %d output devices\n",
-            inputDeviceCount, outputDeviceCount);
-}
-
 bool setAudioInputDevice(int newInputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
@@ -344,7 +327,8 @@ bool setAudioInputDevice(int newInputDevice)
     inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 48000);
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = *monoLayout;
-    inStream->software_latency = 0.005f; // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
+    inStream->software_latency = 0.005f;
+    // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
     // TODO: We probably want to check to make sure we don't set this to a value lower than the
     //       minimum latency for the current device
 
@@ -414,8 +398,147 @@ bool setAudioOutputDevice(int newOutputDevice)
     return true;
 }
 
+void backendDisconnectCallback(SoundIo* sio, int error)
+{
+    log("SoundIo backend disconnected: %s\n", soundio_strerror(error));
+    // TODO: This runs immediately on flush_events on pIjIn's PC, it crashes if we do not
+    //       specify this callback (which is probably correct, what is the appropriate response
+    //       here even?)
+}
+
+void devicesChangeCallback(SoundIo* sio)
+{
+    // TODO: This doesn't appear to get called when I unplug/plug in my microphone (realtek does notice though)
+    int inputDeviceCount = soundio_input_device_count(sio);
+    int outputDeviceCount = soundio_output_device_count(sio);
+    log("SoundIo device list updated - %d input, %d output devices\n",
+            inputDeviceCount, outputDeviceCount);
+
+    if(audioState.currentInputDevice == -1)
+    {
+        // Try to set up a new input stream
+        log("Setup audio input\n");
+        int defaultInputDevice = soundio_default_input_device_index(sio);
+        int managedInputDeviceCount = 0;
+
+        for(int i=0; i<inputDeviceCount; ++i)
+        {
+            SoundIoDevice* device = soundio_get_input_device(sio, i);
+            bool isDefault = (i == defaultInputDevice);
+            printDevice(device, isDefault);
+            if(!device->is_raw)
+            {
+                managedInputDeviceCount += 1;
+            }
+            soundio_device_unref(device);
+        }
+
+        if(audioState.inputDeviceList)
+            delete[] audioState.inputDeviceList;
+        if(audioState.inputDeviceNames)
+            delete[] audioState.inputDeviceNames;
+        audioState.inputDeviceList = new SoundIoDevice*[audioState.inputDeviceCount];
+        audioState.inputDeviceNames = new char*[audioState.inputDeviceCount];
+        audioState.inputDeviceCount = managedInputDeviceCount;
+        int defaultInputDeviceIndex = -1;
+        int managedInputIndex = 0;
+        for(int i=0; i<inputDeviceCount; ++i)
+        {
+            SoundIoDevice* device = soundio_get_input_device(sio, i);
+            if(!device->is_raw)
+            {
+                audioState.inputDeviceList[managedInputIndex] = device;
+                audioState.inputDeviceNames[managedInputIndex] = device->name;
+                if(i == defaultInputDevice)
+                {
+                    defaultInputDeviceIndex = managedInputIndex;
+                }
+                managedInputIndex += 1;
+            }
+            else
+            {
+                soundio_device_unref(device);
+            }
+        }
+
+        if(defaultInputDeviceIndex >= 0)
+        {
+            if(!setAudioInputDevice(defaultInputDeviceIndex))
+            {
+                log("Error: Unable to initialize audio input device %s\n",
+                        audioState.inputDeviceNames[defaultInputDeviceIndex]);
+            }
+        }
+    }
+
+    if(audioState.currentOutputDevice == -1)
+    {
+        // Try to setup a new output stream
+        log("Setup audio output\n");
+        int defaultOutputDevice = soundio_default_output_device_index(sio);
+        int managedOutputDeviceCount = 0;
+        for(int i=0; i<outputDeviceCount; ++i)
+        {
+            SoundIoDevice* device = soundio_get_output_device(sio, i);
+            bool isDefault = (i == defaultOutputDevice);
+            printDevice(device, isDefault);
+            if(!device->is_raw)
+            {
+                managedOutputDeviceCount += 1;
+            }
+            soundio_device_unref(device);
+        }
+
+        if(audioState.outputDeviceList)
+            delete[] audioState.outputDeviceList;
+        if(audioState.outputDeviceNames)
+            delete[] audioState.outputDeviceNames;
+        audioState.outputDeviceList = new SoundIoDevice*[managedOutputDeviceCount];
+        audioState.outputDeviceNames = new char*[managedOutputDeviceCount];
+        audioState.outputDeviceCount = managedOutputDeviceCount;
+        int defaultOutputDeviceIndex = -1;
+        int managedOutputIndex = 0;
+        for(int i=0; i<outputDeviceCount; ++i)
+        {
+            SoundIoDevice* device = soundio_get_output_device(sio, i);
+            if(!device->is_raw)
+            {
+                audioState.outputDeviceList[managedOutputIndex] = device;
+                audioState.outputDeviceNames[managedOutputIndex] = device->name;
+                if(i == defaultOutputDevice)
+                {
+                    defaultOutputDeviceIndex = managedOutputIndex;
+                }
+                managedOutputIndex += 1;
+            }
+            else
+            {
+                soundio_device_unref(device);
+            }
+        }
+
+        if(defaultOutputDeviceIndex >= 0)
+        {
+            if(!setAudioOutputDevice(defaultOutputDeviceIndex))
+            {
+                log("Error: Unable to initialize audio output device %s\n",
+                        audioState.outputDeviceNames[defaultOutputDeviceIndex]);
+            }
+        }
+    }
+}
+
 bool initAudio()
 {
+    // Initialize the current devices to null so that we will connect automatically when we 
+    // get a list of connected devices
+    audioState.currentInputDevice = -1;
+    audioState.currentOutputDevice = -1;
+    inBuffer = new RingBuffer(2400);
+    audioInMutex = createMutex();
+    outBuffer = new RingBuffer(48000);
+    audioOutMutex = createMutex();
+
     // Initialize SoundIO
     log("Initializing libsoundio %s\n", soundio_version_string());
     soundio = soundio_create();
@@ -426,7 +549,12 @@ bool initAudio()
     }
     soundio->on_devices_change = devicesChangeCallback;
     soundio->on_backend_disconnect = backendDisconnectCallback;
-    log("libsoundio initialized, connecting backend...\n");
+    int backendCount = soundio_backend_count(soundio);
+    log("%d audio backends are available:\n", backendCount);
+    for(int backendIndex=0; backendIndex<backendCount; backendIndex++)
+    {
+        log("  %s\n", soundio_backend_name(soundio_get_backend(soundio, backendIndex)));
+    }
 
     int connectError = soundio_connect(soundio);
     if(connectError)
@@ -438,6 +566,7 @@ bool initAudio()
     }
     log("Backend %s connected\n", soundio_backend_name(soundio->current_backend));
     soundio_flush_events(soundio);
+    devicesChangeCallback(soundio)
     log("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
@@ -462,98 +591,6 @@ bool initAudio()
     opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
     log("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
-    // Setup input
-    log("Setup audio input\n");
-    int defaultInputDevice = soundio_default_input_device_index(soundio);
-    int inputDeviceCount = soundio_input_device_count(soundio);
-    int managedInputDeviceCount = 0;
-    for(int i=0; i<inputDeviceCount; ++i)
-    {
-        SoundIoDevice* device = soundio_get_input_device(soundio, i);
-        bool isDefault = (i == defaultInputDevice);
-        printDevice(device, isDefault);
-        if(!device->is_raw)
-        {
-            managedInputDeviceCount += 1;
-        }
-        soundio_device_unref(device);
-    }
-    audioState.defaultInputDevice = 0;
-    audioState.inputDeviceCount = managedInputDeviceCount;
-    audioState.inputDeviceList = new SoundIoDevice*[audioState.inputDeviceCount];
-    audioState.inputDeviceNames = new char*[audioState.inputDeviceCount];
-    int managedInputIndex = 0;
-    for(int i=0; i<inputDeviceCount; ++i)
-    {
-        SoundIoDevice* device = soundio_get_input_device(soundio, i);
-        if(!device->is_raw)
-        {
-            audioState.inputDeviceList[managedInputIndex] = device;
-            audioState.inputDeviceNames[managedInputIndex] = device->name;
-            if(i == defaultInputDevice)
-            {
-                audioState.defaultInputDevice = managedInputIndex;
-            }
-            managedInputIndex += 1;
-        }
-        else
-        {
-            soundio_device_unref(device);
-        }
-    }
-    inBuffer = new RingBuffer(2400);
-    audioInMutex = createMutex();
-
-    // Setup output
-    log("Setup audio output\n");
-    int defaultOutputDevice = soundio_default_output_device_index(soundio);
-    int outputDeviceCount = soundio_output_device_count(soundio);
-    int managedOutputDeviceCount = 0;
-    for(int i=0; i<outputDeviceCount; ++i)
-    {
-        SoundIoDevice* device = soundio_get_output_device(soundio, i);
-        bool isDefault = (i == defaultInputDevice);
-        printDevice(device, isDefault);
-        if(!device->is_raw)
-        {
-            managedOutputDeviceCount += 1;
-        }
-        soundio_device_unref(device);
-    }
-    audioState.defaultOutputDevice = 0;
-    audioState.outputDeviceCount = managedOutputDeviceCount;
-    audioState.outputDeviceList = new SoundIoDevice*[audioState.outputDeviceCount];
-    audioState.outputDeviceNames = new char*[audioState.outputDeviceCount];
-    int managedOutputIndex = 0;
-    for(int i=0; i<outputDeviceCount; ++i)
-    {
-        SoundIoDevice* device = soundio_get_output_device(soundio, i);
-        if(!device->is_raw)
-        {
-            audioState.outputDeviceList[managedOutputIndex] = device;
-            audioState.outputDeviceNames[managedOutputIndex] = device->name;
-            if(i == defaultOutputDevice)
-            {
-                audioState.defaultOutputDevice = managedOutputIndex;
-            }
-            managedOutputIndex += 1;
-        }
-        else
-        {
-            soundio_device_unref(device);
-        }
-    }
-    outBuffer = new RingBuffer(48000);
-    audioOutMutex = createMutex();
-
-    if(!setAudioInputDevice(audioState.defaultInputDevice))
-    {
-        return false;
-    }
-    if(!setAudioOutputDevice(audioState.defaultOutputDevice))
-    {
-        return false;
-    }
     return true;
 }
 
