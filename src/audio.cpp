@@ -364,11 +364,11 @@ bool setAudioInputDevice(int newInputDevice)
     }
 
     const char* rawStr = inDevice->is_raw ? "(RAW) " : "";
-    log("Successfully opened audio input device: %s %s\n", inDevice->name, rawStr);
-    log("  Sample Rate: %d\n", inDevice->sample_rate_current);
-    log("  Latency: %0.8f\n", inDevice->software_latency_current);
-    log("  Layout: %s\n", inDevice->current_layout.name);
-    log("  Format: %s\n", soundio_format_string(inDevice->current_format));
+    log("Successfully opened audio input stream on device: %s %s\n", inDevice->name, rawStr);
+    log("  Sample Rate: %d\n", inStream->sample_rate);
+    log("  Latency: %0.8f\n", inStream->software_latency);
+    log("  Layout: %s\n", inStream->layout.name);
+    log("  Format: %s\n", soundio_format_string(inStream->format));
     return true;
 }
 
@@ -406,11 +406,11 @@ bool setAudioOutputDevice(int newOutputDevice)
     }
 
     const char* rawStr = outDevice->is_raw ? "(RAW) " : "";
-    log("Successfully opened audio output device: %s %s\n", outDevice->name, rawStr);
-    log("  Sample Rate: %d\n", outDevice->sample_rate_current);
-    log("  Latency: %0.8f\n", outDevice->software_latency_current);
-    log("  Layout: %s\n", outDevice->current_layout.name);
-    log("  Format: %s\n", soundio_format_string(outDevice->current_format));
+    log("Successfully opened audio output stream on device: %s %s\n", outDevice->name, rawStr);
+    log("  Sample Rate: %d\n", outStream->sample_rate);
+    log("  Latency: %0.8f\n", outStream->software_latency);
+    log("  Layout: %s\n", outStream->layout.name);
+    log("  Format: %s\n", soundio_format_string(outStream->format));
     return true;
 }
 
