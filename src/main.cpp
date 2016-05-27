@@ -378,6 +378,11 @@ void cleanupGame(GameState* game)
 {
 }
 
+void glfwErrorCallback(int errorCode, const char* errorDescription)
+{
+    log("GLFW Error %d: %s\n", errorCode, errorDescription);
+}
+
 void windowResizeCallback(GLFWwindow* window, int newWidth, int newHeight)
 {
     updateWindowSize(newWidth, newHeight);
@@ -400,6 +405,7 @@ int main()
 {
 
     log("Initializing GLFW version %s\n", glfwGetVersionString());
+    glfwSetErrorCallback(glfwErrorCallback);
     if(!glfwInit())
     {
         log("Error when trying to initialize GLFW\n");
