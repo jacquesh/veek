@@ -437,8 +437,8 @@ void devicesChangeCallback(SoundIo* sio)
             delete[] audioState.inputDeviceList;
         if(audioState.inputDeviceNames)
             delete[] audioState.inputDeviceNames;
-        audioState.inputDeviceList = new SoundIoDevice*[audioState.inputDeviceCount];
-        audioState.inputDeviceNames = new char*[audioState.inputDeviceCount];
+        audioState.inputDeviceList = new SoundIoDevice*[managedInputDeviceCount];
+        audioState.inputDeviceNames = new char*[managedInputDeviceCount];
         audioState.inputDeviceCount = managedInputDeviceCount;
         int defaultInputDeviceIndex = -1;
         int managedInputIndex = 0;
