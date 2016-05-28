@@ -8,37 +8,43 @@
 
 void glPrintError(bool alwaysPrint)
 {
-  GLenum error = glGetError();
-  const char* errorStr;
-  if(alwaysPrint || (error != GL_NO_ERROR))
-  {
-      switch(error)
-      {
-      case GL_NO_ERROR:
-          errorStr = "GL_NO_ERROR";
-          break;
-      case GL_INVALID_ENUM:
-          errorStr = "GL_INVALID_ENUM";
-          break;
-      case GL_INVALID_VALUE:
-          errorStr = "GL_INVALID_VALUE";
-          break;
-      case GL_INVALID_OPERATION:
-          errorStr = "GL_INVALID_OPERATION";
-          break;
-      case GL_INVALID_FRAMEBUFFER_OPERATION:
-          errorStr = "GL_INVALID_FRAMEBUFFER_OPERATION";
-          break;
-      case GL_OUT_OF_MEMORY:
-          errorStr = "GL_OUT_OF_MEMORY";
-          break;
-      default:
-          errorStr = "UNRECOGNIZED";
-          break;
-      }
+    GLenum error = glGetError();
+    if(error == GL_NO_ERROR)
+    {
+        if(alwaysPrint)
+        {
+            logInfo("OpenGL error: GL_NO_ERROR\n");
+        }
+        return;
+    }
 
-      logWarn("OpenGL error: %s\n", errorStr);
-  }
+    const char* errorStr;
+    switch(error)
+    {
+    case GL_NO_ERROR:
+        errorStr = "GL_NO_ERROR";
+        break;
+    case GL_INVALID_ENUM:
+        errorStr = "GL_INVALID_ENUM";
+        break;
+    case GL_INVALID_VALUE:
+        errorStr = "GL_INVALID_VALUE";
+        break;
+    case GL_INVALID_OPERATION:
+        errorStr = "GL_INVALID_OPERATION";
+        break;
+    case GL_INVALID_FRAMEBUFFER_OPERATION:
+        errorStr = "GL_INVALID_FRAMEBUFFER_OPERATION";
+        break;
+    case GL_OUT_OF_MEMORY:
+        errorStr = "GL_OUT_OF_MEMORY";
+        break;
+    default:
+        errorStr = "UNRECOGNIZED";
+        break;
+    }
+
+    logWarn("OpenGL error: %s\n", errorStr);
 }
 
 GLuint loadShaderFromString(const char* shaderStr, GLenum shaderType)
