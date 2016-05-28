@@ -3,6 +3,12 @@ build/
 lib/
 dependencies/
 
+# Log files
+*.log
+
 # Vim Metafiles
 *.swp
+
+# ctime data files
+*.ctm
 
