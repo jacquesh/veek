@@ -47,6 +47,11 @@ static ogg_stream_state ogvOutputStream;
 
 void enableCamera(bool enabled)
 {
+    if(cameraDevice < 0)
+    {
+        return;
+    }
+
     cameraEnabled = enabled;
     if(enabled)
     {
@@ -269,10 +274,6 @@ bool initVideo()
 
     deviceCount = setupESCAPI();
     log("%d video input devices available.\n", deviceCount);
-    if(deviceCount == 0)
-    {
-        return false;
-    }
     cameraDevice = deviceCount-1; // Can be anything in the range [0, deviceCount)
     enableCamera(false);
 
