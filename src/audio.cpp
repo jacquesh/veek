@@ -567,7 +567,6 @@ bool initAudio()
     }
     log("Backend %s connected\n", soundio_backend_name(soundio->current_backend));
     soundio_flush_events(soundio);
-    devicesChangeCallback(soundio)
     log("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
