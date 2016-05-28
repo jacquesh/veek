@@ -9,6 +9,7 @@
 #include "opus/opus.h"
 
 #include "common.h"
+#include "logging.h"
 #include "platform.h"
 #include "vecmath.h"
 #include "ringbuffer.h"

@@ -3,6 +3,7 @@
 #include <GL/gl3w.h>
 
 #include "common.h"
+#include "logging.h"
 #include "graphics.h"
 
 void glPrintError(bool alwaysPrint)

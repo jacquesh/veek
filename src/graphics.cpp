@@ -1,6 +1,7 @@
 #include "graphics.h"
 
 #include "common.h"
+#include "logging.h"
 #include "graphicsutil.h"
 #include "vecmath.h"
 

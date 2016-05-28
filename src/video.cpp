@@ -19,6 +19,7 @@
 #endif
 
 #include "common.h"
+#include "logging.h"
 
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 

@@ -11,6 +11,7 @@
 #include "enet/enet.h"
 
 #include "common.h"
+#include "logging.h"
 #include "platform.h"
 #include "vecmath.h"
 #include "audio.h"
@@ -403,6 +404,10 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 int main()
 {
+    if(!initLogging())
+    {
+        return 1;
+    }
 
     log("Initializing GLFW version %s\n", glfwGetVersionString());
     glfwSetErrorCallback(glfwErrorCallback);
@@ -708,5 +713,7 @@ int main()
     log("Destroy window\n");
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    deinitLogging();
     return 0;
 }
