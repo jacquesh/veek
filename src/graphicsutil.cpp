@@ -37,7 +37,7 @@ void glPrintError(bool alwaysPrint)
           break;
       }
 
-      log("OpenGL error: %s\n", errorStr);
+      logWarn("OpenGL error: %s\n", errorStr);
   }
 }
 
@@ -73,7 +73,7 @@ GLuint loadShaderProgramFromString(const char* vertShaderStr,
         GLsizei logLength = 0;
         GLchar message[1024];
         glGetProgramInfoLog(program, 1024, &logLength, message);
-        log("Error: %s\n", message);
+        logFail("Error: %s\n", message);
 
         glDeleteProgram(program);
         return 0;

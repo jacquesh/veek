@@ -231,7 +231,7 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::SameLine();
         if(ImGui::InputText("##userNameField", game->name, MAX_USER_NAME_LENGTH))
         {
-            log("Name changed\n");
+            logInfo("Name changed\n");
             for(uint8 i=0; i<MAX_USER_NAME_LENGTH; ++i)
             {
                 if(game->name[i] == 0)
@@ -273,7 +273,7 @@ void renderGame(GameState* game, float deltaTime)
                                        audioState.inputDeviceCount);
         if(micChanged)
         {
-            log("Mic Device Changed\n");
+            logInfo("Mic Device Changed\n");
             setAudioInputDevice(selectedRecordingDevice);
         }
 
@@ -289,7 +289,7 @@ void renderGame(GameState* game, float deltaTime)
                                            audioState.outputDeviceCount);
         if(speakerChanged)
         {
-            log("Speaker Device Changed\n");
+            logInfo("Speaker Device Changed\n");
         }
 
         ImGui::Button("Play test sound", ImVec2(120, 20));
@@ -320,7 +320,7 @@ void renderGame(GameState* game, float deltaTime)
                 game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
                 if(!game->netHost)
                 {
-                    log("Unable to create client\n");
+                    logFail("Unable to create client\n");
                 }
             }
         } break;
@@ -381,7 +381,7 @@ void cleanupGame(GameState* game)
 
 void glfwErrorCallback(int errorCode, const char* errorDescription)
 {
-    log("GLFW Error %d: %s\n", errorCode, errorDescription);
+    logWarn("GLFW Error %d: %s\n", errorCode, errorDescription);
 }
 
 void windowResizeCallback(GLFWwindow* window, int newWidth, int newHeight)
@@ -409,11 +409,11 @@ int main()
         return 1;
     }
 
-    log("Initializing GLFW version %s\n", glfwGetVersionString());
+    logInfo("Initializing GLFW version %s\n", glfwGetVersionString());
     glfwSetErrorCallback(glfwErrorCallback);
     if(!glfwInit())
     {
-        log("Error when trying to initialize GLFW\n");
+        logFail("Error when trying to initialize GLFW\n");
         return 1;
     }
 
@@ -429,7 +429,7 @@ int main()
                                           "Veek", 0, 0);
     if(!window)
     {
-        log("Error when trying to create GLFW Window\n");
+        logFail("Error when trying to create GLFW Window\n");
         glfwTerminate();
         return 1;
     }
@@ -440,7 +440,7 @@ int main()
     glfwSetScrollCallback(window, ImGui_ImplGlfwGL3_ScrollCallback);
     glfwSetMouseButtonCallback(window, ImGui_ImplGlfwGL3_MouseButtonCallback);
 
-    log("Initializing OpenGL...\n");
+    logInfo("Initializing OpenGL...\n");
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
     if(!initGraphics())
@@ -453,19 +453,19 @@ int main()
     ImGuiIO& imguiIO = ImGui::GetIO();
     imguiIO.IniFilename = 0;
 
-    log("Initializing audio input/output subsystem...\n");
+    logInfo("Initializing audio input/output subsystem...\n");
     if(!initAudio())
     {
-        log("Unable to initialize audio subsystem\n");
+        logFail("Unable to initialize audio subsystem\n");
         deinitGraphics();
         glfwTerminate();
         return 1;
     }
 
-    log("Initializing video input subsystem...\n");
+    logInfo("Initializing video input subsystem...\n");
     if(!initVideo())
     {
-        log("Unable to initialize camera video subsystem\n");
+        logFail("Unable to initialize camera video subsystem\n");
         deinitAudio();
         deinitGraphics();
         glfwTerminate();
@@ -474,7 +474,7 @@ int main()
 
     if(enet_initialize() != 0)
     {
-        log("Unable to initialize enet!\n");
+        logFail("Unable to initialize enet!\n");
         deinitVideo();
         deinitAudio();
         deinitGraphics();
@@ -496,7 +496,7 @@ int main()
     running = true;
 
     glPrintError(true);
-    log("Setup complete, start running...\n");
+    logInfo("Setup complete, start running...\n");
     while(running)
     {
         nextTickTime += tickDuration;
@@ -528,7 +528,7 @@ int main()
                     static uint8* encodedPixels = new uint8[320*240*3];
                     int videoBytes = encodeRGBImage(320*240*3, pixelValues,
                                                     320*240*3, encodedPixels);
-                    log("Encoded %d video bytes\n", videoBytes);
+                    logTerm("Encoded %d video bytes\n", videoBytes);
                     //delete[] encodedPixels;
 
                     ENetPacket* packet = enet_packet_create(0, videoBytes+1,
@@ -551,7 +551,7 @@ int main()
                 uint8* encodedBuffer = new uint8[encodedBufferLength];
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
-                //log("Send %d bytes of audio\n", audioBytes);
+                //logTerm("Send %d bytes of audio\n", audioBytes);
                 ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
@@ -570,7 +570,7 @@ int main()
             {
                 case ENET_EVENT_TYPE_CONNECT:
                 {
-                    log("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    logInfo("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                     game.connState = NET_CONNSTATE_CONNECTED;
 
                     uint32 dataTime = 0; // TODO
@@ -588,7 +588,7 @@ int main()
                     uint8 dataType = *netEvent.packet->data;
                     uint8* data = netEvent.packet->data+1;
                     int dataLength = netEvent.packet->dataLength-1;
-                    log("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
+                    logTerm("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
 
                     switch(dataType)
                     {
@@ -599,7 +599,7 @@ int main()
                         case NET_MSGTYPE_INIT_DATA:
                         {
                             uint8 clientCount = *data;
-                            log("There are %d connected clients\n", clientCount);
+                            logInfo("There are %d connected clients\n", clientCount);
                             data += 1;
                             for(uint8 i=0; i<clientCount; ++i)
                             {
@@ -615,7 +615,7 @@ int main()
                                 game.users[index].connected = true;
                                 game.users[index].nameLength = nameLength;
                                 game.users[index].name = name;
-                                log("%s\n", name);
+                                logInfo("%s\n", name);
                             }
                         } break;
                         case NET_MSGTYPE_CLIENT_CONNECT:
@@ -627,12 +627,12 @@ int main()
                             game.users[index].name = new char[nameLength+1];
                             memcpy(game.users[index].name, data+2, nameLength);
                             game.users[index].name[nameLength] = 0;
-                            log("%s connected\n", game.users[index].name);
+                            logInfo("%s connected\n", game.users[index].name);
                         } break;
                         case NET_MSGTYPE_CLIENT_DISCONNECT:
                         {
                             uint8 index = *data;
-                            log("%s disconnected\n", game.users[index].name);
+                            logInfo("%s disconnected\n", game.users[index].name);
                             delete[] game.users[index].name; // TODO: Again, network security
                             game.users[index].connected = false;
                             game.users[index].nameLength = 0;
@@ -643,7 +643,7 @@ int main()
                             float* decodedAudio = new float[micBufferLen];
                             int decodedFrames = decodePacket(dataLength, data,
                                                              micBufferLen, decodedAudio);
-                            log("Received %d samples\n", decodedFrames);
+                            logTerm("Received %d samples\n", decodedFrames);
                             writeAudioOutputBuffer(decodedFrames, decodedAudio);
                         } break;
                         case NET_MSGTYPE_VIDEO:
@@ -655,7 +655,7 @@ int main()
                                          cameraWidth, cameraHeight, 0,
                                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                             glBindTexture(GL_TEXTURE_2D, 0);
-                            log("Received %d bytes of video frame\n", dataLength);
+                            logTerm("Received %d bytes of video frame\n", dataLength);
                         } break;
                     }
 
@@ -664,7 +664,7 @@ int main()
 
                 case ENET_EVENT_TYPE_DISCONNECT:
                 {
-                    log("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                 } break;
             }
         }
@@ -693,7 +693,7 @@ int main()
         }
     }
 
-    log("Stop running, begin deinitialization\n");
+    logInfo("Stop running, begin deinitialization\n");
     if(game.netPeer)
     {
         enet_peer_disconnect_now(game.netPeer, 0);
@@ -702,7 +702,7 @@ int main()
     delete[] micBuffer;
     cleanupGame(&game);
 
-    log("Deinitialize enet\n");
+    logInfo("Deinitialize enet\n");
     enet_deinitialize();
 
     deinitVideo();
@@ -710,7 +710,7 @@ int main()
     ImGui_ImplGlfwGL3_Shutdown();
     deinitGraphics();
 
-    log("Destroy window\n");
+    logInfo("Destroy window\n");
     glfwDestroyWindow(window);
     glfwTerminate();
 

@@ -57,7 +57,7 @@ void enableCamera(bool enabled)
     {
         char deviceName[256];
         getCaptureDeviceName(cameraDevice, deviceName, 256);
-        log("Initializing %s\n", deviceName);
+        logInfo("Initializing %s\n", deviceName);
 
         initCapture(cameraDevice, &captureParams);
         doCapture(cameraDevice);
@@ -152,7 +152,7 @@ int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
     int result = th_encode_ycbcr_in(encoderContext, encodingImage);
     if(result < 0)
     {
-        log("ERROR: Image encoding failed with code %d\n", result);
+        logWarn("ERROR: Image encoding failed with code %d\n", result);
         return 0;
     }
 
@@ -217,7 +217,7 @@ int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
         int result = th_decode_packetin(decoderContext, &packet, 0);
         if(result < 0)
         {
-            log("ERROR: Video packet decode failed with code: %d\n", result);
+            logWarn("ERROR: Video packet decode failed with code: %d\n", result);
             return 0;
         }
 
@@ -225,7 +225,7 @@ int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8*
         result = th_decode_ycbcr_out(decoderContext, decodingImage);
         if(result < 0)
         {
-            log("ERROR: Video frame extraction failed with code: %d\n", result);
+            logWarn("ERROR: Video frame extraction failed with code: %d\n", result);
             return 0;
         }
 
@@ -273,7 +273,7 @@ bool initVideo()
     pixelValues = new uint8[pixelBytes];
 
     deviceCount = setupESCAPI();
-    log("%d video input devices available.\n", deviceCount);
+    logInfo("%d video input devices available.\n", deviceCount);
     cameraDevice = deviceCount-1; // Can be anything in the range [0, deviceCount)
     enableCamera(false);
 
@@ -316,7 +316,7 @@ bool initVideo()
         th_comment_clear(&comment);
         copyTheoraPacket(headerPackets[headerPacketCount], tempPacket);
         headerPacketCount++;
-        log("Output theora header packet\n");
+        logInfo("Output theora header packet\n");
     }
     assert(headerPacketCount == 3);
 
@@ -339,7 +339,7 @@ bool initVideo()
     {
         int headersRemaining = th_decode_headerin(&decoderInfo, &comment,
                                                   &setupInfo, &headerPackets[i]);
-        log("Headers left to decode: %d\n", headersRemaining);
+        logInfo("Headers left to decode: %d\n", headersRemaining);
         if(headersRemaining < 0)
             break;
     }
@@ -351,14 +351,14 @@ bool initVideo()
     ogvOutputFile = fopen("debug_videoinput.ogv", "wb");
     if(!ogvOutputFile)
     {
-        log("Error: Unable to open ogg video output file\n");
+        logWarn("Error: Unable to open ogg video output file\n");
         return false;
     }
 
     srand(time(NULL));
     if(ogg_stream_init(&ogvOutputStream, rand()))
     {
-        log("Error: Unable to create ogg video output stream\n");
+        logWarn("Error: Unable to create ogg video output stream\n");
         return false;
     }
 
@@ -388,7 +388,7 @@ bool initVideo()
 
 void deinitVideo()
 {
-    log("Deinitialize video subsystem\n");
+    logInfo("Deinitialize video subsystem\n");
     enableCamera(false);
     delete[] pixelValues;
     delete[] captureParams.mTargetBuf;

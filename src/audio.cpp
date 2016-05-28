@@ -37,28 +37,28 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
 {
     const char* rawStr = device->is_raw ? "(RAW) " : "";
     const char* defaultStr = isDefault ? "(DEFAULT)" : "";
-    log("%s %s%s\n", device->name, rawStr, defaultStr);
+    logInfo("%s %s%s\n", device->name, rawStr, defaultStr);
     if(device->probe_error != SoundIoErrorNone)
     {
-        log("Probe Error: %s\n", soundio_strerror(device->probe_error));
+        logWarn("Probe Error: %s\n", soundio_strerror(device->probe_error));
         return;
     }
-    log("  Sample Rate: %d - %d (Currently %d)\n",
+    logInfo("  Sample Rate: %d - %d (Currently %d)\n",
             device->sample_rates->min, device->sample_rates->max, device->sample_rate_current);
-    log("  Latency: %0.8f - %0.8f (Currently %0.8f)\n",
+    logInfo("  Latency: %0.8f - %0.8f (Currently %0.8f)\n",
             device->software_latency_min, device->software_latency_max,
             device->software_latency_current);
 
-    log("  %d layouts supported:\n", device->layout_count);
+    logInfo("  %d layouts supported:\n", device->layout_count);
     for(int layoutIndex=0; layoutIndex<device->layout_count; layoutIndex++)
     {
-        log("    %s\n", device->layouts[layoutIndex].name);
+        logInfo("    %s\n", device->layouts[layoutIndex].name);
     }
 
-    log("  %d formats supported:\n", device->format_count);
+    logInfo("  %d formats supported:\n", device->format_count);
     for(int formatIndex=0; formatIndex<device->format_count; formatIndex++)
     {
-        log("    %s\n", soundio_format_string(device->formats[formatIndex]));
+        logInfo("    %s\n", soundio_format_string(device->formats[formatIndex]));
     }
 }
 
@@ -72,7 +72,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
-    //log("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
+    //logTerm("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     SoundIoChannelArea* inArea;
 
     // TODO: Check the free space in inBuffer
@@ -83,7 +83,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
         int readError = soundio_instream_begin_read(stream, &inArea, &frameCount);
         if(readError)
         {
-            log("Read error\n");
+            logWarn("Read error\n");
             break;
         }
 
@@ -108,7 +108,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     lockMutex(audioOutMutex);
     int framesAvailable = outBuffer->count();
     int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
-    //log("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
+    //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
 
@@ -118,7 +118,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
         int writeError = soundio_outstream_begin_write(stream, &outArea, &frameCount);
         if(writeError)
         {
-            log("Write error\n");
+            logWarn("Write error\n");
             break;
         }
 
@@ -162,22 +162,22 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
 void inOverflowCallback(SoundIoInStream* stream)
 {
-    log("Input underflow!\n");
+    logWarn("Input underflow!\n");
 }
 
 void outUnderflowCallback(SoundIoOutStream* stream)
 {
-    log("Output underflow!\n");
+    logWarn("Output underflow!\n");
 }
 
 void inErrorCallback(SoundIoInStream* stream, int error)
 {
-    log("Input error: %s\n", soundio_strerror(error));
+    logWarn("Input error: %s\n", soundio_strerror(error));
 }
 
 void outErrorCallback(SoundIoOutStream* stream, int error)
 {
-    log("Output error: %s\n", soundio_strerror(error));
+    logWarn("Output error: %s\n", soundio_strerror(error));
 }
 
 void listenToInput(bool listening)
@@ -205,7 +205,7 @@ int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
                                               correctErrors);
         if(framesDecoded < 0)
         {
-            log("Error decoding audio data. Error %d\n", framesDecoded);
+            logWarn("Error decoding audio data. Error %d\n", framesDecoded);
             break;
         }
 
@@ -241,7 +241,7 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
         *((int*)targetBuffer) = packetLength; // TODO: Byte order checking/swapping
         if(packetLength < 0)
         {
-            log("Error encoding audio. Error code %d\n", packetLength);
+            logWarn("Error encoding audio. Error code %d\n", packetLength);
             break;
         }
 
@@ -264,7 +264,7 @@ int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
     {
         samplesToWrite = ringBufferFreeSpace;
     }
-    //log("Write %d samples\n", samplesToWrite);
+    //logTerm("Write %d samples\n", samplesToWrite);
 
     outBuffer->write(samplesToWrite, sourceBufferPtr);
     outBuffer->advanceWritePointer(samplesToWrite);
@@ -297,16 +297,16 @@ void enableMicrophone(bool enabled)
 {
     if(enabled)
     {
-        log("Mic on\n");
+        logInfo("Mic on\n");
     }
     else
     {
-        log("Mic off\n");
+        logInfo("Mic off\n");
     }
     int error = soundio_instream_pause(inStream, !enabled);
     if(error)
     {
-        log("Error enabling microhpone\n");
+        logWarn("Error enabling microhpone\n");
     }
 }
 
@@ -336,24 +336,24 @@ bool setAudioInputDevice(int newInputDevice)
     int openError = soundio_instream_open(inStream);
     if(openError != SoundIoErrorNone)
     {
-        log("Error opening input stream: %s\n", soundio_strerror(openError));
+        logFail("Error opening input stream: %s\n", soundio_strerror(openError));
         soundio_instream_destroy(inStream);
         return false;
     }
     int startError = soundio_instream_start(inStream);
     if(startError != SoundIoErrorNone)
     {
-        log("Error starting input stream: %s\n", soundio_strerror(startError));
+        logFail("Error starting input stream: %s\n", soundio_strerror(startError));
         soundio_instream_destroy(inStream);
         return false;
     }
 
     const char* rawStr = inDevice->is_raw ? "(RAW) " : "";
-    log("Successfully opened audio input stream on device: %s %s\n", inDevice->name, rawStr);
-    log("  Sample Rate: %d\n", inStream->sample_rate);
-    log("  Latency: %0.8f\n", inStream->software_latency);
-    log("  Layout: %s\n", inStream->layout.name);
-    log("  Format: %s\n", soundio_format_string(inStream->format));
+    logInfo("Successfully opened audio input stream on device: %s %s\n", inDevice->name, rawStr);
+    logInfo("  Sample Rate: %d\n", inStream->sample_rate);
+    logInfo("  Latency: %0.8f\n", inStream->software_latency);
+    logInfo("  Layout: %s\n", inStream->layout.name);
+    logInfo("  Format: %s\n", soundio_format_string(inStream->format));
     return true;
 }
 
@@ -378,30 +378,30 @@ bool setAudioOutputDevice(int newOutputDevice)
     int openError = soundio_outstream_open(outStream);
     if(openError != SoundIoErrorNone)
     {
-        log("Error opening output stream: %s\n", soundio_strerror(openError));
+        logFail("Error opening output stream: %s\n", soundio_strerror(openError));
         soundio_outstream_destroy(outStream);
         return false;
     }
     int startError = soundio_outstream_start(outStream);
     if(startError != SoundIoErrorNone)
     {
-        log("Error starting output stream: %s\n", soundio_strerror(openError));
+        logFail("Error starting output stream: %s\n", soundio_strerror(openError));
         soundio_outstream_destroy(outStream);
         return false;
     }
 
     const char* rawStr = outDevice->is_raw ? "(RAW) " : "";
-    log("Successfully opened audio output stream on device: %s %s\n", outDevice->name, rawStr);
-    log("  Sample Rate: %d\n", outStream->sample_rate);
-    log("  Latency: %0.8f\n", outStream->software_latency);
-    log("  Layout: %s\n", outStream->layout.name);
-    log("  Format: %s\n", soundio_format_string(outStream->format));
+    logInfo("Successfully opened audio output stream on device: %s %s\n", outDevice->name, rawStr);
+    logInfo("  Sample Rate: %d\n", outStream->sample_rate);
+    logInfo("  Latency: %0.8f\n", outStream->software_latency);
+    logInfo("  Layout: %s\n", outStream->layout.name);
+    logInfo("  Format: %s\n", soundio_format_string(outStream->format));
     return true;
 }
 
 void backendDisconnectCallback(SoundIo* sio, int error)
 {
-    log("SoundIo backend disconnected: %s\n", soundio_strerror(error));
+    logWarn("SoundIo backend disconnected: %s\n", soundio_strerror(error));
     // TODO: This runs immediately on flush_events on pIjIn's PC, it crashes if we do not
     //       specify this callback (which is probably correct, what is the appropriate response
     //       here even?)
@@ -412,13 +412,13 @@ void devicesChangeCallback(SoundIo* sio)
     // TODO: This doesn't appear to get called when I unplug/plug in my microphone (realtek does notice though)
     int inputDeviceCount = soundio_input_device_count(sio);
     int outputDeviceCount = soundio_output_device_count(sio);
-    log("SoundIo device list updated - %d input, %d output devices\n",
+    logInfo("SoundIo device list updated - %d input, %d output devices\n",
             inputDeviceCount, outputDeviceCount);
 
     if(audioState.currentInputDevice == -1)
     {
         // Try to set up a new input stream
-        log("Setup audio input\n");
+        logInfo("Setup audio input\n");
         int defaultInputDevice = soundio_default_input_device_index(sio);
         int managedInputDeviceCount = 0;
 
@@ -466,7 +466,7 @@ void devicesChangeCallback(SoundIo* sio)
         {
             if(!setAudioInputDevice(defaultInputDeviceIndex))
             {
-                log("Error: Unable to initialize audio input device %s\n",
+                logFail("Error: Unable to initialize audio input device %s\n",
                         audioState.inputDeviceNames[defaultInputDeviceIndex]);
             }
         }
@@ -475,7 +475,7 @@ void devicesChangeCallback(SoundIo* sio)
     if(audioState.currentOutputDevice == -1)
     {
         // Try to setup a new output stream
-        log("Setup audio output\n");
+        logInfo("Setup audio output\n");
         int defaultOutputDevice = soundio_default_output_device_index(sio);
         int managedOutputDeviceCount = 0;
         for(int i=0; i<outputDeviceCount; ++i)
@@ -522,7 +522,7 @@ void devicesChangeCallback(SoundIo* sio)
         {
             if(!setAudioOutputDevice(defaultOutputDeviceIndex))
             {
-                log("Error: Unable to initialize audio output device %s\n",
+                logFail("Error: Unable to initialize audio output device %s\n",
                         audioState.outputDeviceNames[defaultOutputDeviceIndex]);
             }
         }
@@ -541,44 +541,44 @@ bool initAudio()
     audioOutMutex = createMutex();
 
     // Initialize SoundIO
-    log("Initializing libsoundio %s\n", soundio_version_string());
+    logInfo("Initializing libsoundio %s\n", soundio_version_string());
     soundio = soundio_create();
     if(!soundio)
     {
-        log("Unable to create libsoundio context\n");
+        logFail("Unable to create libsoundio context\n");
         return false;
     }
     soundio->on_devices_change = devicesChangeCallback;
     soundio->on_backend_disconnect = backendDisconnectCallback;
     int backendCount = soundio_backend_count(soundio);
-    log("%d audio backends are available:\n", backendCount);
+    logInfo("%d audio backends are available:\n", backendCount);
     for(int backendIndex=0; backendIndex<backendCount; backendIndex++)
     {
-        log("  %s\n", soundio_backend_name(soundio_get_backend(soundio, backendIndex)));
+        logInfo("  %s\n", soundio_backend_name(soundio_get_backend(soundio, backendIndex)));
     }
 
     int connectError = soundio_connect(soundio);
     if(connectError)
     {
-        log("Unable to connect to libsoundio backend %s: %s\n",
+        logFail("Unable to connect to libsoundio backend %s: %s\n",
                 soundio_backend_name(soundio->current_backend), soundio_strerror(connectError));
         soundio_destroy(soundio);
         return false;
     }
-    log("Backend %s connected\n", soundio_backend_name(soundio->current_backend));
+    logInfo("Backend %s connected\n", soundio_backend_name(soundio->current_backend));
     soundio_flush_events(soundio);
-    log("SoundIO event queue flushed\n");
+    logInfo("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
-    log("Initializing %s\n", opus_get_version_string());
+    logInfo("Initializing %s\n", opus_get_version_string());
     int opusError;
     opus_int32 opusSampleRate = 48000;
     int opusChannels = 1;
     int opusApplication = OPUS_APPLICATION_VOIP;
     encoder = opus_encoder_create(opusSampleRate, opusChannels, opusApplication, &opusError);
-    log("Opus Error from encoder creation: %d\n", opusError);
+    logInfo("Opus Error from encoder creation: %d\n", opusError);
     decoder = opus_decoder_create(opusSampleRate, opusChannels, &opusError);
-    log("Opus Error from decoder creation: %d\n", opusError);
+    logInfo("Opus Error from decoder creation: %d\n", opusError);
 
     opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(6));
     opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
@@ -589,14 +589,14 @@ bool initAudio()
     opus_int32 bitrate;
     opus_encoder_ctl(encoder, OPUS_GET_COMPLEXITY(&complexity));
     opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
-    log("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
+    logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
     return true;
 }
 
 void deinitAudio()
 {
-    log("Deinitialize audio subsystem\n");
+    logInfo("Deinitialize audio subsystem\n");
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
 
