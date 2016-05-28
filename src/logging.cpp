@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-static FILE* logFile = stderr;
+static FILE* logFile;
 
 void _log(const char* format, ...)
 {
@@ -19,6 +19,7 @@ bool initLogging()
     logFile = fopen("output.log", "w");
     if(!logFile)
     {
+        logFile = stderr;
         printf("Error: Unable to create log file\n");
         // NOTE: We don't necessarily need to fail here, we can probably survive without a log file
     }

@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+bool initLogging();
+void deinitLogging();
+
 void _log(const char* format, ...);
 
 #ifdef NDEBUG
@@ -24,7 +27,10 @@ static inline const char* __file_baseName(const char* fileName)
 
     return baseName;
 }
-#define log(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logTerm(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logInfo(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logWarn(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logFail(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
 #endif // NDEBUG
 
 #endif
