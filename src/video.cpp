@@ -45,6 +45,8 @@ static FILE* ogvOutputFile;
 static ogg_stream_state ogvOutputStream;
 #endif
 
+#include <windows.h>
+
 void enableCamera(bool enabled)
 {
     if(cameraDevice < 0)
@@ -60,11 +62,28 @@ void enableCamera(bool enabled)
         logInfo("Initializing %s\n", deviceName);
 
         initCapture(cameraDevice, &captureParams);
-        doCapture(cameraDevice);
+        if(!getCaptureErrorCode(cameraDevice))
+        {
+            logInfo("Begin video capture using %s\n", deviceName);
+            doCapture(cameraDevice);
+        }
     }
     else
     {
+        char deviceName[256];
+        getCaptureDeviceName(cameraDevice, deviceName, 256);
+        logInfo("Deinitializing %s\n", deviceName);
+
         deinitCapture(cameraDevice);
+    }
+
+    int errorCode = getCaptureErrorCode(cameraDevice);
+    if(errorCode)
+    {
+        char errorStr[1024];
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errorStr, 1024, NULL);
+        logWarn("ESCAPI Error %d at line %d: %s\n", errorCode, getCaptureErrorLine(cameraDevice),
+                errorStr);
     }
 }
 
@@ -92,6 +111,15 @@ bool checkForNewVideoFrame()
             }
         }
         doCapture(cameraDevice);
+    }
+
+    int errorCode = getCaptureErrorCode(cameraDevice);
+    if(errorCode)
+    {
+        char errorStr[1024];
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errorStr, 1024, NULL);
+        logWarn("ESCAPI Error %d at line %d: %s\n", errorCode, getCaptureErrorLine(cameraDevice),
+                errorStr);
     }
     return result;
 }
