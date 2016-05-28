@@ -83,7 +83,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
         int readError = soundio_instream_begin_read(stream, &inArea, &frameCount);
         if(readError)
         {
-            logWarn("Read error\n");
+            logWarn("Read error: %s\n", soundio_strerror(readError));
             break;
         }
 
@@ -118,7 +118,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
         int writeError = soundio_outstream_begin_write(stream, &outArea, &frameCount);
         if(writeError)
         {
-            logWarn("Write error\n");
+            logWarn("Write error: %s\n", soundio_strerror(writeError));
             break;
         }
 
@@ -162,7 +162,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
 void inOverflowCallback(SoundIoInStream* stream)
 {
-    logWarn("Input underflow!\n");
+    logWarn("Input overflow!\n");
 }
 
 void outUnderflowCallback(SoundIoOutStream* stream)
