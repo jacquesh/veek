@@ -4,15 +4,25 @@
 
 static FILE* logFile;
 
+void _logTerm(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+}
+
 void _log(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
+    vfprintf(stderr, format, args);
     vfprintf(logFile, format, args);
     va_end(args);
 
     fflush(logFile);
 }
+
 
 bool initLogging()
 {

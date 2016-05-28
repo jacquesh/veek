@@ -7,6 +7,7 @@
 bool initLogging();
 void deinitLogging();
 
+void _logTerm(const char* format, ...);
 void _log(const char* format, ...);
 
 #ifdef NDEBUG
@@ -27,10 +28,17 @@ static inline const char* __file_baseName(const char* fileName)
 
     return baseName;
 }
-#define logTerm(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logInfo(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logWarn(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logFail(MSG, ...); _log("(%s:%d) " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+
+/* Log Levels:
+ * Term: Logs only to the terminal, used for very high-frequency or low-impact messages
+ * Info: Logs to terminal and file, use for information that could be useful but not a problem
+ * Warn: Logs to terminal and file, use for errors/situations that are bad but recoverable
+ * Fail: Logs to terminal and file, use for errors/failures that we cannot recover from
+ */
+#define logTerm(MSG, ...); _logTerm("TERM: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logInfo(MSG, ...);     _log("INFO: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logWarn(MSG, ...);     _log("WARN: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+#define logFail(MSG, ...);     _log("FAIL: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
 #endif // NDEBUG
 
 #endif
