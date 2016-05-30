@@ -295,18 +295,20 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 
 void enableMicrophone(bool enabled)
 {
-    if(enabled)
+    // TODO: Apparently some backends (e.g JACK) don't support pausing at all
+    const char* toggleString = enabled ? "Enable" : "Disable";
+    if(inStream)
     {
-        logInfo("Mic on\n");
+        logInfo("%s audio input\n", toggleString);
+        int error = soundio_instream_pause(inStream, !enabled);
+        if(error)
+        {
+            logWarn("Error enabling microhpone\n");
+        }
     }
     else
     {
-        logInfo("Mic off\n");
-    }
-    int error = soundio_instream_pause(inStream, !enabled);
-    if(error)
-    {
-        logWarn("Error enabling microhpone\n");
+        logWarn("%s audio input failed: No open input stream\n", toggleString)
     }
 }
 
@@ -317,7 +319,6 @@ bool setAudioInputDevice(int newInputDevice)
     {
         soundio_instream_destroy(inStream);
     }
-    const SoundIoChannelLayout* monoLayout = soundio_channel_layout_get_builtin(SoundIoChannelLayoutIdMono);
 
     audioState.currentInputDevice = newInputDevice;
     inDevice = audioState.inputDeviceList[audioState.currentInputDevice];
@@ -327,17 +328,29 @@ bool setAudioInputDevice(int newInputDevice)
     inStream->error_callback = inErrorCallback;
     inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 48000);
     inStream->format = SoundIoFormatFloat32NE;
-    inStream->layout = *monoLayout;
+    inStream->layout = inDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
+    // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
     inStream->software_latency = 0.005f;
     // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
     // TODO: We probably want to check to make sure we don't set this to a value lower than the
     //       minimum latency for the current device
 
+    logInfo("Attempting to open audio input stream on device: %s\n", inDevice->name);
+    logInfo("  Sample Rate: %d\n", inStream->sample_rate);
+    logInfo("  Latency: %0.8f\n", inStream->software_latency);
+    logInfo("  Layout: %s\n", inStream->layout.name);
+    logInfo("  Format: %s\n", soundio_format_string(inStream->format));
+
     int openError = soundio_instream_open(inStream);
     if(openError != SoundIoErrorNone)
     {
         logFail("Error opening input stream: %s\n", soundio_strerror(openError));
+        if(inStream->layout_error)
+        {
+            logFail("  Stream layout error: %s\n", soundio_strerror(inStream->layout_error));
+        }
         soundio_instream_destroy(inStream);
+        inStream = 0;
         return false;
     }
     int startError = soundio_instream_start(inStream);
@@ -345,11 +358,11 @@ bool setAudioInputDevice(int newInputDevice)
     {
         logFail("Error starting input stream: %s\n", soundio_strerror(startError));
         soundio_instream_destroy(inStream);
+        inStream = 0;
         return false;
     }
 
-    const char* rawStr = inDevice->is_raw ? "(RAW) " : "";
-    logInfo("Successfully opened audio input stream on device: %s %s\n", inDevice->name, rawStr);
+    logInfo("Successfully opened audio input stream on device: %s\n", inDevice->name);
     logInfo("  Sample Rate: %d\n", inStream->sample_rate);
     logInfo("  Latency: %0.8f\n", inStream->software_latency);
     logInfo("  Layout: %s\n", inStream->layout.name);
@@ -373,13 +386,28 @@ bool setAudioOutputDevice(int newOutputDevice)
     outStream->error_callback = outErrorCallback;
     outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, 48000);
     outStream->format = SoundIoFormatFloat32NE;
-    // TODO: Set all the other options
+    outStream->layout = outDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
+    // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
+    outStream->software_latency = 0.005f;
+    // TODO: We probably want to check to make sure we don't set this to a value lower than the
+    //       minimum latency for the current device
+
+    logInfo("Attempting to open audio output stream on device: %s\n", outDevice->name);
+    logInfo("  Sample Rate: %d\n", outStream->sample_rate);
+    logInfo("  Latency: %0.8f\n", outStream->software_latency);
+    logInfo("  Layout: %s\n", outStream->layout.name);
+    logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
     int openError = soundio_outstream_open(outStream);
     if(openError != SoundIoErrorNone)
     {
         logFail("Error opening output stream: %s\n", soundio_strerror(openError));
+        if(outStream->layout_error)
+        {
+            logFail("  Stream layout error: %s\n", soundio_strerror(outStream->layout_error));
+        }
         soundio_outstream_destroy(outStream);
+        outStream = 0;
         return false;
     }
     int startError = soundio_outstream_start(outStream);
@@ -387,11 +415,11 @@ bool setAudioOutputDevice(int newOutputDevice)
     {
         logFail("Error starting output stream: %s\n", soundio_strerror(openError));
         soundio_outstream_destroy(outStream);
+        outStream = 0;
         return false;
     }
 
-    const char* rawStr = outDevice->is_raw ? "(RAW) " : "";
-    logInfo("Successfully opened audio output stream on device: %s %s\n", outDevice->name, rawStr);
+    logInfo("Successfully opened audio output stream on device: %s\n", outDevice->name);
     logInfo("  Sample Rate: %d\n", outStream->sample_rate);
     logInfo("  Latency: %0.8f\n", outStream->software_latency);
     logInfo("  Layout: %s\n", outStream->layout.name);
@@ -466,9 +494,14 @@ void devicesChangeCallback(SoundIo* sio)
         {
             if(!setAudioInputDevice(defaultInputDeviceIndex))
             {
-                logFail("Error: Unable to initialize audio input device %s\n",
+                logWarn("Error: Unable to initialize audio input device %s\n",
                         audioState.inputDeviceNames[defaultInputDeviceIndex]);
             }
+        }
+        else
+        {
+            // TODO: We probably want to just open SOME device
+            logWarn("Error: No non-raw default audio input device\n");
         }
     }
 
@@ -522,9 +555,14 @@ void devicesChangeCallback(SoundIo* sio)
         {
             if(!setAudioOutputDevice(defaultOutputDeviceIndex))
             {
-                logFail("Error: Unable to initialize audio output device %s\n",
+                logWarn("Error: Unable to initialize audio output device %s\n",
                         audioState.outputDeviceNames[defaultOutputDeviceIndex]);
             }
+        }
+        else
+        {
+            // TODO: We probably want to just open SOME device
+            logWarn("Error: No non-raw default audio output device\n");
         }
     }
 }
@@ -597,21 +635,31 @@ bool initAudio()
 void deinitAudio()
 {
     logInfo("Deinitialize audio subsystem\n");
+    // TODO: Wraithy crashes inside this function
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
 
-    soundio_instream_pause(inStream, true);
-    soundio_instream_destroy(inStream);
-    delete inBuffer;
-    destroyMutex(audioInMutex);
+    if(inStream)
+    {
+        soundio_instream_pause(inStream, true);
+        soundio_instream_destroy(inStream);
+    }
+    if(inBuffer)
+        delete inBuffer;
+    if(audioInMutex)
+        destroyMutex(audioInMutex);
     for(int i=0; i<audioState.inputDeviceCount; ++i)
     {
         soundio_device_unref(audioState.inputDeviceList[i]);
     }
 
-    soundio_outstream_pause(outStream, true);
-    soundio_outstream_destroy(outStream);
-    delete outBuffer;
+    if(outStream)
+    {
+        soundio_outstream_pause(outStream, true);
+        soundio_outstream_destroy(outStream);
+    }
+    if(outBuffer)
+        delete outBuffer;
     destroyMutex(audioOutMutex);
     for(int i=0; i<audioState.outputDeviceCount; ++i)
     {

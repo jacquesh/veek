@@ -49,17 +49,21 @@ static ogg_stream_state ogvOutputStream;
 
 void enableCamera(bool enabled)
 {
+    const char* toggleString = enabled ? "Enable" : "Disable";
     if(cameraDevice < 0)
     {
+        logWarn("%s camera failed: No active camera device\n", toggleString);
         return;
     }
 
+    // TODO: getCaptureDeviceName can fail, but it never returns failure. We should probably fix
+    //       that when we re-implement the video capture API
     cameraEnabled = enabled;
     if(enabled)
     {
         char deviceName[256];
         getCaptureDeviceName(cameraDevice, deviceName, 256);
-        logInfo("Initializing %s\n", deviceName);
+        logInfo("%s camera: %s\n", toggleString, deviceName);
 
         initCapture(cameraDevice, &captureParams);
         if(!getCaptureErrorCode(cameraDevice))
@@ -67,12 +71,16 @@ void enableCamera(bool enabled)
             logInfo("Begin video capture using %s\n", deviceName);
             doCapture(cameraDevice);
         }
+        else
+        {
+            logWarn("Unable to initialize video capture using %s\n", deviceName);
+        }
     }
     else
     {
         char deviceName[256];
         getCaptureDeviceName(cameraDevice, deviceName, 256);
-        logInfo("Deinitializing %s\n", deviceName);
+        logInfo("%s camera: %s\n", toggleString, deviceName);
 
         deinitCapture(cameraDevice);
     }
