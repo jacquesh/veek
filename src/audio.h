@@ -31,7 +31,12 @@ bool setAudioInputDevice(int newInputDevice);
 bool setAudioOutputDevice(int newOutputDevice);
 
 void listenToInput(bool listen);
-void enableMicrophone(bool enabled);
+
+/**
+ * \return The new state of the microphone, which equals enabled if the function succeeded,
+ * and equals the previous state if the function failed
+ */
+bool enableMicrophone(bool enabled);
 
 int encodePacket(int sourceLength, float* sourceBuffer, int targetLength, uint8_t* targetBuffer);
 int decodePacket(int sourceLength, uint8_t* sourceBuffer, int targetLength, float* targetBuffer);

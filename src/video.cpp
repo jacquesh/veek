@@ -47,18 +47,17 @@ static ogg_stream_state ogvOutputStream;
 
 #include <windows.h>
 
-void enableCamera(bool enabled)
+bool enableCamera(bool enabled)
 {
     const char* toggleString = enabled ? "Enable" : "Disable";
     if(cameraDevice < 0)
     {
         logWarn("%s camera failed: No active camera device\n", toggleString);
-        return;
+        return cameraEnabled;
     }
 
     // TODO: getCaptureDeviceName can fail, but it never returns failure. We should probably fix
     //       that when we re-implement the video capture API
-    cameraEnabled = enabled;
     if(enabled)
     {
         char deviceName[256];
@@ -70,10 +69,6 @@ void enableCamera(bool enabled)
         {
             logInfo("Begin video capture using %s\n", deviceName);
             doCapture(cameraDevice);
-        }
-        else
-        {
-            logWarn("Unable to initialize video capture using %s\n", deviceName);
         }
     }
     else
@@ -92,7 +87,10 @@ void enableCamera(bool enabled)
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errorStr, 1024, NULL);
         logWarn("ESCAPI Error %d at line %d: %s\n", errorCode, getCaptureErrorLine(cameraDevice),
                 errorStr);
+        return cameraEnabled;
     }
+    cameraEnabled = enabled;
+    return enabled;
 }
 
 bool checkForNewVideoFrame()

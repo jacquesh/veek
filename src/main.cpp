@@ -143,7 +143,7 @@ void readSettings(GameState* game, const char* fileName)
 void initGame(GameState* game)
 {
     game->connState = NET_CONNSTATE_DISCONNECTED;
-    game->micEnabled = true;
+    game->micEnabled = enableMicrophone(true);
 
     glGenTextures(1, &game->cameraTexture);
     glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
@@ -252,7 +252,7 @@ void renderGame(GameState* game, float deltaTime)
         bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
         if(cameraToggled)
         {
-            enableCamera(game->cameraEnabled);
+            game->cameraEnabled = enableCamera(game->cameraEnabled);
         }
     }
 
@@ -264,7 +264,7 @@ void renderGame(GameState* game, float deltaTime)
         bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
         if(micToggled)
         {
-            enableMicrophone(game->micEnabled);
+            game->micEnabled = enableMicrophone(game->micEnabled);
         }
 
         bool micChanged = ImGui::Combo("Recording Device",

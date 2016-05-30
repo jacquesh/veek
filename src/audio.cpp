@@ -293,7 +293,7 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     return samplesToWrite;
 }
 
-void enableMicrophone(bool enabled)
+bool enableMicrophone(bool enabled)
 {
     // TODO: Apparently some backends (e.g JACK) don't support pausing at all
     const char* toggleString = enabled ? "Enable" : "Disable";
@@ -303,12 +303,15 @@ void enableMicrophone(bool enabled)
         int error = soundio_instream_pause(inStream, !enabled);
         if(error)
         {
-            logWarn("Error enabling microhpone\n");
+            logWarn("Error toggling microhpone\n");
+            return false; // TODO: libsoundio doesn't let us query the current state of the stream
         }
+        return enabled;
     }
     else
     {
-        logWarn("%s audio input failed: No open input stream\n", toggleString)
+        logWarn("%s audio input failed: No open input stream\n", toggleString);
+        return false;
     }
 }
 
