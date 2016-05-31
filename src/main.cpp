@@ -63,8 +63,6 @@ extern RingBuffer* outBuffer;
 extern Mutex* audioInMutex;
 extern Mutex* audioOutMutex;
 
-static const char* SERVER_HOST = "localhost";
-
 struct UserData
 {
     bool connected;
@@ -90,6 +88,9 @@ struct GameState
     int connectedUserCount;
     UserData users[NET_MAX_CLIENTS];
 };
+
+const int HOSTNAME_MAX_LENGTH = 26;
+static char serverHostname[HOSTNAME_MAX_LENGTH];
 
 static bool running;
 extern int screenWidth;
@@ -126,6 +127,7 @@ void readSettings(GameState* game, const char* fileName)
 
 void initGame(GameState* game)
 {
+    strcpy(serverHostname, "localhost");
     game->connState = NET_CONNSTATE_DISCONNECTED;
     game->micEnabled = enableMicrophone(true);
 
@@ -296,11 +298,14 @@ void renderGame(GameState* game, float deltaTime)
                 roomId = (uint8)(roomId32 & 0xFF);
             }
 
+            ImGui::Text("Server:");
+            ImGui::SameLine();
+            ImGui::InputText("##serverHostname", serverHostname, HOSTNAME_MAX_LENGTH);
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
                 game->connState = NET_CONNSTATE_CONNECTING;
                 ENetAddress peerAddr = {};
-                enet_address_set_host(&peerAddr, SERVER_HOST);
+                enet_address_set_host(&peerAddr, serverHostname);
                 peerAddr.port = NET_PORT;
 
                 game->netHost = enet_host_create(0, 1, 2, 0,0);
