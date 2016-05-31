@@ -80,6 +80,8 @@ bool enableCamera(bool enabled)
         deinitCapture(cameraDevice);
     }
 
+    logInfo("Camera capture toggled, capture error is %d\n", getCaptureErrorCode(cameraDevice));
+    // TODO: This was the last line of output for Wraithy
     int errorCode = getCaptureErrorCode(cameraDevice);
     if(errorCode)
     {
@@ -98,6 +100,7 @@ bool checkForNewVideoFrame()
     bool result = (isCaptureDone(cameraDevice) == 1);
     if(result)
     {
+        logTerm("Recevied video input frame\n"); // TODO: Wraithy gets none of these
         for(int y=0; y<cameraHeight; ++y)
         {
             for(int x=0; x<cameraWidth; ++x)
