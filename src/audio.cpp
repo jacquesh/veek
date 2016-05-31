@@ -33,6 +33,10 @@ static SoundIoOutStream* outStream = 0;
 RingBuffer* outBuffer = 0;
 Mutex* audioOutMutex = 0;
 
+static float* sampleSoundSamples = 0;
+static uint32 sampleSoundSampleIndex = 0;
+static uint32 sampleSoundSampleCount = 0;
+
 static void printDevice(SoundIoDevice* device, bool isDefault)
 {
     const char* rawStr = device->is_raw ? "(RAW) " : "";
@@ -67,7 +71,6 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
     //       get an error during initialization since we specifically ask for MONO
     int channelCount = stream->layout.channel_count;
-    assert(channelCount == 1);
 
     // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
@@ -111,6 +114,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
+    // TODO: Wraithy always gets 0 frameCountMin and then framesRemaining gets 0 and it underflows
 
     while(framesRemaining > 0)
     {
@@ -167,7 +171,7 @@ void inOverflowCallback(SoundIoInStream* stream)
 
 void outUnderflowCallback(SoundIoOutStream* stream)
 {
-    logWarn("Output underflow!\n");
+    logTerm("Output underflow!\n");
 }
 
 void inErrorCallback(SoundIoInStream* stream, int error)
@@ -183,6 +187,11 @@ void outErrorCallback(SoundIoOutStream* stream, int error)
 void listenToInput(bool listening)
 {
     audioState.isListeningToInput = listening;
+}
+
+void playTestSound()
+{
+    sampleSoundSampleIndex = 0;
 }
 
 int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
@@ -427,6 +436,25 @@ bool setAudioOutputDevice(int newOutputDevice)
     logInfo("  Latency: %0.8f\n", outStream->software_latency);
     logInfo("  Layout: %s\n", outStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
+
+    // Create the test sound based on the sample rate that we got
+    if(sampleSoundSamples)
+        delete[] sampleSoundSamples;
+    sampleSoundSampleCount = outStream->sample_rate;
+    sampleSoundSampleIndex = sampleSoundSampleCount;
+    sampleSoundSamples = new float[sampleSoundSampleCount];
+
+    float twopi = 2.0f*3.1415927f;
+    float frequency = 261.6f; // Middle C
+    float timestep = 1.0f/(float)outStream->sample_rate;
+    float sampleTime = 0.0f;
+    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount; sampleIndex++)
+    {
+        float sinVal = sinf(frequency*twopi*sampleTime);
+        sampleSoundSamples[sampleIndex] = sinVal;
+        sampleTime += timestep;
+    }
+
     return true;
 }
 
@@ -456,10 +484,10 @@ void devicesChangeCallback(SoundIo* sio)
         for(int i=0; i<inputDeviceCount; ++i)
         {
             SoundIoDevice* device = soundio_get_input_device(sio, i);
-            bool isDefault = (i == defaultInputDevice);
-            printDevice(device, isDefault);
             if(!device->is_raw)
             {
+                bool isDefault = (i == defaultInputDevice);
+                printDevice(device, isDefault);
                 managedInputDeviceCount += 1;
             }
             soundio_device_unref(device);
@@ -517,10 +545,10 @@ void devicesChangeCallback(SoundIo* sio)
         for(int i=0; i<outputDeviceCount; ++i)
         {
             SoundIoDevice* device = soundio_get_output_device(sio, i);
-            bool isDefault = (i == defaultOutputDevice);
-            printDevice(device, isDefault);
             if(!device->is_raw)
             {
+                bool isDefault = (i == defaultOutputDevice);
+                printDevice(device, isDefault);
                 managedOutputDeviceCount += 1;
             }
             soundio_device_unref(device);

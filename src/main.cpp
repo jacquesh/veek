@@ -103,22 +103,6 @@ static GLuint netcamTexture;
 static uint32 micBufferLen;
 static float* micBuffer;
 
-static float currentTimef = 0.0f;
-void fillAudioBuffer(int length, float* buffer)
-{
-    float pi = 3.1415927f;
-    float frequency = 261.6f;
-    float timestep = 1.0f/48000.0f;
-
-    for(int i=0; i<length; ++i)
-    {
-        float sinVal = sinf(frequency*2*pi*currentTimef);
-        buffer[i] = sinVal;
-
-        currentTimef += timestep;
-    }
-}
-
 void readSettings(GameState* game, const char* fileName)
 {
     FILE* settingsFile = fopen(fileName, "r");
@@ -292,7 +276,10 @@ void renderGame(GameState* game, float deltaTime)
             logInfo("Speaker Device Changed\n");
         }
 
-        ImGui::Button("Play test sound", ImVec2(120, 20));
+        if(ImGui::Button("Play test sound", ImVec2(120, 20)))
+        {
+            playTestSound();
+        }
     }
 
     ImGui::Separator();
@@ -668,12 +655,6 @@ int main()
                 } break;
             }
         }
-
-#if 0
-        float sinBuffer[2410];
-        fillAudioBuffer(2410, sinBuffer);
-        writeAudioOutputBuffer(2410, sinBuffer);
-#endif
 
         // Rendering
         ImGui_ImplGlfwGL3_NewFrame();

@@ -31,6 +31,7 @@ bool setAudioInputDevice(int newInputDevice);
 bool setAudioOutputDevice(int newOutputDevice);
 
 void listenToInput(bool listen);
+void playTestSound();
 
 /**
  * \return The new state of the microphone, which equals enabled if the function succeeded,
