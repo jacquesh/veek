@@ -11,7 +11,10 @@ void _logTerm(const char* format, ...);
 void _log(const char* format, ...);
 
 #ifdef NDEBUG
-#define log(MSG, ...);
+#define logTerm(MSG, ...);
+#define logInfo(MSG, ...);
+#define logWarn(MSG, ...);
+#define logFail(MSG, ...);
 #else
 static inline const char* __file_baseName(const char* fileName)
 {
