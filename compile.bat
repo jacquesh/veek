@@ -6,14 +6,16 @@ set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\graphicsutil.cpp ..
 set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MDd
 set IncludeDirs= -I..\include
 
-set GLFWLibs=..\lib\glfw3.lib gdi32.lib shell32.lib
-set EnetLibs=..\lib\enet.lib ws2_32.lib winmm.lib
-set OpusLibs=..\lib\opus.lib ..\lib\celt.lib ..\lib\silk_common.lib ..\lib\silk_fixed.lib ..\lib\silk_float.lib
-set TheoraLibs=..\lib\libtheora_static.lib ..\lib\libogg_static.lib
-set LinkLibs= OpenGL32.lib ..\lib\escapi.lib %GLFWLibs% %EnetLibs% %OpusLibs% %TheoraLibs% ..\lib\libsoundio.dll.a
+set GLFWLibs=glfw3.lib gdi32.lib shell32.lib
+set EnetLibs=enet.lib ws2_32.lib winmm.lib
+set OpusLibs=opus.lib celt.lib silk_common.lib silk_fixed.lib silk_float.lib
+set TheoraLibs=libtheora_static.lib libogg_static.lib
+set SoundIOLibs=soundio.lib ole32.lib
+REM set LinkLibs= OpenGL32.lib ..\lib\escapi.lib %GLFWLibs% %EnetLibs% %OpusLibs% %TheoraLibs% ..\lib\libsoundio.dll.a
+set LinkLibs= OpenGL32.lib escapi.lib %GLFWLibs% %EnetLibs% %OpusLibs% %TheoraLibs% %SoundIOLibs%
 
 pushd build
-cl %CompileFlags% %CompileFiles% %IncludeDirs% -link %LinkLibs% -INCREMENTAL:NO -OUT:main.exe
+cl %CompileFlags% %CompileFiles% %IncludeDirs% -DSOUNDIO_STATIC_LIBRARY -link -LIBPATH:..\lib %LinkLibs% -INCREMENTAL:NO -OUT:main.exe
 popd
 
 ctime -end veek_time.ctm %ERRORLEVEL%
