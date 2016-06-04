@@ -500,6 +500,8 @@ int main()
         // Handle input
         glfwPollEvents();
 
+        updateAudio();
+
         // Update the camera (uploading the new texture to the GPU if there is one)
         if(game.cameraEnabled)
         {

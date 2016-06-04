@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <math.h>
 #include <assert.h>
 
@@ -461,9 +462,44 @@ bool setAudioOutputDevice(int newOutputDevice)
 void backendDisconnectCallback(SoundIo* sio, int error)
 {
     logWarn("SoundIo backend disconnected: %s\n", soundio_strerror(error));
-    // TODO: This runs immediately on flush_events on pIjIn's PC, it crashes if we do not
-    //       specify this callback (which is probably correct, what is the appropriate response
-    //       here even?)
+    //NOTE: This assumes that we are only connected to a single backend, otherwise we
+    //      would need to check that the devices belong to the disconnected backend
+    if(error == SoundIoErrorBackendDisconnected)
+    {
+        if(audioState.inputDeviceList)
+        {
+            for(int i=0; i<audioState.inputDeviceCount; i++)
+            {
+                soundio_device_unref(audioState.inputDeviceList[i]);
+            }
+            delete[] audioState.inputDeviceList;
+            audioState.inputDeviceList = NULL;
+        }
+        if(audioState.inputDeviceNames)
+        {
+            delete[] audioState.inputDeviceNames;
+            audioState.inputDeviceNames = NULL;
+        }
+        audioState.inputDeviceCount = 0;
+        audioState.currentInputDevice = 0;
+
+        if(audioState.outputDeviceList)
+        {
+            for(int i=0; i<audioState.outputDeviceCount; i++)
+            {
+                soundio_device_unref(audioState.outputDeviceList[i]);
+            }
+            delete[] audioState.outputDeviceList;
+            audioState.outputDeviceList = 0;
+        }
+        if(audioState.outputDeviceNames)
+        {
+            delete[] audioState.outputDeviceNames;
+            audioState.outputDeviceNames = 0;
+        }
+        audioState.outputDeviceCount = 0;
+        audioState.currentOutputDevice = 0;
+    }
 }
 
 void devicesChangeCallback(SoundIo* sio)
@@ -474,127 +510,182 @@ void devicesChangeCallback(SoundIo* sio)
     logInfo("SoundIo device list updated - %d input, %d output devices\n",
             inputDeviceCount, outputDeviceCount);
 
-    if(audioState.currentInputDevice == -1)
+    // TODO: Check if the current device is still enabled, if it isn't we need to nullify things,
+    //       if it is we need to update currentInputDevice to be the correct new index.
+    //       It would seem that the only way we have of comparing devices is by the device.id string
+
+    logInfo("Setup audio input\n");
+    // Store the ID of the current open input device, if any
+    int currentInputDeviceNewIndex = -1;
+    char* currentInputId = 0;
+    if(audioState.currentInputDevice >= 0)
     {
-        // Try to set up a new input stream
-        logInfo("Setup audio input\n");
-        int defaultInputDevice = soundio_default_input_device_index(sio);
-        int managedInputDeviceCount = 0;
+        currentInputId = audioState.inputDeviceList[audioState.currentInputDevice]->id;
+    }
 
-        for(int i=0; i<inputDeviceCount; ++i)
+    // Store input device information. Names are stored for use by ImGui
+    int defaultInputDevice = soundio_default_input_device_index(sio);
+    int managedInputDeviceCount = 0;
+    for(int i=0; i<inputDeviceCount; i++)
+    {
+        SoundIoDevice* device = soundio_get_input_device(sio, i);
+        if(currentInputId && (currentInputDeviceNewIndex == -1))
         {
-            SoundIoDevice* device = soundio_get_input_device(sio, i);
-            if(!device->is_raw)
+            if(strcmp(device->id, currentInputId) == 0)
             {
-                bool isDefault = (i == defaultInputDevice);
-                printDevice(device, isDefault);
-                managedInputDeviceCount += 1;
+                currentInputDeviceNewIndex = i;
             }
-            soundio_device_unref(device);
         }
-
-        if(audioState.inputDeviceList)
-            delete[] audioState.inputDeviceList;
-        if(audioState.inputDeviceNames)
-            delete[] audioState.inputDeviceNames;
-        audioState.inputDeviceList = new SoundIoDevice*[managedInputDeviceCount];
-        audioState.inputDeviceNames = new char*[managedInputDeviceCount];
-        audioState.inputDeviceCount = managedInputDeviceCount;
-        int defaultInputDeviceIndex = -1;
-        int managedInputIndex = 0;
-        for(int i=0; i<inputDeviceCount; ++i)
+        if(!device->is_raw)
         {
-            SoundIoDevice* device = soundio_get_input_device(sio, i);
-            if(!device->is_raw)
+            bool isDefault = (i == defaultInputDevice);
+            printDevice(device, isDefault);
+            managedInputDeviceCount += 1;
+        }
+        soundio_device_unref(device);
+    }
+
+    if(audioState.inputDeviceList)
+    {
+        for(int i=0; i<audioState.inputDeviceCount; i++)
+        {
+            soundio_device_unref(audioState.inputDeviceList[i]);
+        }
+        delete[] audioState.inputDeviceList;
+    }
+    if(audioState.inputDeviceNames)
+        delete[] audioState.inputDeviceNames;
+    audioState.inputDeviceList = new SoundIoDevice*[managedInputDeviceCount];
+    audioState.inputDeviceNames = new char*[managedInputDeviceCount];
+    audioState.inputDeviceCount = managedInputDeviceCount;
+    int targetInputDeviceIndex = -1;
+    int managedInputIndex = 0;
+    for(int i=0; i<inputDeviceCount; ++i)
+    {
+        SoundIoDevice* device = soundio_get_input_device(sio, i);
+        if(!device->is_raw)
+        {
+            audioState.inputDeviceList[managedInputIndex] = device;
+            audioState.inputDeviceNames[managedInputIndex] = device->name;
+            // NOTE: We use the current open device if it exists, otherwise we'll use the default
+            if(targetInputDeviceIndex < 0)
             {
-                audioState.inputDeviceList[managedInputIndex] = device;
-                audioState.inputDeviceNames[managedInputIndex] = device->name;
-                if(i == defaultInputDevice)
+                if(i == currentInputDeviceNewIndex)
                 {
-                    defaultInputDeviceIndex = managedInputIndex;
+                    targetInputDeviceIndex = managedInputIndex;
                 }
-                managedInputIndex += 1;
+                else if(i == defaultInputDevice)
+                {
+                    targetInputDeviceIndex = managedInputIndex;
+                }
             }
-            else
-            {
-                soundio_device_unref(device);
-            }
-        }
-
-        if(defaultInputDeviceIndex >= 0)
-        {
-            if(!setAudioInputDevice(defaultInputDeviceIndex))
-            {
-                logWarn("Error: Unable to initialize audio input device %s\n",
-                        audioState.inputDeviceNames[defaultInputDeviceIndex]);
-            }
+            managedInputIndex += 1;
         }
         else
         {
-            // TODO: We probably want to just open SOME device
-            logWarn("Error: No non-raw default audio input device\n");
+            soundio_device_unref(device);
         }
     }
 
-    if(audioState.currentOutputDevice == -1)
+    if(targetInputDeviceIndex >= 0)
     {
-        // Try to setup a new output stream
-        logInfo("Setup audio output\n");
-        int defaultOutputDevice = soundio_default_output_device_index(sio);
-        int managedOutputDeviceCount = 0;
-        for(int i=0; i<outputDeviceCount; ++i)
+        if(!setAudioInputDevice(targetInputDeviceIndex))
         {
-            SoundIoDevice* device = soundio_get_output_device(sio, i);
-            if(!device->is_raw)
-            {
-                bool isDefault = (i == defaultOutputDevice);
-                printDevice(device, isDefault);
-                managedOutputDeviceCount += 1;
-            }
-            soundio_device_unref(device);
+            logWarn("Error: Unable to initialize audio input device %s\n",
+                    audioState.inputDeviceNames[targetInputDeviceIndex]);
         }
+    }
+    else
+    {
+        // TODO: We probably want to just open SOME device
+        logWarn("Error: No non-raw default audio input device\n");
+    }
 
-        if(audioState.outputDeviceList)
-            delete[] audioState.outputDeviceList;
-        if(audioState.outputDeviceNames)
-            delete[] audioState.outputDeviceNames;
-        audioState.outputDeviceList = new SoundIoDevice*[managedOutputDeviceCount];
-        audioState.outputDeviceNames = new char*[managedOutputDeviceCount];
-        audioState.outputDeviceCount = managedOutputDeviceCount;
-        int defaultOutputDeviceIndex = -1;
-        int managedOutputIndex = 0;
-        for(int i=0; i<outputDeviceCount; ++i)
+    logInfo("Setup audio output\n");
+    // Store the ID of the current open output device, if any
+    int currentOutputDeviceNewIndex = -1;
+    char* currentOutputId = 0;
+    if(audioState.currentOutputDevice >= 0)
+    {
+        currentOutputId = audioState.outputDeviceList[audioState.currentOutputDevice]->id;
+    }
+
+    // Store input device information. Names are stored for use by ImGui
+    int defaultOutputDevice = soundio_default_output_device_index(sio);
+    int managedOutputDeviceCount = 0;
+    for(int i=0; i<outputDeviceCount; i++)
+    {
+        SoundIoDevice* device = soundio_get_output_device(sio, i);
+        if(currentOutputId && (currentOutputDeviceNewIndex == -1))
         {
-            SoundIoDevice* device = soundio_get_output_device(sio, i);
-            if(!device->is_raw)
+            if(strcmp(device->id, currentOutputId) == 0)
             {
-                audioState.outputDeviceList[managedOutputIndex] = device;
-                audioState.outputDeviceNames[managedOutputIndex] = device->name;
+                currentOutputDeviceNewIndex = i;
+            }
+        }
+        if(!device->is_raw)
+        {
+            bool isDefault = (i == defaultOutputDevice);
+            printDevice(device, isDefault);
+            managedOutputDeviceCount += 1;
+        }
+        soundio_device_unref(device);
+    }
+
+    if(audioState.outputDeviceList)
+    {
+        for(int i=0; i<audioState.outputDeviceCount; i++)
+        {
+            soundio_device_unref(audioState.outputDeviceList[i]);
+        }
+        delete[] audioState.outputDeviceList;
+    }
+    if(audioState.outputDeviceNames)
+        delete[] audioState.outputDeviceNames;
+    audioState.outputDeviceList = new SoundIoDevice*[managedOutputDeviceCount];
+    audioState.outputDeviceNames = new char*[managedOutputDeviceCount];
+    audioState.outputDeviceCount = managedOutputDeviceCount;
+    int targetOutputDeviceIndex = -1;
+    int managedOutputIndex = 0;
+    for(int i=0; i<outputDeviceCount; ++i)
+    {
+        SoundIoDevice* device = soundio_get_output_device(sio, i);
+        if(!device->is_raw)
+        {
+            audioState.outputDeviceList[managedOutputIndex] = device;
+            audioState.outputDeviceNames[managedOutputIndex] = device->name;
+            // NOTE: We use the current open device if it exists, otherwise we'll use the default
+            if(targetOutputDeviceIndex == -1)
+            {
+                if(i == currentOutputDeviceNewIndex)
+                {
+                    targetOutputDeviceIndex = managedOutputIndex;
+                }
                 if(i == defaultOutputDevice)
                 {
-                    defaultOutputDeviceIndex = managedOutputIndex;
+                    targetOutputDeviceIndex = managedOutputIndex;
                 }
-                managedOutputIndex += 1;
             }
-            else
-            {
-                soundio_device_unref(device);
-            }
-        }
-
-        if(defaultOutputDeviceIndex >= 0)
-        {
-            if(!setAudioOutputDevice(defaultOutputDeviceIndex))
-            {
-                logWarn("Error: Unable to initialize audio output device %s\n",
-                        audioState.outputDeviceNames[defaultOutputDeviceIndex]);
-            }
+            managedOutputIndex += 1;
         }
         else
         {
-            // TODO: We probably want to just open SOME device
-            logWarn("Error: No non-raw default audio output device\n");
+            soundio_device_unref(device);
         }
+    }
+
+    if(targetOutputDeviceIndex >= 0)
+    {
+        if(!setAudioOutputDevice(targetOutputDeviceIndex))
+        {
+            logWarn("Error: Unable to initialize audio output device %s\n",
+                    audioState.outputDeviceNames[targetOutputDeviceIndex]);
+        }
+    }
+    else
+    {
+        // TODO: We probably want to just open SOME device
+        logWarn("Error: No non-raw default audio output device\n");
     }
 }
 
@@ -661,6 +752,11 @@ bool initAudio()
     logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
     return true;
+}
+
+void updateAudio()
+{
+    soundio_flush_events(soundio);
 }
 
 void deinitAudio()

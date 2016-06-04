@@ -25,6 +25,7 @@ extern AudioData audioState; // TODO: We probably want to only have SOME of this
                              //       enabled bools or the devices themselves etc
 
 bool initAudio();
+void updateAudio();
 void deinitAudio();
 
 bool setAudioInputDevice(int newInputDevice);
