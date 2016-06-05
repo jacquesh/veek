@@ -1,16 +1,17 @@
 #include "ringbuffer.h"
 
 #include <assert.h>
+#include <atomic>
 
-// TODO: Modify count correctly when you cross the wrap around/pass the read ptr
+#include "platform.h"
+#include "logging.h"
 
 RingBuffer::RingBuffer(int size)
-    : capacity(size)
+    : capacity(size), capacityMask(size-1), readIndex(0), writeIndex(0)
 {
+    assert(size && !(size & (size-1))); // We require power-of-2 capacity so that we can use
+                                        // atomic AND operations instead of a modulo
     buffer = new float[size];
-    _count = 0;
-    readIndex = 0;
-    writeIndex = 0;
 }
 
 RingBuffer::~RingBuffer()
@@ -20,52 +21,48 @@ RingBuffer::~RingBuffer()
 
 void RingBuffer::write(int valCount, float* vals)
 {
-    int readOverflow = free() - valCount;
-    if(readOverflow < 0)
-    {
-        advanceReadPointer(-readOverflow);
-    }
-    assert(free() >= valCount);
+    assert(valCount <= free()); // TODO: asserting is probably much too strong here, be more friendly
 
-    int contiguousFreeSpace = capacity - writeIndex;
+    int localWriteIndex = writeIndex.load();
+    int contiguousFreeSpace = capacity - localWriteIndex;
     if(contiguousFreeSpace > valCount)
     {
         for(int i=0; i<valCount; ++i)
-            buffer[writeIndex+i] = vals[i];
+            buffer[localWriteIndex+i] = vals[i];
     }
     else
     {
         for(int i=0; i<contiguousFreeSpace; ++i)
-            buffer[writeIndex+i] = vals[i];
+            buffer[localWriteIndex+i] = vals[i];
 
         int wrappedValCount = valCount - contiguousFreeSpace;
         for(int i=0; i<wrappedValCount; ++i)
             buffer[i] = vals[contiguousFreeSpace+i];
     }
-}
 
-void RingBuffer::advanceWritePointer(int increment)
-{
-    assert(increment <= capacity);
-    writeIndex = (writeIndex+increment)%capacity;
-    _count += increment;
+    writeIndex.fetch_add(valCount);
+    // NOTE: See corresponding note in RingBuffer::read
+    writeIndex.fetch_and(capacityMask);
 }
 
 void RingBuffer::read(int valCount, float* vals)
 {
-    int contiguousAvailableValues = capacity - readIndex;
+    assert(valCount <= count()); // TODO: asserting is probably much too strong here, be more friendly
+
+    int localReadIndex = readIndex.load();
+    int contiguousAvailableValues = capacity - localReadIndex;
     if(contiguousAvailableValues > valCount)
     {
         for(int i=0; i<valCount; ++i)
         {
-            vals[i] = buffer[readIndex+i];
+            vals[i] = buffer[localReadIndex+i];
         }
     }
     else
     {
         for(int i=0; i<contiguousAvailableValues; ++i)
         {
-            vals[i] = buffer[readIndex+i];
+            vals[i] = buffer[localReadIndex+i];
         }
 
         int wrappedValCount = valCount - contiguousAvailableValues;
@@ -74,21 +71,41 @@ void RingBuffer::read(int valCount, float* vals)
             vals[contiguousAvailableValues+i] = buffer[i];
         }
     }
-}
 
-void RingBuffer::advanceReadPointer(int increment)
-{
-    readIndex = (readIndex+increment)%capacity;
-    _count -= increment;
+    readIndex.fetch_add(valCount);
+    // NOTE: We need to wrap if we go past capacity, so we AND.
+    //       This only works because we require power-of-2 capacity,
+    //       also because AND is idempotent so it doesn't matter if we interleave here
+    readIndex.fetch_and(capacityMask);
 }
 
 int RingBuffer::count()
 {
-    return _count;
+    // NOTE: The order is important here, if we read the writeIndex second, we might get
+    //       a count that is larger than it really is. This is bad but we're ok with getting one
+    //       that is smaller (since we'll just miss a couple values instead of getting wrong ones)
+    int localWriteIndex = writeIndex.load();
+    int localReadIndex = readIndex.load();
+
+    if(localWriteIndex < localReadIndex)
+        return (capacity - localReadIndex) + localWriteIndex;
+    else
+        return localWriteIndex - localReadIndex;
 }
 
 int RingBuffer::free()
 {
-    int result = capacity - count();
-    return result;
+    // NOTE: As with count(), order is important here. We load read first then write so that we
+    //       err on the side of giving a smaller-than-correct value
+    int localReadIndex = readIndex.load();
+    int localWriteIndex = writeIndex.load();
+
+    int numberOfSlots;
+    if(localReadIndex <= localWriteIndex)
+        numberOfSlots = (capacity - localWriteIndex) + localReadIndex;
+    else
+        numberOfSlots = localReadIndex - localWriteIndex;
+
+    // NOTE: We subtract 1 here so that readIndex == writeIndex only if the buffer is empty
+    return numberOfSlots - 1;
 }
