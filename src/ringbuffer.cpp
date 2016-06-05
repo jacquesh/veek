@@ -28,6 +28,7 @@ void RingBuffer::write(int valCount, float* vals)
     {
         int readIndexIncrement = valCount - free();
         readIndex.fetch_add(readIndexIncrement);
+        readIndex.fetch_and(capacityMask);
         // TODO: We should probably check that this is sufficient, can we not ask to read a large
         //       block of data, in which case we will start reading, then get here and write through
         //       the area that we're currently reading, which would cause a discontinuity
