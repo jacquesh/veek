@@ -16,4 +16,6 @@ typedef int64_t int64;
 const unsigned char MAX_ROOM_NAME_LENGTH = 128;
 const unsigned char MAX_USER_NAME_LENGTH = 128;
 
+const unsigned char MAX_USERS = 8;
+
 #endif

@@ -86,7 +86,7 @@ struct GameState
     ENetPeer* netPeer;
 
     int connectedUserCount;
-    UserData users[NET_MAX_CLIENTS];
+    UserData users[MAX_USERS];
 };
 
 const int HOSTNAME_MAX_LENGTH = 26;

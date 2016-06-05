@@ -23,12 +23,12 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    ClientData clients[NET_MAX_CLIENTS] = {0};
+    ClientData clients[MAX_USERS] = {0};
 
     ENetAddress addr = {};
     addr.host = ENET_HOST_ANY;
     addr.port = NET_PORT;
-    ENetHost* netHost = enet_host_create(&addr, NET_MAX_CLIENTS, 2, 0,0);
+    ENetHost* netHost = enet_host_create(&addr, MAX_USERS, 2, 0,0);
 
     bool running = true;
     while(running)
@@ -45,7 +45,7 @@ int main(int argc, char** argv)
                     //       connect, if we ever got more than that simultaneously this would break
                     //       and overwrite the previous clients
                     uint8 peerIndex = 0;
-                    for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
+                    for(uint8 i=0; i<MAX_USERS; ++i)
                     {
                         if(!clients[i].netPeer)
                         {
@@ -86,7 +86,7 @@ int main(int argc, char** argv)
                         // Tell the new client about all other clients
                         int replyLength = 2;
                         uint8 clientCount = 0;
-                        for(int i=0; i<NET_MAX_CLIENTS; ++i)
+                        for(int i=0; i<MAX_USERS; ++i)
                         {
                             if((i == peerIndex) || (!clients[i].netPeer)
                                     || (clients[i].roomId != roomId))
@@ -99,7 +99,7 @@ int main(int argc, char** argv)
                         *replyData = NET_MSGTYPE_INIT_DATA;
                         *(replyData+1) = clientCount;
                         replyData += 2;
-                        for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
+                        for(uint8 i=0; i<MAX_USERS; ++i)
                         {
                             if((i == peerIndex) || (!clients[i].netPeer)
                                     || (clients[i].roomId != roomId))
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
                         enet_peer_send(netEvent.peer, 0, initReplyPacket);
 
                         // Tell all other clients about the new client
-                        for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
+                        for(uint8 i=0; i<MAX_USERS; ++i)
                         {
                             if((i == peerIndex) || (!clients[i].netPeer)
                                     || (clients[i].roomId != roomId))
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
                                                                netEvent.packet->dataLength,
                                                                ENET_PACKET_FLAG_UNSEQUENCED);
                     // TODO: This is wrong, because it will probably destroy the packet after sending
-                    for(int i=0; i<NET_MAX_CLIENTS; ++i)
+                    for(int i=0; i<MAX_USERS; ++i)
                     {
                         if((i == peerIndex) || (!clients[i].netPeer)
                                 || (clients[i].roomId != clients[peerIndex].roomId))
@@ -152,8 +152,8 @@ int main(int argc, char** argv)
                     clients[peerIndex].nameLength = 0;
                     clients[peerIndex].name = 0;
 
-                    // Tell all other clients about the new client
-                    for(uint8 i=0; i<NET_MAX_CLIENTS; ++i)
+                    // Tell all other clients about the disconnect
+                    for(uint8 i=0; i<MAX_USERS; ++i)
                     {
                         if((i == peerIndex) || (!clients[i].netPeer))
                             continue;
