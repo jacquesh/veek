@@ -69,7 +69,7 @@ struct GameState
 {
     char name[MAX_USER_NAME_LENGTH];
     uint8 nameLength;
-    int localUserIndex;
+    uint8 localUserIndex;
 
     GLuint cameraTexture;
 

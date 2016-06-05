@@ -420,7 +420,7 @@ bool setAudioOutputDevice(int newOutputDevice)
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
     // Create the test sound based on the sample rate that we got
-    int sampleSoundSampleCount = 1 << 16;
+    uint32 sampleSoundSampleCount = 1 << 16;
     AudioSource sampleSource = {0};
     sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
 
