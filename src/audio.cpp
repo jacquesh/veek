@@ -1,7 +1,6 @@
 #include "audio.h"
 
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 #include <math.h>
 #include <assert.h>
@@ -14,6 +13,7 @@
 #include "platform.h"
 #include "vecmath.h"
 #include "ringbuffer.h"
+#include "unorderedlist.h"
 
 // TODO: Allow runtime switching of the recording/playback devices.
 // TODO: The decoder states that we need to call decode with empty values for every lost packet
@@ -26,17 +26,16 @@ static OpusDecoder* decoder = 0;
 
 static SoundIoDevice* inDevice = 0;
 static SoundIoInStream* inStream = 0;
-RingBuffer* inBuffer = 0; // TODO: These should probably be static but at the moment we use them for
-Mutex* audioInMutex = 0;  //       the microphone volume bars
+static RingBuffer* inBuffer = 0; // TODO: These should probably be static but at the moment we
+                                 //       use them for the microphone volume bars
 
 static SoundIoDevice* outDevice = 0;
 static SoundIoOutStream* outStream = 0;
-RingBuffer* outBuffer = 0;
-Mutex* audioOutMutex = 0;
 
-static float* sampleSoundSamples = 0;
-static uint32 sampleSoundSampleIndex = 0;
-static uint32 sampleSoundSampleCount = 0;
+static UnorderedList<AudioSource> sourceList(10); // TODO: Pick a correct max value here, 8 users + test sound + listening? I dunno
+
+static RingBuffer* listenBuffer;
+static RingBuffer* userBuffers[MAX_USERS];
 
 static void printDevice(SoundIoDevice* device, bool isDefault)
 {
@@ -80,7 +79,6 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     SoundIoChannelArea* inArea;
 
     // TODO: Check the free space in inBuffer
-    lockMutex(audioInMutex);
     while(framesRemaining > 0)
     {
         int frameCount = framesRemaining;
@@ -98,20 +96,21 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
             inArea[0].ptr += inArea[0].step;
 
             inBuffer->write(1, &val);
-            inBuffer->advanceWritePointer(1);
+
+            if(audioState.isListeningToInput)
+            {
+                listenBuffer->write(1, &val);
+            }
         }
 
         soundio_instream_end_read(stream);
         framesRemaining -= frameCount;
     }
-    unlockMutex(audioInMutex);
 }
 
 void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
-    lockMutex(audioOutMutex);
-    int framesAvailable = outBuffer->count();
-    int framesRemaining = clamp(framesAvailable, frameCountMin, frameCountMax);
+    int framesRemaining = frameCountMin;
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
@@ -127,19 +126,18 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             break;
         }
 
-        RingBuffer* sourceBuffer = outBuffer;
-        if(audioState.isListeningToInput)
+        for(int frame=0; frame<frameCount; ++frame)
         {
-            sourceBuffer = inBuffer;
-        }
-
-        framesAvailable = sourceBuffer->count();
-        framesAvailable = min(framesAvailable, frameCount);
-        for(int frame=0; frame<framesAvailable; ++frame)
-        {
-            float val;
-            sourceBuffer->read(1, &val);
-            sourceBuffer->advanceReadPointer(1);
+            float val = 0.0f;
+            for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
+            {
+                if(sourceList[sourceIndex].buffer->count() > 0)
+                {
+                    float temp;
+                    sourceList[sourceIndex].buffer->read(1, &temp);
+                    val += temp;
+                }
+            }
 
             for(int channel=0; channel<channelCount; ++channel)
             {
@@ -149,20 +147,9 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
             }
         }
 
-        for(int frame=framesAvailable; frame<frameCount; ++frame)
-        {
-            for(int channel=0; channel<channelCount; ++channel)
-            {
-                float* samplePtr = (float*)outArea[channel].ptr;
-                *samplePtr = 0.0f;
-                outArea[channel].ptr += outArea[channel].step;
-            }
-        }
-
         soundio_outstream_end_write(stream);
         framesRemaining -= frameCount;
     }
-    unlockMutex(audioOutMutex);
 }
 
 void inOverflowCallback(SoundIoInStream* stream)
@@ -192,7 +179,7 @@ void listenToInput(bool listening)
 
 void playTestSound()
 {
-    sampleSoundSampleIndex = 0;
+    // TODO
 }
 
 int decodePacket(int sourceLength, uint8_t* sourceBufferPtr,
@@ -265,9 +252,10 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
     return bytesWritten;
 }
 
-int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
+int addUserAudioData(int userIndex, int sourceBufferLength, float* sourceBufferPtr)
 {
-    lockMutex(audioOutMutex);
+    RingBuffer* outBuffer = userBuffers[userIndex];
+
     int samplesToWrite = sourceBufferLength;
     int ringBufferFreeSpace = outBuffer->free();
     if(samplesToWrite > ringBufferFreeSpace)
@@ -277,16 +265,12 @@ int writeAudioOutputBuffer(int sourceBufferLength, float* sourceBufferPtr)
     //logTerm("Write %d samples\n", samplesToWrite);
 
     outBuffer->write(samplesToWrite, sourceBufferPtr);
-    outBuffer->advanceWritePointer(samplesToWrite);
-
-    unlockMutex(audioOutMutex);
 
     return samplesToWrite;
 }
 
 int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 {
-    lockMutex(audioInMutex);
     // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
     //       to be a single sample from a single channel, but its important to note that that is what
     //       we're currently doing
@@ -296,9 +280,6 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
         samplesToWrite = samplesAvailable;
 
     inBuffer->read(samplesToWrite, targetBufferPtr);
-    inBuffer->advanceReadPointer(samplesToWrite);
-
-    unlockMutex(audioInMutex);
 
     return samplesToWrite;
 }
@@ -439,21 +420,33 @@ bool setAudioOutputDevice(int newOutputDevice)
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
     // Create the test sound based on the sample rate that we got
-    if(sampleSoundSamples)
-        delete[] sampleSoundSamples;
-    sampleSoundSampleCount = outStream->sample_rate;
-    sampleSoundSampleIndex = sampleSoundSampleCount;
-    sampleSoundSamples = new float[sampleSoundSampleCount];
+    int sampleSoundSampleCount = 1 << 16;
+    AudioSource sampleSource = {0};
+    sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
 
     float twopi = 2.0f*3.1415927f;
     float frequency = 261.6f; // Middle C
     float timestep = 1.0f/(float)outStream->sample_rate;
     float sampleTime = 0.0f;
-    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount; sampleIndex++)
+    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
     {
         float sinVal = sinf(frequency*twopi*sampleTime);
-        sampleSoundSamples[sampleIndex] = sinVal;
+        sampleSource.buffer->write(1, &sinVal);
         sampleTime += timestep;
+    }
+    sourceList.insert(sampleSource);
+
+    AudioSource listenSource = {0};
+    listenBuffer = new RingBuffer(1 << 13);
+    listenSource.buffer = listenBuffer;
+    sourceList.insert(listenSource);
+
+    for(int userIndex=0; userIndex<MAX_USERS; userIndex++)
+    {
+        AudioSource userSource = {0};
+        userBuffers[userIndex] = new RingBuffer(1 << 13);
+        userSource.buffer = userBuffers[userIndex];
+        sourceList.insert(userSource);
     }
 
     return true;
@@ -695,10 +688,7 @@ bool initAudio()
     // get a list of connected devices
     audioState.currentInputDevice = -1;
     audioState.currentOutputDevice = -1;
-    inBuffer = new RingBuffer(2400);
-    audioInMutex = createMutex();
-    outBuffer = new RingBuffer(48000);
-    audioOutMutex = createMutex();
+    inBuffer = new RingBuffer(4096);
 
     // Initialize SoundIO
     logInfo("Initializing libsoundio %s\n", soundio_version_string());
@@ -765,6 +755,8 @@ void deinitAudio()
     // TODO: Wraithy crashes inside this function
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
+    // TODO: Clean up the sourceList and its elements (in particular the ringbuffers should
+    //       probably be freed here)
 
     if(inStream)
     {
@@ -773,8 +765,6 @@ void deinitAudio()
     }
     if(inBuffer)
         delete inBuffer;
-    if(audioInMutex)
-        destroyMutex(audioInMutex);
     for(int i=0; i<audioState.inputDeviceCount; ++i)
     {
         soundio_device_unref(audioState.inputDeviceList[i]);
@@ -785,9 +775,6 @@ void deinitAudio()
         soundio_outstream_pause(outStream, true);
         soundio_outstream_destroy(outStream);
     }
-    if(outBuffer)
-        delete outBuffer;
-    destroyMutex(audioOutMutex);
     for(int i=0; i<audioState.outputDeviceCount; ++i)
     {
         soundio_device_unref(audioState.outputDeviceList[i]);
@@ -800,6 +787,7 @@ void deinitAudio()
 }
 
 // TODO: This is just here for testing, writing the audio recording to file
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <Mmreg.h>
 #pragma pack (push,1)

@@ -84,7 +84,7 @@ int main(int argc, char** argv)
                         enet_packet_destroy(netEvent.packet);
 
                         // Tell the new client about all other clients
-                        int replyLength = 2;
+                        int replyLength = 3;
                         uint8 clientCount = 0;
                         for(int i=0; i<MAX_USERS; ++i)
                         {
@@ -97,8 +97,9 @@ int main(int argc, char** argv)
                         ENetPacket* initReplyPacket = enet_packet_create(0, replyLength, ENET_PACKET_FLAG_UNSEQUENCED);
                         uint8* replyData = initReplyPacket->data;
                         *replyData = NET_MSGTYPE_INIT_DATA;
-                        *(replyData+1) = clientCount;
-                        replyData += 2;
+                        *(replyData+1) = peerIndex;
+                        *(replyData+2) = clientCount;
+                        replyData += 3;
                         for(uint8 i=0; i<MAX_USERS; ++i)
                         {
                             if((i == peerIndex) || (!clients[i].netPeer)

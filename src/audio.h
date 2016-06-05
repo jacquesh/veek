@@ -5,6 +5,8 @@
 
 #include "soundio/soundio.h"
 
+#include "ringbuffer.h"
+
 struct AudioData
 {
     int inputDeviceCount;
@@ -18,6 +20,12 @@ struct AudioData
     int currentOutputDevice;
 
     bool isListeningToInput;
+};
+
+struct AudioSource
+{
+    int userIndex;
+    RingBuffer* buffer;
 };
 
 extern AudioData audioState; // TODO: We probably want to only have SOME of this be global
@@ -45,7 +53,7 @@ int decodePacket(int sourceLength, uint8_t* sourceBuffer, int targetLength, floa
 
 // Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
 int readAudioInputBuffer(int bufferLength, float* buffer);
-int writeAudioOutputBuffer(int bufferLength, float* buffer);
+int addUserAudioData(int peerIndex, int bufferLength, float* buffer);
 
 void writeAudioToFile(int length, uint8_t* data);
 #endif

@@ -57,12 +57,6 @@ TODO:
     - Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
 */
 
-#include "ringbuffer.h"
-extern RingBuffer* inBuffer;
-extern RingBuffer* outBuffer;
-extern Mutex* audioInMutex;
-extern Mutex* audioOutMutex;
-
 struct UserData
 {
     bool connected;
@@ -75,6 +69,7 @@ struct GameState
 {
     char name[MAX_USER_NAME_LENGTH];
     uint8 nameLength;
+    int localUserIndex;
 
     GLuint cameraTexture;
 
@@ -181,7 +176,7 @@ void renderGame(GameState* game, float deltaTime)
 
     int connectedUserIndex = 0;
     int userWidth = cameraWidth+10;
-    for(int userIndex=0; userIndex<NET_MAX_CLIENTS; ++userIndex)
+    for(int userIndex=0; userIndex<MAX_USERS; ++userIndex)
     {
         if(!game->users[userIndex].connected)
             continue;
@@ -358,11 +353,9 @@ void renderGame(GameState* game, float deltaTime)
     rms /= micBufferLen;
     rms = sqrtf(rms);
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
-    lockMutex(audioInMutex);
     ImGui::Text("inBuffer: %05d/%d", inBuffer->count(), 48000);
     ImGui::SameLine();
     ImGui::Text("outBuffer: %05d/%d", outBuffer->count(), 48000);
-    unlockMutex(audioInMutex);
 
     ImGui::End();
 }
@@ -525,10 +518,11 @@ int main()
                     logTerm("Encoded %d video bytes\n", videoBytes);
                     //delete[] encodedPixels;
 
-                    ENetPacket* packet = enet_packet_create(0, videoBytes+1,
+                    ENetPacket* packet = enet_packet_create(0, videoBytes+2,
                                                             ENET_PACKET_FLAG_UNSEQUENCED);
                     *packet->data = NET_MSGTYPE_VIDEO;
-                    memcpy(packet->data+1, encodedPixels, videoBytes);
+                    *(packet->data+1) = game.localUserIndex;
+                    memcpy(packet->data+2, encodedPixels, videoBytes);
                     enet_peer_send(game.netPeer, 0, packet);
                 }
             }
@@ -546,10 +540,11 @@ int main()
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
                 //logTerm("Send %d bytes of audio\n", audioBytes);
-                ENetPacket* outPacket = enet_packet_create(0, 1+audioBytes,
+                ENetPacket* outPacket = enet_packet_create(0, 2+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
-                memcpy(outPacket->data+1, encodedBuffer, audioBytes);
+                outPacket->data[1] = game.localUserIndex;
+                memcpy(outPacket->data+2, encodedBuffer, audioBytes);
                 enet_peer_send(game.netPeer, 0, outPacket);
 
                 delete[] encodedBuffer;
@@ -580,8 +575,9 @@ int main()
                 case ENET_EVENT_TYPE_RECEIVE:
                 {
                     uint8 dataType = *netEvent.packet->data;
-                    uint8* data = netEvent.packet->data+1;
-                    int dataLength = netEvent.packet->dataLength-1;
+                    uint8 sourceClientIndex = *(netEvent.packet->data+1);
+                    uint8* data = netEvent.packet->data+2;
+                    int dataLength = netEvent.packet->dataLength-2;
                     logTerm("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
 
                     switch(dataType)
@@ -593,7 +589,8 @@ int main()
                         case NET_MSGTYPE_INIT_DATA:
                         {
                             uint8 clientCount = *data;
-                            logInfo("There are %d connected clients\n", clientCount);
+                            game.localUserIndex = sourceClientIndex;
+                            logInfo("There are %d connected clients, we are client %d\n", clientCount, sourceClientIndex);
                             data += 1;
                             for(uint8 i=0; i<clientCount; ++i)
                             {
@@ -606,31 +603,29 @@ int main()
 
                                 // TODO: What happens if a client disconnects as we connect and we
                                 //       only receive the init_data after the disconnect event?
-                                game.users[index].connected = true;
-                                game.users[index].nameLength = nameLength;
-                                game.users[index].name = name;
+                                game.users[sourceClientIndex].connected = true;
+                                game.users[sourceClientIndex].nameLength = nameLength;
+                                game.users[sourceClientIndex].name = name;
                                 logInfo("%s\n", name);
                             }
                         } break;
                         case NET_MSGTYPE_CLIENT_CONNECT:
                         {
-                            uint8 index = *data;
-                            uint8 nameLength = *(data+1);
-                            game.users[index].connected = true;
-                            game.users[index].nameLength = index;
-                            game.users[index].name = new char[nameLength+1];
-                            memcpy(game.users[index].name, data+2, nameLength);
-                            game.users[index].name[nameLength] = 0;
-                            logInfo("%s connected\n", game.users[index].name);
+                            uint8 nameLength = *data;
+                            game.users[sourceClientIndex].connected = true;
+                            game.users[sourceClientIndex].nameLength = nameLength;
+                            game.users[sourceClientIndex].name = new char[nameLength+1];
+                            memcpy(game.users[sourceClientIndex].name, data+1, nameLength);
+                            game.users[sourceClientIndex].name[nameLength] = 0;
+                            logInfo("%s connected\n", game.users[sourceClientIndex].name);
                         } break;
                         case NET_MSGTYPE_CLIENT_DISCONNECT:
                         {
-                            uint8 index = *data;
-                            logInfo("%s disconnected\n", game.users[index].name);
-                            delete[] game.users[index].name; // TODO: Again, network security
-                            game.users[index].connected = false;
-                            game.users[index].nameLength = 0;
-                            game.users[index].name = 0;
+                            logInfo("%s disconnected\n", game.users[sourceClientIndex].name);
+                            delete[] game.users[sourceClientIndex].name; // TODO: Again, network security
+                            game.users[sourceClientIndex].connected = false;
+                            game.users[sourceClientIndex].nameLength = 0;
+                            game.users[sourceClientIndex].name = 0;
                         } break;
                         case NET_MSGTYPE_AUDIO:
                         {
@@ -638,7 +633,7 @@ int main()
                             int decodedFrames = decodePacket(dataLength, data,
                                                              micBufferLen, decodedAudio);
                             logTerm("Received %d samples\n", decodedFrames);
-                            writeAudioOutputBuffer(decodedFrames, decodedAudio);
+                            addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
                         } break;
                         case NET_MSGTYPE_VIDEO:
                         {
