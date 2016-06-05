@@ -21,7 +21,19 @@ RingBuffer::~RingBuffer()
 
 void RingBuffer::write(int valCount, float* vals)
 {
-    assert(valCount <= free()); // TODO: asserting is probably much too strong here, be more friendly
+    // NOTE: We must be strictly less than capacity so that our pointers don't coincide afterwards
+    assert(valCount < capacity);
+
+    if(valCount > free())
+    {
+        int readIndexIncrement = valCount - free();
+        readIndex.fetch_add(readIndexIncrement);
+        // TODO: We should probably check that this is sufficient, can we not ask to read a large
+        //       block of data, in which case we will start reading, then get here and write through
+        //       the area that we're currently reading, which would cause a discontinuity
+        //
+        //       So we might need a mutex here or something...
+    }
 
     int localWriteIndex = writeIndex.load();
     int contiguousFreeSpace = capacity - localWriteIndex;
@@ -47,7 +59,7 @@ void RingBuffer::write(int valCount, float* vals)
 
 void RingBuffer::read(int valCount, float* vals)
 {
-    assert(valCount <= count()); // TODO: asserting is probably much too strong here, be more friendly
+    assert(valCount < capacity);
 
     int localReadIndex = readIndex.load();
     int contiguousAvailableValues = capacity - localReadIndex;
