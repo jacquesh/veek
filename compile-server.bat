@@ -1,12 +1,12 @@
 @echo off
 set CompileFiles= ..\src\server.cpp
-set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -MD
+set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -MDd
 set IncludeDirs= -I..\include
 
-set LinkLibs=..\lib\enet64.lib ws2_32.lib winmm.lib
+set LinkLibs=enet.lib ws2_32.lib winmm.lib
 
 pushd build
-cl %CompileFlags% %CompileFiles% %IncludeDirs% -link %LinkLibs% -INCREMENTAL:NO -OUT:server.exe
+cl %CompileFlags% %CompileFiles% %IncludeDirs% -link -LIBPATH:..\lib %LinkLibs% -INCREMENTAL:NO -OUT:server.exe
 popd
 
 
