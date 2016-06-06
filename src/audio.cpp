@@ -15,9 +15,6 @@
 #include "ringbuffer.h"
 #include "unorderedlist.h"
 
-// TODO: Allow runtime switching of the recording/playback devices.
-// TODO: The decoder states that we need to call decode with empty values for every lost packet
-//       We do actually keep track of time but we have yet to use that to check for packet loss
 AudioData audioState = {};
 
 static SoundIo* soundio = 0;
