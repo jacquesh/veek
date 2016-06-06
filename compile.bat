@@ -2,8 +2,8 @@
 
 ctime -begin veek_time.ctm
 
-set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\graphicsutil.cpp ..\src\vecmath.cpp ..\src\audio.cpp ..\src\video.cpp ..\src\ringbuffer.cpp ..\src\win32_platform.cpp ..\src\logging.cpp ..\src\escapi.cpp ..\imgui\gl3w.cpp ..\imgui\imgui.cpp ..\imgui\imgui_draw.cpp ..\imgui\imgui_impl_glfw_gl3.cpp
-set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MDd -EHsc-
+set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\graphicsutil.cpp ..\src\vecmath.cpp ..\srcvideo.cpp ..\src\audio.cpp  ..\src\ringbuffer.cpp ..\src\win32_platform.cpp ..\src\logging.cpp ..\src\escapi.cpp
+set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MTd -EHsc-
 set IncludeDirs= -I..\include
 
 set GLFWLibs=glfw3.lib gdi32.lib shell32.lib

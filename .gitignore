@@ -2,6 +2,7 @@
 build/
 lib/
 dependencies/
+tests/
 
 # Log files
 *.log
