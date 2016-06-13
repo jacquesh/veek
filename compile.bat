@@ -2,8 +2,9 @@
 
 ctime -begin veek_time.ctm
 
+FOR /f %%H IN ('git log -n 1 --oneline') DO set VersionHash=%%H
 set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\graphicsutil.cpp ..\src\vecmath.cpp ..\src\video.cpp ..\src\audio.cpp  ..\src\ringbuffer.cpp ..\src\win32_platform.cpp ..\src\logging.cpp ..\src\escapi.cpp
-set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MTd -EHsc-
+set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -DNOMINMAX -MTd -EHsc- -DBUILD_VERSION=\"%VersionHash%\"
 set IncludeDirs= -I..\include
 
 set GLFWLibs=glfw3.lib gdi32.lib shell32.lib

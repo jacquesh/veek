@@ -20,6 +20,10 @@
 #include "graphicsutil.h"
 #include "network_common.h"
 
+#ifndef BUILD_VERSION
+#define BUILD_VERSION "Unknown"
+#endif
+
 struct UserData
 {
     bool connected;
@@ -356,6 +360,7 @@ int main()
     {
         return 1;
     }
+    logInfo("Veek version %s\n", BUILD_VERSION);
 
     logInfo("Initializing GLFW version %s\n", glfwGetVersionString());
     glfwSetErrorCallback(glfwErrorCallback);
