@@ -635,7 +635,7 @@ int main()
         {
             double sleepSeconds = nextTickTime - newTime;
             uint32 sleepMS = (uint32)(sleepSeconds*1000);
-            sleep(sleepMS);
+            sleepForMilliseconds(sleepMS);
         }
     }
 
