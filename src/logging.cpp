@@ -6,19 +6,22 @@ static FILE* logFile;
 
 void _logTerm(const char* format, ...)
 {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
+    va_list stderrArgs;
+    va_start(stderrArgs, format);
+    vfprintf(stderr, format, stderrArgs);
+    va_end(stderrArgs);
 }
 
 void _log(const char* format, ...)
 {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    vfprintf(logFile, format, args);
-    va_end(args);
+    va_list stderrArgs;
+    va_list fileArgs;
+    va_start(stderrArgs, format);
+    va_copy(fileArgs, stderrArgs);
+    vfprintf(stderr, format, stderrArgs);
+    vfprintf(logFile, format, fileArgs);
+    va_end(fileArgs);
+    va_end(stderrArgs);
 
     fflush(logFile);
 }
@@ -38,6 +41,7 @@ bool initLogging()
 
 void deinitLogging()
 {
+    fflush(stderr);
     fflush(logFile);
     fclose(logFile);
 }
