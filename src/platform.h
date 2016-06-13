@@ -9,6 +9,6 @@ void destroyMutex(Mutex* mutex);
 void lockMutex(Mutex* mutex);
 void unlockMutex(Mutex* mutex);
 
-void sleep(uint32 milliseconds);
+void sleepForMilliseconds(uint32 milliseconds);
 
 #endif

@@ -39,7 +39,7 @@ void unlockMutex(Mutex* mutex)
     LeaveCriticalSection(&mutex->critSec);
 }
 
-void sleep(uint32 milliseconds)
+void sleepForMilliseconds(uint32 milliseconds)
 {
     Sleep(milliseconds);
 }
