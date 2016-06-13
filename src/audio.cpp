@@ -107,7 +107,10 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
 
 void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
-    int framesRemaining = frameCountMin;
+    // TODO: 0.025 is twice per frame, we should probably link that in to where we actually specify
+    //       the tickrate
+    int samplesPerFrame = (int)(0.025f*stream->sample_rate);
+    int framesRemaining = max(frameCountMin, samplesPerFrame); //frameCountMin;
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
@@ -125,6 +128,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
         for(int frame=0; frame<frameCount; ++frame)
         {
+            // TODO: Proper audio mixing. Reading: http://www.voegler.eu/pub/audio/digital-audio-mixing-and-normalization.html
             float val = 0.0f;
             for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
             {
