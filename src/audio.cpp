@@ -110,7 +110,7 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     // TODO: 0.025 is twice per frame, we should probably link that in to where we actually specify
     //       the tickrate
     int samplesPerFrame = (int)(0.025f*stream->sample_rate);
-    int framesRemaining = max(frameCountMin, samplesPerFrame); //frameCountMin;
+    int framesRemaining = clamp(samplesPerFrame, frameCountMin, frameCountMax);
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
