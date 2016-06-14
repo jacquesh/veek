@@ -324,10 +324,6 @@ void renderGame(GameState* game, float deltaTime)
     rms /= micBufferLen;
     rms = sqrtf(rms);
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
-    ImGui::Text("inBuffer: %05d/%d", inBuffer->count(), 48000);
-    ImGui::SameLine();
-    ImGui::Text("outBuffer: %05d/%d", outBuffer->count(), 48000);
-
     ImGui::End();
 }
 
