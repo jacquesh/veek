@@ -14,7 +14,7 @@ struct Mutex
 Mutex* createMutex()
 {
     Mutex* result = (Mutex*)malloc(sizeof(Mutex));
-    pthread_mutex_init(&result->mutex);
+    pthread_mutex_init(&result->mutex, NULL);
     return result;
 };
 
