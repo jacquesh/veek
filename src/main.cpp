@@ -610,6 +610,7 @@ int main()
                                                              micBufferLen, decodedAudio);
                             logTerm("Received %d samples\n", decodedFrames);
                             addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
+                            delete[] decodedAudio;
                         } break;
 #if 0
                         case NET_MSGTYPE_VIDEO:
