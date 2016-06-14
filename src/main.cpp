@@ -138,7 +138,7 @@ void renderGame(GameState* game, float deltaTime)
     Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
     Vector2 screenSize((float)screenWidth, (float)screenHeight);
     Vector2 cameraPosition = screenSize * 0.5f;
-    //renderTexture(game->cameraTexture, cameraPosition, size, 1.0f);
+    renderTexture(game->cameraTexture, cameraPosition-Vector2(340,0), size, 1.0f);
     //renderTexture(pixelTexture, cameraPosition, size, 1.0f);
 
     int connectedUserIndex = 0;
