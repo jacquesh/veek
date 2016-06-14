@@ -1,5 +1,5 @@
-#ifndef _MATH_H
-#define _MATH_H
+#ifndef _VECTOR_MATH_H
+#define _VECTOR_MATH_H
 
 struct Vector2
 {
