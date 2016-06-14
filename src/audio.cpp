@@ -498,7 +498,9 @@ void backendDisconnectCallback(SoundIo* sio, int error)
 
 void devicesChangeCallback(SoundIo* sio)
 {
-    // TODO: This doesn't appear to get called when I unplug/plug in my microphone (realtek does notice though)
+    // TODO: This will recreate the streams even if the device already exists, which is bad
+    //       because pulse appears to call this *very* frequently on my laptop, should
+    //       make it only create a new stream if the device used by the previous one is gone
     int inputDeviceCount = soundio_input_device_count(sio);
     int outputDeviceCount = soundio_output_device_count(sio);
     logInfo("SoundIo device list updated - %d input, %d output devices\n",
