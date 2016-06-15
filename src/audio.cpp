@@ -498,17 +498,12 @@ void backendDisconnectCallback(SoundIo* sio, int error)
 
 void devicesChangeCallback(SoundIo* sio)
 {
-    // TODO: This will recreate the streams even if the device already exists, which is bad
-    //       because pulse appears to call this *very* frequently on my laptop, should
-    //       make it only create a new stream if the device used by the previous one is gone
+    // TODO: Check that this works correctly now with PulseAudio which (on my laptop) calls this
+    //       *very* frequently, it should at least not try re-opening a stream each time now
     int inputDeviceCount = soundio_input_device_count(sio);
     int outputDeviceCount = soundio_output_device_count(sio);
     logInfo("SoundIo device list updated - %d input, %d output devices\n",
             inputDeviceCount, outputDeviceCount);
-
-    // TODO: Check if the current device is still enabled, if it isn't we need to nullify things,
-    //       if it is we need to update currentInputDevice to be the correct new index.
-    //       It would seem that the only way we have of comparing devices is by the device.id string
 
     logInfo("Setup audio input\n");
     // Store the ID of the current open input device, if any
@@ -554,8 +549,10 @@ void devicesChangeCallback(SoundIo* sio)
     audioState.inputDeviceList = new SoundIoDevice*[managedInputDeviceCount];
     audioState.inputDeviceNames = new char*[managedInputDeviceCount];
     audioState.inputDeviceCount = managedInputDeviceCount;
+    audioState.currentInputDevice = -1;
     int targetInputDeviceIndex = -1;
     int managedInputIndex = 0;
+    int needNewInputStream = true;
     for(int i=0; i<inputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_input_device(sio, i);
@@ -568,7 +565,8 @@ void devicesChangeCallback(SoundIo* sio)
             {
                 if(i == currentInputDeviceNewIndex)
                 {
-                    targetInputDeviceIndex = managedInputIndex;
+                    audioState.currentInputDevice = managedInputIndex;
+                    needNewInputStream = false;
                 }
                 else if(i == defaultInputDevice)
                 {
@@ -583,7 +581,7 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    if(targetInputDeviceIndex >= 0)
+    if(needNewInputStream)
     {
         if(!setAudioInputDevice(targetInputDeviceIndex))
         {
@@ -641,8 +639,10 @@ void devicesChangeCallback(SoundIo* sio)
     audioState.outputDeviceList = new SoundIoDevice*[managedOutputDeviceCount];
     audioState.outputDeviceNames = new char*[managedOutputDeviceCount];
     audioState.outputDeviceCount = managedOutputDeviceCount;
+    audioState.currentOutputDevice = -1;
     int targetOutputDeviceIndex = -1;
     int managedOutputIndex = 0;
+    int needNewOutputStream = true;
     for(int i=0; i<outputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_output_device(sio, i);
@@ -655,7 +655,8 @@ void devicesChangeCallback(SoundIo* sio)
             {
                 if(i == currentOutputDeviceNewIndex)
                 {
-                    targetOutputDeviceIndex = managedOutputIndex;
+                    audioState.currentOutputDevice = managedOutputIndex;
+                    needNewOutputStream = false;
                 }
                 if(i == defaultOutputDevice)
                 {
@@ -670,7 +671,7 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    if(targetOutputDeviceIndex >= 0)
+    if(needNewOutputStream)
     {
         if(!setAudioOutputDevice(targetOutputDeviceIndex))
         {
