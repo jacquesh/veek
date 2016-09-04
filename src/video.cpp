@@ -25,6 +25,7 @@
 // https://github.com/rygorous/kkapture
 // https://github.com/ofTheo/videoInput
 // https://github.com/jarikomppa/escapi
+// https://github.com/roxlu/video_capture
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 // https://people.xiph.org/~jm/daala/revisiting/
 
