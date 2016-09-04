@@ -6,7 +6,7 @@
 #include "theora/theoraenc.h"
 #include "theora/theoradec.h"
 
-#include "escapi.h"
+#include "videoinput.h"
 
 #ifdef DEBUG_VIDEO_IMAGE_OUTPUT
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -27,7 +27,8 @@ static int deviceCount;
 
 static bool cameraEnabled = false;
 static int cameraDevice;
-static SimpleCapParams captureParams;
+
+static videoInput VI;
 
 int cameraWidth = 320; // TODO: We probably also want these to be static
 int cameraHeight = 240;
@@ -56,79 +57,45 @@ bool enableCamera(bool enabled)
         return cameraEnabled;
     }
 
-    // TODO: getCaptureDeviceName can fail, but it never returns failure. We should probably fix
-    //       that when we re-implement the video capture API
     if(enabled)
     {
-        char deviceName[256];
-        getCaptureDeviceName(cameraDevice, deviceName, 256);
+        if(deviceCount == 0)
+            return false;
+
+        cameraDevice = 0;
+        const char* deviceName = VI.getDeviceName(cameraDevice);
         logInfo("%s camera: %s\n", toggleString, deviceName);
 
-        initCapture(cameraDevice, &captureParams);
-        if(!getCaptureErrorCode(cameraDevice))
+        bool success = VI.setupDevice(cameraDevice, cameraWidth, cameraHeight);
+        if(success)
         {
-            logInfo("Begin video capture using %s\n", deviceName);
-            doCapture(cameraDevice);
+            logInfo("Begin video capture using %s - Dimensions are %dx%dx%d\n", deviceName,
+                    VI.getWidth(cameraDevice), VI.getHeight(cameraDevice), VI.getSize(cameraDevice));
+        }
+        else
+        {
+            logWarn("Failed to begin video capture using %s\n", deviceName);
         }
     }
     else
     {
-        char deviceName[256];
-        getCaptureDeviceName(cameraDevice, deviceName, 256);
+        const char* deviceName = VI.getDeviceName(cameraDevice);
         logInfo("%s camera: %s\n", toggleString, deviceName);
 
-        deinitCapture(cameraDevice);
+        VI.stopDevice(cameraDevice);
     }
 
-    logInfo("Camera capture toggled, capture error is %d\n", getCaptureErrorCode(cameraDevice));
-    // TODO: This was the last line of output for Wraithy
-    int errorCode = getCaptureErrorCode(cameraDevice);
-    if(errorCode)
-    {
-        char errorStr[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errorStr, 1024, NULL);
-        logWarn("ESCAPI Error %d at line %d: %s\n", errorCode, getCaptureErrorLine(cameraDevice),
-                errorStr);
-        return cameraEnabled;
-    }
     cameraEnabled = enabled;
     return enabled;
 }
 
 bool checkForNewVideoFrame()
 {
-    bool result = (isCaptureDone(cameraDevice) == 1);
+    bool result = VI.isFrameNew(cameraDevice);
     if(result)
     {
-        logTerm("Recevied video input frame\n"); // TODO: Wraithy gets none of these
-        for(int y=0; y<cameraHeight; ++y)
-        {
-            for(int x=0; x<cameraWidth; ++x)
-            {
-                int targetBufferIndex = y*cameraWidth+ x;
-                int pixelVal = captureParams.mTargetBuf[targetBufferIndex];
-                uint8* pixel = (uint8*)&pixelVal;
-                uint8 red   = pixel[0];
-                uint8 green = pixel[1];
-                uint8 blue  = pixel[2];
-                uint8 alpha = pixel[3];
-
-                int pixelIndex = (cameraHeight-y-1)*cameraWidth+ x;
-                pixelValues[3*pixelIndex + 0] = blue;
-                pixelValues[3*pixelIndex + 1] = green;
-                pixelValues[3*pixelIndex + 2] = red;
-            }
-        }
-        doCapture(cameraDevice);
-    }
-
-    int errorCode = getCaptureErrorCode(cameraDevice);
-    if(errorCode)
-    {
-        char errorStr[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, errorCode, 0, errorStr, 1024, NULL);
-        logWarn("ESCAPI Error %d at line %d: %s\n", errorCode, getCaptureErrorLine(cameraDevice),
-                errorStr);
+        //logTerm("Recevied video input frame from local camera\n"); // TODO: Wraithy gets none of these
+        VI.getPixels(cameraDevice, pixelValues, true);
     }
     return result;
 }
@@ -309,14 +276,8 @@ bool initVideo()
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
 
-    deviceCount = setupESCAPI();
+    deviceCount = VI.listDevices();
     logInfo("%d video input devices available.\n", deviceCount);
-    cameraDevice = deviceCount-1; // Can be anything in the range [0, deviceCount)
-    enableCamera(false);
-
-    captureParams.mWidth = cameraWidth;
-    captureParams.mHeight = cameraHeight;
-    captureParams.mTargetBuf = new int[cameraWidth*cameraHeight];
 
     // Initialize theora encoder
     th_info encoderInfo;
@@ -428,7 +389,6 @@ void deinitVideo()
     logInfo("Deinitialize video subsystem\n");
     enableCamera(false);
     delete[] pixelValues;
-    delete[] captureParams.mTargetBuf;
 
     for(int i=0; i<3; i++)
     {
