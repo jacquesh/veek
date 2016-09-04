@@ -628,7 +628,8 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    if(needNewInputStream)
+    // NOTE: If there are no input devices then target will be -1 but needNew will be true
+    if(needNewInputStream && (targetInputDeviceIndex >= 0))
     {
         if(!setAudioInputDevice(targetInputDeviceIndex))
         {
@@ -718,7 +719,7 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    if(needNewOutputStream)
+    if(needNewOutputStream && (targetOutputDeviceIndex >= 0))
     {
         if(!setAudioOutputDevice(targetOutputDeviceIndex))
         {
