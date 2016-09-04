@@ -119,7 +119,21 @@ int min(int x, int y)
     return y;
 }
 
+float minf(float x, float y)
+{
+    if(x <= y)
+        return x;
+    return y;
+}
+
 int max(int x, int y)
+{
+    if(x >= y)
+        return x;
+    return y;
+}
+
+float maxf(float x, float y)
 {
     if(x >= y)
         return x;

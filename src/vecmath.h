@@ -34,6 +34,8 @@ int max(int x, int y);
 int clamp(int x, int min, int max);
 
 float signf(float x);
+float minf(float x, float y);
+float maxf(float x, float y);
 float clampf(float x, float min, float max);
 float lerp(float from, float to, float t);
 
