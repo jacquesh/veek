@@ -1,9 +1,9 @@
-#include <stdio.h>
-
 #include "enet/enet.h"
 
 #include "common.h"
 #include "network_common.h"
+#include "logging.h"
+#include "platform.h"
 
 struct ClientData
 {
@@ -17,9 +17,13 @@ struct ClientData
 
 int main(int argc, char** argv)
 {
+    if(!initLogging())
+    {
+        return 1;
+    }
     if(enet_initialize() != 0)
     {
-        printf("Unable to initialize enet!\n");
+        logFail("Unable to initialize enet!\n");
         return 1;
     }
 
@@ -30,9 +34,14 @@ int main(int argc, char** argv)
     addr.port = NET_PORT;
     ENetHost* netHost = enet_host_create(&addr, MAX_USERS, 2, 0,0);
 
+    float updateTime = 1/30.0f;
+    int64 clockFreq = getClockFrequency();
+
     bool running = true;
     while(running)
     {
+        int64 tickTime = getClockValue();
+
         ENetEvent netEvent;
         if(netHost && enet_host_service(netHost, &netEvent, 0) > 0)
         {
@@ -53,7 +62,7 @@ int main(int argc, char** argv)
                             break;
                         }
                     }
-                    printf("Connection from %x:%u, assigned index %d\n",
+                    logInfo("Connection from %x:%u, assigned index %d\n",
                             netEvent.peer->address.host,
                             netEvent.peer->address.port,
                             peerIndex);
@@ -65,7 +74,7 @@ int main(int argc, char** argv)
                 case ENET_EVENT_TYPE_RECEIVE:
                 {
                     uint8 peerIndex = *((uint8*)netEvent.peer->data);
-                    printf("Received %llu bytes from %d\n", netEvent.packet->dataLength, peerIndex);
+                    //logTerm("Received %llu bytes from %d\n", netEvent.packet->dataLength, peerIndex);
 
                     uint8* packetData = netEvent.packet->data;
                     uint8 packetType = *packetData;
@@ -80,7 +89,7 @@ int main(int argc, char** argv)
                         clients[peerIndex].roomId = roomId;
                         clients[peerIndex].nameLength = nameLength;
                         clients[peerIndex].name = name;
-                        printf("Initialization received for %s in room %d\n", name, roomId);
+                        logInfo("Initialization received for %s(%d) in room %d\n", name, peerIndex, roomId);
                         enet_packet_destroy(netEvent.packet);
 
                         // Tell the new client about all other clients
@@ -91,6 +100,7 @@ int main(int argc, char** argv)
                             if((i == peerIndex) || (!clients[i].netPeer)
                                     || (clients[i].roomId != roomId))
                                 continue;
+                            logInfo("Send information about %s (%d) to new client\n", clients[i].name, i);
                             replyLength += 2 + clients[i].nameLength;
                             clientCount += 1;
                         }
@@ -145,7 +155,7 @@ int main(int argc, char** argv)
 
                 case ENET_EVENT_TYPE_DISCONNECT:
                 {
-                    printf("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                     uint8 peerIndex = *((uint8*)netEvent.peer->data);
                     delete netEvent.peer->data;
                     delete[] clients[peerIndex].name;
@@ -166,6 +176,14 @@ int main(int argc, char** argv)
                     }
                 } break;
             }
+        }
+
+        int64 currentTime = getClockValue();
+        float deltaTime = (float)(currentTime - tickTime)/(float)clockFreq;
+        float sleepSeconds = updateTime - deltaTime;
+        if(sleepSeconds > 0)
+        {
+            sleepForMilliseconds((uint32)(sleepSeconds*1000.0f));
         }
     }
     enet_deinitialize();
