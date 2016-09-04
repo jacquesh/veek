@@ -63,6 +63,52 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
     }
 }
 
+void resampleBuffer(int inSampleRate, int inBufferLen, float* inBuffer,
+                    int outSampleRate, int outBufferLen, float* outBuffer)
+{
+    assert(inBufferLen > 0);
+    assert(outBufferLen > 0);
+    outBuffer[0] = inBuffer[0];
+
+    float inTimePerSample = 1.0f/(float)inSampleRate;
+    float outTimePerSample = 1.0f/(float)outSampleRate;
+
+    // TODO: Apparently its a good idea to lowpass filter the output here
+    //       We can achieve that with a simple averaging
+    int inIndex = 1;
+    int outIndex = 1;
+    float timeTillNextInSample = inTimePerSample;
+    float timeTillNextOutSample = outTimePerSample;
+    while((inIndex < inBufferLen) && (outIndex < outBufferLen))
+    {
+        float advanceTime = minf(timeTillNextInSample, timeTillNextOutSample);
+        timeTillNextInSample -= advanceTime;
+        timeTillNextOutSample -= advanceTime;
+
+        if(timeTillNextInSample <= 0.0f)
+        {
+            timeTillNextInSample += inTimePerSample;
+            inIndex++;
+        }
+        if(timeTillNextOutSample <= 0.0f)
+        {
+            timeTillNextOutSample += outTimePerSample;
+            float previousInSample = inBuffer[inIndex-1];
+            float nextInSample = inBuffer[inIndex];
+            float lerpFactor = 1.0f - (timeTillNextInSample/inTimePerSample);
+            outBuffer[outIndex] = lerp(previousInSample, nextInSample, lerpFactor);
+            outIndex++;
+        }
+    }
+
+    // NOTE: If the inBuffer is shorter than the outBuffer, we just fill the rest of the
+    //       outBuffer with silence
+    while(outIndex < outBufferLen)
+    {
+        outBuffer[outIndex++] = 0.0f;
+    }
+}
+
 void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
     // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
@@ -256,6 +302,7 @@ int encodePacket(int sourceLength, float* sourceBufferPtr,
 int addUserAudioData(int userIndex, int sourceBufferLength, float* sourceBufferPtr)
 {
     RingBuffer* outBuffer = userBuffers[userIndex];
+    //resampleBuffer(inSampleRate, sourceBufferLength, sourceBufferPtr, outSampleRate, targetBufferLength, targetBufferPtr);
 
     int samplesToWrite = sourceBufferLength;
     int ringBufferFreeSpace = outBuffer->free();
