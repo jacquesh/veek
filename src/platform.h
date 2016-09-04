@@ -11,4 +11,7 @@ void unlockMutex(Mutex* mutex);
 
 void sleepForMilliseconds(uint32 milliseconds);
 
+int64 getClockValue();
+int64 getClockFrequency();
+
 #endif

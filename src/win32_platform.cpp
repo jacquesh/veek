@@ -43,3 +43,17 @@ void sleepForMilliseconds(uint32 milliseconds)
 {
     Sleep(milliseconds);
 }
+
+int64 getClockValue()
+{
+    LARGE_INTEGER result;
+    QueryPerformanceCounter(&result);
+    return result.QuadPart;
+}
+
+int64 getClockFrequency()
+{
+    LARGE_INTEGER result;
+    QueryPerformanceFrequency(&result);
+    return result.QuadPart;
+}
