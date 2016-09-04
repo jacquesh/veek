@@ -1,5 +1,5 @@
 @echo off
-set CompileFiles= ..\src\server.cpp
+set CompileFiles= ..\src\server.cpp ..\src\platform.cpp ..\src\logging.cpp
 set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -MTd
 set IncludeDirs= -I..\include
 
