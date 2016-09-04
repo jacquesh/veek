@@ -122,3 +122,9 @@ int RingBuffer::free()
     // NOTE: We subtract 1 here so that readIndex == writeIndex only if the buffer is empty
     return numberOfSlots - 1;
 }
+
+void RingBuffer::clear()
+{
+    writeIndex.store(0);
+    readIndex.store(0);
+}

@@ -31,6 +31,9 @@ public:
     // behind the read pointer. We will fail if we try to write free()+1 elements.
     int free();
 
+    // Empty the ringbuffer
+    void clear();
+
 private:
     int capacity;
     int capacityMask;
