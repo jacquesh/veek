@@ -6,6 +6,7 @@ tests/
 
 # Log files
 *.log
+*.out
 
 # Vim Metafiles
 *.swp
