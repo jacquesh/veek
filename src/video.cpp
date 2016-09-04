@@ -21,7 +21,12 @@
 #include "common.h"
 #include "logging.h"
 
+// https://www.reddit.com/r/programming/comments/4rljty/got_fed_up_with_skype_wrote_my_own_toy_video_chat?st=iql0rqn9&sh=7602e95d
+// https://github.com/rygorous/kkapture
+// https://github.com/ofTheo/videoInput
+// https://github.com/jarikomppa/escapi
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
+// https://people.xiph.org/~jm/daala/revisiting/
 
 static int deviceCount;
 
