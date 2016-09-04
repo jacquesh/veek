@@ -15,7 +15,7 @@
 #include "platform.h"
 #include "vecmath.h"
 #include "audio.h"
-//#include "video.h"
+#include "video.h"
 const int cameraWidth = 320;
 const int cameraHeight = 240;
 #include "graphics.h"
@@ -197,7 +197,6 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Text("You are: %s", game->name);
     }
     ImGui::Text("%.1fms", deltaTime*1000.0f);
-#if 0
     if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
         bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
@@ -206,7 +205,6 @@ void renderGame(GameState* game, float deltaTime)
             game->cameraEnabled = enableCamera(game->cameraEnabled);
         }
     }
-#endif
 
     static bool listening = false;
     static int selectedRecordingDevice = 0;
@@ -415,7 +413,6 @@ int main()
         return 1;
     }
 
-#if 0
     logInfo("Initializing video input subsystem...\n");
     if(!initVideo())
     {
@@ -425,7 +422,6 @@ int main()
         glfwTerminate();
         return 1;
     }
-#endif
 
     if(enet_initialize() != 0)
     {
@@ -465,7 +461,6 @@ int main()
 
         updateAudio();
 
-#if 0
         // Update the camera (uploading the new texture to the GPU if there is one)
         if(game.cameraEnabled)
         {
@@ -486,7 +481,7 @@ int main()
                     static uint8* encodedPixels = new uint8[320*240*3];
                     int videoBytes = encodeRGBImage(320*240*3, pixelValues,
                                                     320*240*3, encodedPixels);
-                    logTerm("Encoded %d video bytes\n", videoBytes);
+                    //logTerm("Encoded %d video bytes\n", videoBytes);
                     //delete[] encodedPixels;
 
                     ENetPacket* packet = enet_packet_create(0, videoBytes+2,
@@ -498,7 +493,6 @@ int main()
                 }
             }
         }
-#endif
 
         // Send network output data
         if(game.micEnabled)
@@ -608,7 +602,6 @@ int main()
                             addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
                             delete[] decodedAudio;
                         } break;
-#if 0
                         case NET_MSGTYPE_VIDEO:
                         {
                             static uint8* pixelValues = new uint8[320*240*8];
@@ -620,7 +613,6 @@ int main()
                             glBindTexture(GL_TEXTURE_2D, 0);
                             logTerm("Received %d bytes of video frame\n", dataLength);
                         } break;
-#endif
                     }
 
                     enet_packet_destroy(netEvent.packet);
