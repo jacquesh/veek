@@ -83,6 +83,19 @@ void readSettings(GameState* game, const char* fileName)
     else
     {
         game->nameLength = 11;
+        char userName[256+1];
+        int hasUsername = getCurrentUserName(sizeof(userName), userName);
+        if(hasUsername)
+        {
+            assert(sizeof(userName) >= MAX_USER_NAME_LENGTH);
+            strncpy(game->name, userName, MAX_USER_NAME_LENGTH);
+        }
+        else
+        {
+            const char* defaultName = "UnnamedUser";
+            strncpy(game->name, defaultName, MAX_USER_NAME_LENGTH);
+        }
+        game->name[MAX_USER_NAME_LENGTH] = 0;
         const char* defaultName = "UnnamedUser";
         memcpy(game->name, defaultName, game->nameLength);
         game->name[game->nameLength] = 0;

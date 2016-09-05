@@ -38,3 +38,9 @@ void sleepForMilliseconds(uint32 milliseconds)
 {
     usleep(1000*milliseconds);
 }
+
+int getCurrentUsername(size_t bufferLen, char* buffer)
+{
+    int result = getlogin_r(buffer, bufferLen);
+    return result;
+}

@@ -57,3 +57,9 @@ int64 getClockFrequency()
     QueryPerformanceFrequency(&result);
     return result.QuadPart;
 }
+
+int getCurrentUserName(size_t bufferLen, char* buffer)
+{
+    int result = GetUserName(buffer, (LPDWORD)&bufferLen);
+    return result;
+}

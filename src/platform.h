@@ -14,4 +14,6 @@ void sleepForMilliseconds(uint32 milliseconds);
 int64 getClockValue();
 int64 getClockFrequency();
 
+int getCurrentUserName(size_t bufferLen, char* buffer);
+
 #endif
