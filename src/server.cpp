@@ -43,7 +43,8 @@ int main(int argc, char** argv)
         int64 tickTime = getClockValue();
 
         ENetEvent netEvent;
-        if(netHost && enet_host_service(netHost, &netEvent, 0) > 0)
+        int serviceResult = 0;
+        while(netHost && ((serviceResult = enet_host_service(netHost, &netEvent, 0)) > 0))
         {
             switch(netEvent.type)
             {
@@ -176,6 +177,10 @@ int main(int argc, char** argv)
                     }
                 } break;
             }
+        }
+        if(serviceResult < 0)
+        {
+            logWarn("ENET service error\n");
         }
 
         int64 currentTime = getClockValue();

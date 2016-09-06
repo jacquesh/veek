@@ -532,7 +532,8 @@ int main()
 
         // Handle network events
         ENetEvent netEvent;
-        if(game.netHost && enet_host_service(game.netHost, &netEvent, 0) > 0)
+        int serviceResult = 0;
+        while(game.netHost && ((serviceResult = enet_host_service(game.netHost, &netEvent, 0)) > 0))
         {
             switch(netEvent.type)
             {
@@ -636,6 +637,10 @@ int main()
                     logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                 } break;
             }
+        }
+        if(serviceResult < 0)
+        {
+            logWarn("ENET service error\n");
         }
 
         // Rendering
