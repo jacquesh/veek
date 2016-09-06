@@ -628,19 +628,22 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    // NOTE: If there are no input devices then target will be -1 but needNew will be true
-    if(needNewInputStream && (targetInputDeviceIndex >= 0))
+    if(needNewInputStream)
     {
-        if(!setAudioInputDevice(targetInputDeviceIndex))
+        // NOTE: If there are no input devices then target will be -1 even if needNew is true
+        if(targetInputDeviceIndex >= 0)
         {
-            logWarn("Error: Unable to initialize audio input device %s\n",
-                    audioState.inputDeviceNames[targetInputDeviceIndex]);
+            if(!setAudioInputDevice(targetInputDeviceIndex))
+            {
+                logWarn("Error: Unable to initialize audio input device %s\n",
+                        audioState.inputDeviceNames[targetInputDeviceIndex]);
+            }
         }
-    }
-    else
-    {
-        // TODO: We probably want to just open SOME device
-        logWarn("Error: No non-raw default audio input device\n");
+        else
+        {
+            // TODO: We probably want to just open SOME device
+            logWarn("Error: No non-raw default audio input device\n");
+        }
     }
 
     logInfo("Setup audio output\n");
@@ -719,18 +722,21 @@ void devicesChangeCallback(SoundIo* sio)
         }
     }
 
-    if(needNewOutputStream && (targetOutputDeviceIndex >= 0))
+    if(needNewOutputStream)
     {
-        if(!setAudioOutputDevice(targetOutputDeviceIndex))
+        if(targetOutputDeviceIndex >= 0)
         {
-            logWarn("Error: Unable to initialize audio output device %s\n",
-                    audioState.outputDeviceNames[targetOutputDeviceIndex]);
+            if(!setAudioOutputDevice(targetOutputDeviceIndex))
+            {
+                logWarn("Error: Unable to initialize audio output device %s\n",
+                        audioState.outputDeviceNames[targetOutputDeviceIndex]);
+            }
         }
-    }
-    else
-    {
-        // TODO: We probably want to just open SOME device
-        logWarn("Error: No non-raw default audio output device\n");
+        else
+        {
+            // TODO: We probably want to just open SOME device
+            logWarn("Error: No non-raw default audio output device\n");
+        }
     }
 }
 
