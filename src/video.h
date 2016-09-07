@@ -14,7 +14,7 @@ void deinitVideo();
  * \return The new state of the camera device, which is equal to enabled if the function succeeded,
  * and equal to the previous state of the device if the function failed
  */
-bool enableCamera(bool enabled);
+bool enableCamera(int deviceID);
 bool checkForNewVideoFrame();
 uint8_t* currentVideoFrame();
 

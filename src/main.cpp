@@ -60,6 +60,9 @@ static bool running;
 extern int screenWidth;
 extern int screenHeight;
 
+extern int cameraDeviceCount;
+extern char** cameraDeviceNames;
+
 static uint8 roomId;
 
 static GLuint pixelTexture;
@@ -210,12 +213,34 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Text("You are: %s", game->name);
     }
     ImGui::Text("%.1fms", deltaTime*1000.0f);
+
+    static int selectedCameraDevice = 0;
     if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
         bool cameraToggled = ImGui::Checkbox("Camera Enabled", &game->cameraEnabled);
         if(cameraToggled)
         {
-            game->cameraEnabled = enableCamera(game->cameraEnabled);
+            if(game->cameraEnabled)
+            {
+                game->cameraEnabled = enableCamera(selectedCameraDevice);
+            }
+            else
+            {
+                game->cameraEnabled = enableCamera(-1);
+            }
+        }
+
+        bool cameraChanged = ImGui::Combo("Camera Device",
+                                         &selectedCameraDevice,
+                                         (const char**)cameraDeviceNames,
+                                         cameraDeviceCount);
+        if(cameraChanged)
+        {
+            logInfo("Camera Device Changed\n");
+            if(game->cameraEnabled)
+            {
+                game->cameraEnabled = enableCamera(selectedCameraDevice);
+            }
         }
     }
 

@@ -29,10 +29,11 @@
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 // https://people.xiph.org/~jm/daala/revisiting/
 
-static int deviceCount;
+int cameraDeviceCount;
+char** cameraDeviceNames;
 
 static bool cameraEnabled = false;
-static int cameraDevice;
+static int cameraDevice = -1;
 
 static videoInput VI;
 
@@ -54,45 +55,48 @@ static ogg_stream_state ogvOutputStream;
 
 #include <windows.h>
 
-bool enableCamera(bool enabled)
+bool enableCamera(int deviceID)
 {
-    const char* toggleString = enabled ? "Enable" : "Disable";
-    if(cameraDevice < 0)
+    if(cameraDeviceCount == 0)
     {
-        logWarn("%s camera failed: No active camera device\n", toggleString);
-        return cameraEnabled;
+        logWarn("Toggle camera failed: No available camera device\n");
+        return false;
     }
 
-    if(enabled)
+    if(((deviceID < 0) || (deviceID != cameraDevice)) && (cameraDevice >= 0))
     {
-        if(deviceCount == 0)
-            return false;
-
-        cameraDevice = 0;
         const char* deviceName = VI.getDeviceName(cameraDevice);
-        logInfo("%s camera: %s\n", toggleString, deviceName);
+        logInfo("Disable camera: %s\n", deviceName);
+        VI.stopDevice(cameraDevice);
+        cameraDevice = -1;
+    }
+
+    if((deviceID >= 0) && (deviceID < cameraDeviceCount))
+    {
+        if(deviceID == cameraDevice)
+        {
+            return true;
+        }
+
+        cameraDevice = deviceID;
+        const char* deviceName = VI.getDeviceName(cameraDevice);
+        logInfo("Enable camera: %s\n", deviceName);
 
         bool success = VI.setupDevice(cameraDevice, cameraWidth, cameraHeight);
         if(success)
         {
             logInfo("Begin video capture using %s - Dimensions are %dx%dx%d\n", deviceName,
                     VI.getWidth(cameraDevice), VI.getHeight(cameraDevice), VI.getSize(cameraDevice));
+            return true;
         }
         else
         {
             logWarn("Failed to begin video capture using %s\n", deviceName);
         }
-    }
-    else
-    {
-        const char* deviceName = VI.getDeviceName(cameraDevice);
-        logInfo("%s camera: %s\n", toggleString, deviceName);
-
-        VI.stopDevice(cameraDevice);
+        return false;
     }
 
-    cameraEnabled = enabled;
-    return enabled;
+    return false;
 }
 
 bool checkForNewVideoFrame()
@@ -282,8 +286,15 @@ bool initVideo()
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
 
-    deviceCount = VI.listDevices();
-    logInfo("%d video input devices available.\n", deviceCount);
+    cameraDeviceCount = VI.listDevices();
+    cameraDeviceNames = new char*[cameraDeviceCount];
+    for(int i=0; i<cameraDeviceCount; i++)
+    {
+        const char* deviceName = VI.getDeviceName(i);
+        cameraDeviceNames[i] = new char[strlen(deviceName)+1];
+        strcpy(cameraDeviceNames[i], deviceName);
+    }
+    logInfo("%d video input devices available.\n", cameraDeviceCount);
 
     // Initialize theora encoder
     th_info encoderInfo;
@@ -395,6 +406,11 @@ void deinitVideo()
     logInfo("Deinitialize video subsystem\n");
     enableCamera(false);
     delete[] pixelValues;
+    for(int i=0; i<cameraDeviceCount; i++)
+    {
+        delete[] cameraDeviceNames[i];
+    }
+    delete[] cameraDeviceNames;
 
     for(int i=0; i<3; i++)
     {
