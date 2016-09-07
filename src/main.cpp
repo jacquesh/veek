@@ -326,7 +326,7 @@ void renderGame(GameState* game, float deltaTime)
             if(ImGui::Button("Disconnect", ImVec2(80,20)))
             {
                 game->connState = NET_CONNSTATE_DISCONNECTED;
-                enet_peer_disconnect_now(game->netPeer, 0);
+                enet_peer_disconnect(game->netPeer, 0);
                 game->netPeer = 0;
             }
         } break;
@@ -601,22 +601,24 @@ int main()
                             uint8 clientCount = *data;
                             game.localUserIndex = sourceClientIndex;
                             logInfo("There are %d connected clients, we are client %d\n", clientCount, sourceClientIndex);
+                            game.users[sourceClientIndex].connected = true;
+                            strcpy(game.users[sourceClientIndex].name, game.name);
+
                             data += 1;
                             for(uint8 i=0; i<clientCount; ++i)
                             {
                                 uint8 index = *data;
                                 uint8 nameLength = *(data+1);
-                                char* name = new char[nameLength+1];
-                                memcpy(name, data+2, nameLength);
-                                name[nameLength] = 0;
-                                data += 2+nameLength;
+                                assert(nameLength < MAX_USER_NAME_LENGTH);
+
+                                game.users[sourceClientIndex].connected = true;
+                                game.users[sourceClientIndex].nameLength = nameLength;
+                                memcpy(game.users[sourceClientIndex].name, data+2, nameLength);
+                                game.users[sourceClientIndex].name[nameLength] = 0;
 
                                 // TODO: What happens if a client disconnects as we connect and we
                                 //       only receive the init_data after the disconnect event?
-                                game.users[sourceClientIndex].connected = true;
-                                game.users[sourceClientIndex].nameLength = nameLength;
-                                game.users[sourceClientIndex].name = name;
-                                logInfo("%s\n", name);
+                                logInfo("%s\n", game.users[sourceClientIndex].name);
                             }
                         } break;
                         case NET_MSGTYPE_CLIENT_CONNECT:
@@ -699,6 +701,10 @@ int main()
                 case ENET_EVENT_TYPE_DISCONNECT:
                 {
                     logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+                    for(int i=0; i<MAX_USERS; i++)
+                    {
+                        game.users[i].connected = false;
+                    }
                 } break;
             }
         }
