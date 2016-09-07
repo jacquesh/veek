@@ -522,11 +522,12 @@ int main()
                     //logTerm("Encoded %d video bytes\n", videoBytes);
                     //delete[] encodedPixels;
 
-                    ENetPacket* packet = enet_packet_create(0, videoBytes+2,
+                    ENetPacket* packet = enet_packet_create(0, videoBytes+3,
                                                             ENET_PACKET_FLAG_UNSEQUENCED);
                     *packet->data = NET_MSGTYPE_VIDEO;
                     *(packet->data+1) = game.localUserIndex;
-                    memcpy(packet->data+2, encodedPixels, videoBytes);
+                    *(packet->data+2) = game.lastSentVideoPacket++;
+                    memcpy(packet->data+3, encodedPixels, videoBytes);
                     enet_peer_send(game.netPeer, 0, packet);
                     netOutBytes += packet->dataLength;
                 }
@@ -545,11 +546,12 @@ int main()
                 int audioBytes = encodePacket(audioFrames, micBuffer, encodedBufferLength, encodedBuffer);
 
                 //logTerm("Send %d bytes of audio\n", audioBytes);
-                ENetPacket* outPacket = enet_packet_create(0, 2+audioBytes,
+                ENetPacket* outPacket = enet_packet_create(0, 3+audioBytes,
                                                            ENET_PACKET_FLAG_UNSEQUENCED);
                 outPacket->data[0] = NET_MSGTYPE_AUDIO;
                 outPacket->data[1] = game.localUserIndex;
-                memcpy(outPacket->data+2, encodedBuffer, audioBytes);
+                outPacket->data[2] = game.lastSentAudioPacket++;
+                memcpy(outPacket->data+3, encodedBuffer, audioBytes);
                 enet_peer_send(game.netPeer, 0, outPacket);
                 netOutBytes += outPacket->dataLength;
 
@@ -636,35 +638,58 @@ int main()
                         } break;
                         case NET_MSGTYPE_AUDIO:
                         {
-                            float* decodedAudio = new float[micBufferLen];
-                            int decodedFrames = decodePacket(dataLength, data,
-                                                             micBufferLen, decodedAudio);
-                            logTerm("Received %d samples\n", decodedFrames);
-                            addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
-                            delete[] decodedAudio;
+                            uint8 packetIndex = *data;
+                            if(((packetIndex < 20) && (game.lastReceivedAudioPacket > 235)) ||
+                                    (game.lastReceivedAudioPacket < packetIndex))
+                            {
                                 if(game.lastReceivedAudioPacket + 1 != packetIndex)
                                 {
                                     logWarn("Dropped audio packets %d to %d (inclusive)\n",
                                             game.lastReceivedAudioPacket+1, packetIndex-1);
                                 }
                                 game.lastReceivedAudioPacket = packetIndex;
+                                float* decodedAudio = new float[micBufferLen];
+                                int decodedFrames = decodePacket(dataLength, data+1,
+                                                                 micBufferLen, decodedAudio);
+                                logTerm("Received %d samples\n", decodedFrames);
+                                addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
+                                delete[] decodedAudio;
+                            }
+                            else
+                            {
+                                logWarn("Audio packet %u received out of order\n", packetIndex);
+                            }
                         } break;
                         case NET_MSGTYPE_VIDEO:
                         {
-                            static uint8* pixelValues = new uint8[320*240*8];
-                            decodeRGBImage(dataLength, data, 320*240*3, pixelValues);
-                            glBindTexture(GL_TEXTURE_2D, netcamTexture);
-                            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                                         cameraWidth, cameraHeight, 0,
-                                         GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-                            glBindTexture(GL_TEXTURE_2D, 0);
-                            logTerm("Received %d bytes of video frame\n", dataLength);
+                            uint8 packetIndex = *data;
+                            if(((packetIndex < 20) && (game.lastReceivedVideoPacket > 235)) ||
+                                    (game.lastReceivedVideoPacket < packetIndex))
+                            {
                                 if(game.lastReceivedVideoPacket + 1 != packetIndex)
                                 {
                                     logWarn("Dropped video packets %d to %d (inclusive)\n",
                                             game.lastReceivedVideoPacket+1, packetIndex-1);
                                 }
                                 game.lastReceivedVideoPacket = packetIndex;
+                                static uint8* pixelValues = new uint8[320*240*8];
+                                decodeRGBImage(dataLength, data+1, 320*240*3, pixelValues);
+                                glBindTexture(GL_TEXTURE_2D, netcamTexture);
+                                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                                             cameraWidth, cameraHeight, 0,
+                                             GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+                                glBindTexture(GL_TEXTURE_2D, 0);
+                                logTerm("Received %d bytes of video frame\n", dataLength);
+                            }
+                            else
+                            {
+                                logWarn("Video packet %d received out of order\n", packetIndex);
+                            }
+
+                        } break;
+                        default:
+                        {
+                            logWarn("Received data of unknown type: %u\n", dataType);
                         } break;
                     }
 
