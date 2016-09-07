@@ -177,10 +177,8 @@ void renderGame(GameState* game, float deltaTime)
     ImVec2 windowLoc(0.0f, 0.0f);
     ImVec2 windowSize(300.0f, 400.f);
     int UIFlags = ImGuiWindowFlags_NoMove |
-                  ImGuiWindowFlags_NoResize |
-                  ImGuiWindowFlags_NoTitleBar |
-                  ImGuiWindowFlags_NoSavedSettings;
-    ImGui::Begin("TestWindow", 0, UIFlags);
+                  ImGuiWindowFlags_NoResize;
+    ImGui::Begin("Options", 0, UIFlags);
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
@@ -341,8 +339,7 @@ void renderGame(GameState* game, float deltaTime)
                         volumeBarYOffset - volumeBarPadding);
     UIFlags = ImGuiWindowFlags_NoMove |
               ImGuiWindowFlags_NoResize |
-              ImGuiWindowFlags_NoTitleBar |
-              ImGuiWindowFlags_NoSavedSettings;
+              ImGuiWindowFlags_NoTitleBar;
     ImGui::Begin("Stats", 0, UIFlags);
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
@@ -357,6 +354,24 @@ void renderGame(GameState* game, float deltaTime)
     rms /= micBufferLen;
     rms = sqrtf(rms);
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
+    ImGui::End();
+
+    UIFlags = ImGuiWindowFlags_NoMove |
+              ImGuiWindowFlags_NoResize;
+    ImGui::Begin("Connected users", 0, UIFlags);
+    ImGui::SetWindowPos(ImVec2(300, 0));
+    ImGui::SetWindowSize(ImVec2(150, 150));
+    for(int i=0; i<MAX_USERS; i++)
+    {
+        if(!game->users[i].connected)
+            continue;
+        if(i == game->localUserIndex)
+            ImGui::Text("+");
+        else
+            ImGui::Text("-");
+        ImGui::SameLine();
+        ImGui::Text(game->users[i].name);
+    }
     ImGui::End();
 }
 
