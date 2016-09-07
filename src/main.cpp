@@ -11,6 +11,7 @@
 #include "enet/enet.h"
 
 #include "common.h"
+#include "client.h"
 #include "logging.h"
 #include "platform.h"
 #include "vecmath.h"
@@ -25,14 +26,6 @@ const int cameraHeight = 240;
 #ifndef BUILD_VERSION
 #define BUILD_VERSION "Unknown"
 #endif
-
-struct UserData
-{
-    bool connected;
-
-    int nameLength;
-    char* name;
-};
 
 struct GameState
 {
@@ -49,7 +42,6 @@ struct GameState
     ENetHost* netHost;
     ENetPeer* netPeer;
 
-    int connectedUserCount;
     UserData users[MAX_USERS];
 };
 
@@ -99,9 +91,6 @@ void readSettings(GameState* game, const char* fileName)
             strncpy(game->name, defaultName, MAX_USER_NAME_LENGTH);
         }
         game->name[MAX_USER_NAME_LENGTH] = 0;
-        const char* defaultName = "UnnamedUser";
-        memcpy(game->name, defaultName, game->nameLength);
-        game->name[game->nameLength] = 0;
     }
 }
 
@@ -612,7 +601,6 @@ int main()
                             uint8 nameLength = *data;
                             game.users[sourceClientIndex].connected = true;
                             game.users[sourceClientIndex].nameLength = nameLength;
-                            game.users[sourceClientIndex].name = new char[nameLength+1];
                             memcpy(game.users[sourceClientIndex].name, data+1, nameLength);
                             game.users[sourceClientIndex].name[nameLength] = 0;
                             logInfo("%s connected\n", game.users[sourceClientIndex].name);

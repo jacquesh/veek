@@ -3,10 +3,6 @@
 
 #include <stdint.h>
 
-// TODO: Remove
-extern int cameraWidth;
-extern int cameraHeight;
-
 bool initVideo();
 void deinitVideo();
 
