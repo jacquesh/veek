@@ -29,7 +29,7 @@ const int cameraHeight = 240;
 
 struct GameState
 {
-    char name[MAX_USER_NAME_LENGTH];
+    char name[MAX_USER_NAME_LENGTH+1];
     uint8 nameLength;
     uint8 localUserIndex;
 
@@ -98,6 +98,7 @@ void readSettings(GameState* game, const char* fileName)
             strncpy(game->name, defaultName, MAX_USER_NAME_LENGTH);
         }
         game->name[MAX_USER_NAME_LENGTH] = 0;
+        logInfo("Settings loaded, you are: %s\n", game->name);
     }
 }
 
