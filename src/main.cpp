@@ -33,6 +33,10 @@ struct GameState
     uint8 nameLength;
     uint8 localUserIndex;
 
+    uint8 lastSentAudioPacket;
+    uint8 lastSentVideoPacket;
+    uint8 lastReceivedAudioPacket;
+    uint8 lastReceivedVideoPacket;
     GLuint cameraTexture;
 
     bool cameraEnabled;
@@ -62,6 +66,9 @@ static GLuint netcamTexture;
 
 static uint32 micBufferLen;
 static float* micBuffer;
+
+static float netOutput;
+static float netInput;
 
 void readSettings(GameState* game, const char* fileName)
 {
@@ -136,6 +143,9 @@ void initGame(GameState* game)
 
     readSettings(game, "settings");
     roomId = 0;
+
+    game->lastSentAudioPacket = 1;
+    game->lastReceivedVideoPacket = 1;
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -309,6 +319,10 @@ void renderGame(GameState* game, float deltaTime)
 
         case NET_CONNSTATE_CONNECTED:
         {
+            ImGui::Text("Incoming: %.1fKB/s", netInput);
+            ImGui::Text("Outgoing: %.1fKB/s", netOutput);
+            ImGui::Text("Last Audio Sent/Received: %d/%d", game->lastSentAudioPacket, game->lastReceivedAudioPacket);
+            ImGui::Text("Last Video Sent/Received: %d/%d", game->lastSentVideoPacket, game->lastReceivedVideoPacket);
             if(ImGui::Button("Disconnect", ImVec2(80,20)))
             {
                 game->connState = NET_CONNSTATE_DISCONNECTED;
@@ -477,6 +491,9 @@ int main()
         float deltaTime = (float)(newTime - currentTime);
         currentTime = newTime;
 
+        size_t netInBytes = 0;
+        size_t netOutBytes = 0;
+
         // Handle input
         glfwPollEvents();
 
@@ -511,6 +528,7 @@ int main()
                     *(packet->data+1) = game.localUserIndex;
                     memcpy(packet->data+2, encodedPixels, videoBytes);
                     enet_peer_send(game.netPeer, 0, packet);
+                    netOutBytes += packet->dataLength;
                 }
             }
         }
@@ -533,6 +551,7 @@ int main()
                 outPacket->data[1] = game.localUserIndex;
                 memcpy(outPacket->data+2, encodedBuffer, audioBytes);
                 enet_peer_send(game.netPeer, 0, outPacket);
+                netOutBytes += outPacket->dataLength;
 
                 delete[] encodedBuffer;
             }
@@ -557,6 +576,7 @@ int main()
                     *(initPacket->data+2) = game.nameLength;
                     memcpy(initPacket->data+3, game.name, game.nameLength);
                     enet_peer_send(game.netPeer, 0, initPacket);
+                    netOutBytes += initPacket->dataLength;
                 } break;
 
                 case ENET_EVENT_TYPE_RECEIVE:
@@ -565,7 +585,8 @@ int main()
                     uint8 sourceClientIndex = *(netEvent.packet->data+1);
                     uint8* data = netEvent.packet->data+2;
                     int dataLength = netEvent.packet->dataLength-2;
-                    logTerm("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
+                    netInBytes += netEvent.packet->dataLength;
+                    //logTerm("Received %llu bytes of type %d\n", netEvent.packet->dataLength, dataType);
 
                     switch(dataType)
                     {
@@ -621,6 +642,12 @@ int main()
                             logTerm("Received %d samples\n", decodedFrames);
                             addUserAudioData(sourceClientIndex, decodedFrames, decodedAudio);
                             delete[] decodedAudio;
+                                if(game.lastReceivedAudioPacket + 1 != packetIndex)
+                                {
+                                    logWarn("Dropped audio packets %d to %d (inclusive)\n",
+                                            game.lastReceivedAudioPacket+1, packetIndex-1);
+                                }
+                                game.lastReceivedAudioPacket = packetIndex;
                         } break;
                         case NET_MSGTYPE_VIDEO:
                         {
@@ -632,6 +659,12 @@ int main()
                                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
                             glBindTexture(GL_TEXTURE_2D, 0);
                             logTerm("Received %d bytes of video frame\n", dataLength);
+                                if(game.lastReceivedVideoPacket + 1 != packetIndex)
+                                {
+                                    logWarn("Dropped video packets %d to %d (inclusive)\n",
+                                            game.lastReceivedVideoPacket+1, packetIndex-1);
+                                }
+                                game.lastReceivedVideoPacket = packetIndex;
                         } break;
                     }
 
@@ -648,6 +681,10 @@ int main()
         {
             logWarn("ENET service error\n");
         }
+
+        float netT = 0.8f;
+        netInput = netT*netInput + (1.0f - netT)*((float)netInBytes*(float)tickRate*(1.0f/1024.0f));
+        netOutput = netT*netOutput + (1.0f - netT)*((float)netOutBytes*(float)tickRate*(1.0f/1024.0f));
 
         // Rendering
         ImGui_ImplGlfwGL3_NewFrame();
