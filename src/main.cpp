@@ -156,11 +156,7 @@ void renderGame(GameState* game, float deltaTime)
     Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
     Vector2 screenSize((float)screenWidth, (float)screenHeight);
     Vector2 cameraPosition = screenSize * 0.5f;
-    renderTexture(game->cameraTexture, cameraPosition-Vector2(340,0), size, 1.0f);
-    //renderTexture(pixelTexture, cameraPosition, size, 1.0f);
 
-    int connectedUserIndex = 0;
-    int userWidth = cameraWidth+10;
     for(int userIndex=0; userIndex<MAX_USERS; ++userIndex)
     {
         if(!game->users[userIndex].connected)
@@ -176,8 +172,6 @@ void renderGame(GameState* game, float deltaTime)
             //renderTexture(pixelTexture, position, size, 1.0f);
             renderTexture(netcamTexture, position, size, 1.0f);
         }
-
-        connectedUserIndex += 1;
     }
 
     // Options window
@@ -567,7 +561,6 @@ int main()
                     logInfo("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
                     game.connState = NET_CONNSTATE_CONNECTED;
 
-                    uint32 dataTime = 0; // TODO
                     ENetPacket* initPacket = enet_packet_create(0, 3+game.nameLength,
                                                                 ENET_PACKET_FLAG_UNSEQUENCED);
                     initPacket->data[0] = NET_MSGTYPE_INIT_DATA;
@@ -627,10 +620,10 @@ int main()
                         case NET_MSGTYPE_CLIENT_DISCONNECT:
                         {
                             logInfo("%s disconnected\n", game.users[sourceClientIndex].name);
-                            delete[] game.users[sourceClientIndex].name; // TODO: Again, network security
+                            // TODO: We're crashing here sometimes - almost certainly because we're getting a disconnect from a user that timed out before we connected (or something like that)
                             game.users[sourceClientIndex].connected = false;
+                            game.users[sourceClientIndex].name[0] = 0; // TODO: Again, network security
                             game.users[sourceClientIndex].nameLength = 0;
-                            game.users[sourceClientIndex].name = 0;
                         } break;
                         case NET_MSGTYPE_AUDIO:
                         {

@@ -201,22 +201,22 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
 
 void inOverflowCallback(SoundIoInStream* stream)
 {
-    logWarn("Input overflow!\n");
+    logWarn("Input overflow on stream from %s\n", stream->device->name);
 }
 
 void outUnderflowCallback(SoundIoOutStream* stream)
 {
-    logTerm("Output underflow!\n");
+    logTerm("Output underflow on stream to %s\n", stream->device->name);
 }
 
 void inErrorCallback(SoundIoInStream* stream, int error)
 {
-    logWarn("Input error: %s\n", soundio_strerror(error));
+    logWarn("Input error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
 void outErrorCallback(SoundIoOutStream* stream, int error)
 {
-    logWarn("Output error: %s\n", soundio_strerror(error));
+    logWarn("Output error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
 void listenToInput(bool listening)

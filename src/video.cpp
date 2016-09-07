@@ -53,8 +53,6 @@ static FILE* ogvOutputFile;
 static ogg_stream_state ogvOutputStream;
 #endif
 
-#include <windows.h>
-
 bool enableCamera(int deviceID)
 {
     if(cameraDeviceCount == 0)
