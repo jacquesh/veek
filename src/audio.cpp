@@ -567,18 +567,21 @@ void devicesChangeCallback(SoundIo* sio)
     for(int i=0; i<inputDeviceCount; i++)
     {
         SoundIoDevice* device = soundio_get_input_device(sio, i);
-        if(currentInputId && (currentInputDeviceNewIndex == -1))
+        if(!device->probe_error)
         {
-            if(strcmp(device->id, currentInputId) == 0)
+            if(currentInputId && (currentInputDeviceNewIndex == -1))
             {
-                currentInputDeviceNewIndex = i;
+                if(strcmp(device->id, currentInputId) == 0)
+                {
+                    currentInputDeviceNewIndex = i;
+                }
             }
-        }
-        if(!device->is_raw)
-        {
-            bool isDefault = (i == defaultInputDevice);
-            printDevice(device, isDefault);
-            managedInputDeviceCount += 1;
+            if(!device->is_raw)
+            {
+                bool isDefault = (i == defaultInputDevice);
+                printDevice(device, isDefault);
+                managedInputDeviceCount += 1;
+            }
         }
         soundio_device_unref(device);
     }
@@ -661,18 +664,21 @@ void devicesChangeCallback(SoundIo* sio)
     for(int i=0; i<outputDeviceCount; i++)
     {
         SoundIoDevice* device = soundio_get_output_device(sio, i);
-        if(currentOutputId && (currentOutputDeviceNewIndex == -1))
+        if(!device->probe_error)
         {
-            if(strcmp(device->id, currentOutputId) == 0)
+            if(currentOutputId && (currentOutputDeviceNewIndex == -1))
             {
-                currentOutputDeviceNewIndex = i;
+                if(strcmp(device->id, currentOutputId) == 0)
+                {
+                    currentOutputDeviceNewIndex = i;
+                }
             }
-        }
-        if(!device->is_raw)
-        {
-            bool isDefault = (i == defaultOutputDevice);
-            printDevice(device, isDefault);
-            managedOutputDeviceCount += 1;
+            if(!device->is_raw)
+            {
+                bool isDefault = (i == defaultOutputDevice);
+                printDevice(device, isDefault);
+                managedOutputDeviceCount += 1;
+            }
         }
         soundio_device_unref(device);
     }
