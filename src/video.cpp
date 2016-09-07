@@ -305,7 +305,7 @@ bool initVideo()
     encoderInfo.frame_height = 240;// Must be a multiple of 16
     encoderInfo.pixel_fmt = TH_PF_444;
     encoderInfo.colorspace = TH_CS_UNSPECIFIED;
-    encoderInfo.quality = 48;
+    encoderInfo.quality = 32;
     encoderInfo.target_bitrate=  -1;
     encoderInfo.fps_numerator = 24;
     encoderInfo.fps_denominator = 1;
