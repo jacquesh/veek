@@ -6,8 +6,6 @@
 #include "theora/theoraenc.h"
 #include "theora/theoradec.h"
 
-#include "videoinput.h"
-
 #ifdef DEBUG_VIDEO_IMAGE_OUTPUT
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -19,6 +17,7 @@
 #endif
 
 #include "common.h"
+#include "crossCap.h"
 #include "logging.h"
 
 // https://www.reddit.com/r/programming/comments/4rljty/got_fed_up_with_skype_wrote_my_own_toy_video_chat?st=iql0rqn9&sh=7602e95d
@@ -34,8 +33,6 @@ char** cameraDeviceNames;
 
 static bool cameraEnabled = false;
 static int cameraDevice = -1;
-
-static videoInput VI;
 
 int cameraWidth = 320; // TODO: We probably also want these to be static
 int cameraHeight = 240;
@@ -63,9 +60,9 @@ bool enableCamera(int deviceID)
 
     if(((deviceID < 0) || (deviceID != cameraDevice)) && (cameraDevice >= 0))
     {
-        const char* deviceName = VI.getDeviceName(cameraDevice);
+        const char* deviceName = cc_deviceName(cameraDevice);
         logInfo("Disable camera: %s\n", deviceName);
-        VI.stopDevice(cameraDevice);
+        cc_disableDevice(cameraDevice);
         cameraDevice = -1;
     }
 
@@ -77,14 +74,14 @@ bool enableCamera(int deviceID)
         }
 
         cameraDevice = deviceID;
-        const char* deviceName = VI.getDeviceName(cameraDevice);
+        const char* deviceName = cc_deviceName(cameraDevice);
         logInfo("Enable camera: %s\n", deviceName);
 
-        bool success = VI.setupDevice(cameraDevice, cameraWidth, cameraHeight);
+        bool success = cc_enableDevice(cameraDevice, cameraWidth, cameraHeight);
         if(success)
         {
-            logInfo("Begin video capture using %s - Dimensions are %dx%dx%d\n", deviceName,
-                    VI.getWidth(cameraDevice), VI.getHeight(cameraDevice), VI.getSize(cameraDevice));
+            logInfo("Begin video capture using %s - Dimensions are %dx%d\n", deviceName,
+                    cc_getWidth(cameraDevice), cc_getHeight(cameraDevice));
             return true;
         }
         else
@@ -99,11 +96,11 @@ bool enableCamera(int deviceID)
 
 bool checkForNewVideoFrame()
 {
-    bool result = VI.isFrameNew(cameraDevice);
+    bool result = cc_isFrameNew(cameraDevice);
     if(result)
     {
         //logTerm("Recevied video input frame from local camera\n"); // TODO: Wraithy gets none of these
-        VI.getPixels(cameraDevice, pixelValues, true);
+        cc_getPixels(cameraDevice, pixelValues);
     }
     return result;
 }
@@ -284,11 +281,12 @@ bool initVideo()
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
 
-    cameraDeviceCount = VI.listDevices();
+    cc_initialize();
+    cameraDeviceCount = cc_deviceCount();
     cameraDeviceNames = new char*[cameraDeviceCount];
     for(int i=0; i<cameraDeviceCount; i++)
     {
-        const char* deviceName = VI.getDeviceName(i);
+        const char* deviceName = cc_deviceName(i);
         cameraDeviceNames[i] = new char[strlen(deviceName)+1];
         strcpy(cameraDeviceNames[i], deviceName);
     }
