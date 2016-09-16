@@ -405,7 +405,7 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 int main()
 {
-    if(!initLogging())
+    if(!initLogging("output.log"))
     {
         return 1;
     }

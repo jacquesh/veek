@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-bool initLogging();
+bool initLogging(const char* filename);
 void deinitLogging();
 
 void _logTerm(const char* format, ...);

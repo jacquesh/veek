@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+
+static const char* logFileName;
 static FILE* logFile;
 
 void _logTerm(const char* format, ...)
@@ -27,9 +29,10 @@ void _log(const char* format, ...)
 }
 
 
-bool initLogging()
+bool initLogging(const char* filename)
 {
-    logFile = fopen("output.log", "w");
+    logFileName = filename;
+    logFile = fopen(logFileName, "w");
     if(!logFile)
     {
         logFile = stderr;

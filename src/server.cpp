@@ -17,7 +17,7 @@ struct ClientData
 
 int main(int argc, char** argv)
 {
-    if(!initLogging())
+    if(!initLogging("output-server.log"))
     {
         return 1;
     }
