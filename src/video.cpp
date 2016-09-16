@@ -27,6 +27,7 @@
 // https://github.com/roxlu/video_capture
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 // https://people.xiph.org/~jm/daala/revisiting/
+// http://www.innoarchitech.com/what-is-webrtc-and-how-does-it-work/
 
 int cameraDeviceCount;
 char** cameraDeviceNames;
@@ -400,7 +401,7 @@ bool initVideo()
 void deinitVideo()
 {
     logInfo("Deinitialize video subsystem\n");
-    enableCamera(false);
+    enableCamera(-1);
     delete[] pixelValues;
     for(int i=0; i<cameraDeviceCount; i++)
     {

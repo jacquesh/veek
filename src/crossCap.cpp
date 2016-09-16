@@ -24,7 +24,7 @@ bool cc_enableDevice(int deviceID, int width, int height)
 
 void cc_disableDevice(int deviceID)
 {
-    VI.stopDevice(cameraDevice);
+    VI.stopDevice(deviceID);
 }
 
 int cc_getWidth(int deviceID)
