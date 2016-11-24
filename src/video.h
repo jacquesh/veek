@@ -3,6 +3,21 @@
 
 #include <stdint.h>
 
+#include "common.h"
+#include "user.h"
+
+struct NetworkVideoPacket
+{
+    UserIdentifier srcUser;
+    uint8 index;
+    uint16 imageWidth;
+    uint16 imageHeight;
+    uint16 encodedDataLength;
+    uint8 encodedData[320*240*3]; // TODO: Sizing
+
+    template<typename Packet> bool serialize(Packet& packet);
+};
+
 bool initVideo();
 void deinitVideo();
 

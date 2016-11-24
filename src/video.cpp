@@ -16,9 +16,11 @@
 #include <stdlib.h> // For srand/rand
 #endif
 
+#include "video.h"
 #include "common.h"
 #include "crossCap.h"
 #include "logging.h"
+#include "network.h"
 
 // https://www.reddit.com/r/programming/comments/4rljty/got_fed_up_with_skype_wrote_my_own_toy_video_chat?st=iql0rqn9&sh=7602e95d
 // https://github.com/rygorous/kkapture
@@ -432,3 +434,17 @@ void deinitVideo()
     }
 #endif
 }
+
+template<typename Packet>
+bool NetworkVideoPacket::serialize(Packet& packet)
+{
+    packet.serializeuint8(this->index);
+    packet.serializeuint16(this->imageWidth);
+    packet.serializeuint16(this->imageHeight);
+    packet.serializeuint16(this->encodedDataLength);
+    packet.serializestring((char*)this->encodedData, this->encodedDataLength);
+
+    return true;
+}
+template bool NetworkVideoPacket::serialize(NetworkInPacket& packet);
+template bool NetworkVideoPacket::serialize(NetworkOutPacket& packet);

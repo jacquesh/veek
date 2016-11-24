@@ -4,8 +4,20 @@
 #include <stdint.h>
 
 #include "soundio/soundio.h"
+#include "opus/opus.h"
 
+#include "user.h"
 #include "ringbuffer.h"
+
+struct NetworkAudioPacket
+{
+    UserIdentifier srcUser;
+    uint8 index;
+    uint16 encodedDataLength;
+    uint8 encodedData[2400]; // TODO: Sizing (currently =2400=micBufferLen from main.cpp)
+
+    template<typename Packet> bool serialize(Packet& packet);
+};
 
 struct AudioData
 {
@@ -24,9 +36,10 @@ struct AudioData
 
 struct AudioSource
 {
-    int userIndex;
     RingBuffer* buffer;
 };
+
+const int32 NETWORK_SAMPLE_RATE = 48000;
 
 extern AudioData audioState; // TODO: We probably want to only have SOME of this be global
                              //       E.g We probably don't need/want global access to the 
@@ -34,6 +47,8 @@ extern AudioData audioState; // TODO: We probably want to only have SOME of this
 
 bool initAudio();
 void updateAudio();
+void initAudioUser(int userIndex); // TODO: Implementation. We need to do things when a user
+void deinitAudioUser(int userIndex);//      connects so that we can create a decoder etc
 void deinitAudio();
 
 bool setAudioInputDevice(int newInputDevice);
@@ -48,12 +63,12 @@ void playTestSound();
  */
 bool enableMicrophone(bool enabled);
 
-int encodePacket(int sourceLength, float* sourceBuffer, int targetLength, uint8_t* targetBuffer);
-int decodePacket(int sourceLength, uint8_t* sourceBuffer, int targetLength, float* targetBuffer);
+// TODO: It might be better to take the encoder here, as with decodePacket
+int encodePacket(int sourceLength, float* sourceBuffer, int sourceSampleRate, int targetLength, uint8_t* targetBuffer);
+int decodePacket(OpusDecoder* decoder, int sourceLength, uint8_t* sourceBuffer, int targetLength, float* targetBuffer, int targetSampleRate);
 
 // Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
 int readAudioInputBuffer(int bufferLength, float* buffer);
-int addUserAudioData(int peerIndex, int bufferLength, float* buffer);
 
 void writeAudioToFile(int length, uint8_t* data);
 #endif
