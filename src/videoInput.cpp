@@ -1136,7 +1136,6 @@ bool videoInput::getVideoSettingFilter(int deviceID, long Property, long &min, l
 	if( !isDeviceSetup(deviceID) )return false;
 
 	HRESULT hr;
-	bool isSuccessful = false;
 
 	videoDevice * VD = VDList[deviceID];
 
@@ -1212,7 +1211,6 @@ bool videoInput::setVideoSettingFilter(int deviceID, long Property, long lValue,
 	if( !isDeviceSetup(deviceID) )return false;
 
 	HRESULT hr;
-	bool isSuccessful = false;
 
 	videoDevice * VD = VDList[deviceID];
 
@@ -1335,7 +1333,6 @@ bool videoInput::getVideoSettingCamera(int deviceID, long Property, long &min, l
 	if( !isDeviceSetup(deviceID) )return false;
 
 	HRESULT hr;
-	bool isSuccessful = false;
 
 	videoDevice * VD = VDList[deviceID];
 
@@ -1578,10 +1575,6 @@ void videoInput::processPixels(unsigned char * src, unsigned char * dst, int wid
 	int numBytes = widthInBytes * height;
 
 	if(!bRGB){
-
-		int x = 0;
-		int y = 0;
-
 		if(bFlip){
 			for(int y = 0; y < height; y++){
 				memcpy(dst + (y * widthInBytes), src + ( (height -y -1) * widthInBytes), widthInBytes);
@@ -1771,8 +1764,6 @@ static bool setSizeAndSubtype(videoDevice * VD, int attemptWidth, int attemptHei
 	VIDEOINFOHEADER *pVih =  reinterpret_cast<VIDEOINFOHEADER*>(VD->pAmMediaType->pbFormat);
 
 	//store current size
-	int tmpWidth  = HEADER(pVih)->biWidth;
-	int tmpHeight = HEADER(pVih)->biHeight;
 	AM_MEDIA_TYPE * tmpType = NULL;
 
 	HRESULT	hr = VD->streamConf->GetFormat(&tmpType);
