@@ -11,10 +11,10 @@
 #include "common.h"
 #include "user.h"
 #include "user_client.h"
+#include "math_utils.h"
 #include "network.h"
 #include "logging.h"
 #include "platform.h"
-#include "vecmath.h"
 #include "ringbuffer.h"
 #include "unorderedlist.h"
 
