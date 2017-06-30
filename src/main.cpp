@@ -64,8 +64,6 @@ extern int screenHeight;
 extern int cameraDeviceCount;
 extern char** cameraDeviceNames;
 
-static GLuint pixelTexture;
-
 static uint32 micBufferLen;
 static float* micBuffer;
 
@@ -74,58 +72,20 @@ static size_t netOutBytes;
 static float netOutput;
 static float netInput;
 
-void addRemoteUser(NetworkUserConnectPacket* packet)
-{
-    // TODO: This is what constructors are for?
-}
-
 void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
     game->connState = NET_CONNSTATE_DISCONNECTED;
     game->micEnabled = enableMicrophone(true);
 
-    glGenTextures(1, &game->cameraTexture);
-    glBindTexture(GL_TEXTURE_2D, game->cameraTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    game->cameraTexture = createTexture();
 
     // TODO: Move this to user setup
-    GLuint userVideoTex[MAX_USERS];
-    int textureIndex = 0;
-    glGenTextures(MAX_USERS, userVideoTex);
     for(auto userIter=game->remoteUsers.begin(); userIter != game->remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
-        user->videoTexture = userVideoTex[textureIndex++];
-        glBindTexture(GL_TEXTURE_2D, user->videoTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        user->videoTexture = createTexture();
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    unsigned char testImagePixel[] = {255, 255, 255};
-    glGenTextures(1, &pixelTexture);
-    glBindTexture(GL_TEXTURE_2D, pixelTexture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                 1, 1, 0,
-                 GL_RGB, GL_UNSIGNED_BYTE, &testImagePixel);
-    glBindTexture(GL_TEXTURE_2D, 0);
 
     game->lastSentAudioPacket = 1;
     game->lastReceivedVideoPacket = 1;
