@@ -23,7 +23,6 @@
 const int cameraWidth = 320;
 const int cameraHeight = 240;
 #include "graphics.h"
-#include "graphicsutil.h"
 #include "network.h"
 
 #ifndef BUILD_VERSION
@@ -33,6 +32,7 @@ const int cameraHeight = 240;
 // TODO: Look into replacing the GL3 UI with something slightly more native (but still cross platform)
 //       - http://www.fltk.org/index.php
 //       - http://webserver2.tecgraf.puc-rio.br/iup/
+//       - wxWidgets
 //       - Qt (pls no....maybe?)
 
 struct GameState
@@ -138,12 +138,14 @@ void renderGame(GameState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    Vector2 size = Vector2((float)cameraWidth, (float)cameraHeight);
+    ImGui::Begin("Video");
+    ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
     Vector2 screenSize((float)screenWidth, (float)screenHeight);
     Vector2 cameraPosition = screenSize * 0.5f;
 
     Vector2 selfCamPosition = Vector2(0.5f*cameraWidth, screenHeight - 0.5f*cameraHeight);
-    renderTexture(game->cameraTexture, selfCamPosition, size, 1.0f);
+    //renderTexture(game->cameraTexture, selfCamPosition, size, 1.0f);
+    ImGui::Image((ImTextureID)game->cameraTexture, size);
 
     int userIndex = 0;
     for(auto userIter=game->remoteUsers.begin(); userIter!=game->remoteUsers.end(); userIter++)
@@ -155,9 +157,11 @@ void renderGame(GameState* game, float deltaTime)
         Vector2 position = Vector2(0.5f*cameraWidth, screenHeight - 0.5f*cameraHeight) +
                            Vector2((float)x*cameraWidth, (float)y*cameraHeight);
 
-        renderTexture(user->videoTexture, position, size, 1.0f);
+        //renderTexture(user->videoTexture, position, size, 1.0f);
+        ImGui::Image((ImTextureID)user->videoTexture, size);
         userIndex++;
     }
+    ImGui::End();
 
     // Options window
     ImVec2 windowLoc(0.0f, 0.0f);
