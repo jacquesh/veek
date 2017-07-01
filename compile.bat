@@ -5,7 +5,7 @@ ctime -begin veek_time.ctm
 For /f "tokens=1-4 delims=/ " %%a in ("%DATE%") do (set BuildDate=%%a-%%b-%%c)
 For /f "tokens=1-2 delims=/:/ " %%a in ("%TIME%") do (set BuildTime=%%a-%%b)
 FOR /f %%H IN ('git log -n 1 --oneline') DO set VersionHash=%%H
-set CompileFiles= ..\src\main.cpp ..\src\graphics.cpp ..\src\video.cpp ..\src\audio.cpp  ..\src\ringbuffer.cpp ..\src\platform.cpp ..\src\logging.cpp ..\src\user.cpp ..\src\user_client.cpp ..\src\network.cpp ..\src\videoinput.cpp ..\src\crossCap.cpp ..\src\happyhttp.cpp
+set CompileFiles= ..\src\main.cpp ..\src\render.cpp ..\src\video.cpp ..\src\audio.cpp  ..\src\ringbuffer.cpp ..\src\platform.cpp ..\src\logging.cpp ..\src\user.cpp ..\src\user_client.cpp ..\src\network.cpp ..\src\videoinput.cpp ..\src\crossCap.cpp ..\src\happyhttp.cpp
 set CompileFlags= -nologo -Zi -Gm- -W4 -D_CRT_SECURE_NO_WARNINGS -Od -DNOMINMAX -MTd -EHsc- -DBUILD_VERSION=\"%VersionHash%_%BuildDate%_%BuildTime%\"
 set IncludeDirs= -I..\include
 

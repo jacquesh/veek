@@ -31,7 +31,7 @@ struct ClientUserData : UserData
     ClientUserData();
     explicit ClientUserData(NetworkUserConnectPacket& connectionPacket);
     void processIncomingAudioPacket(Audio::NetworkAudioPacket& packet);
-    void processIncomingVideoPacket(NetworkVideoPacket& packet);
+    void processIncomingVideoPacket(Video::NetworkVideoPacket& packet);
 };
 
 #endif

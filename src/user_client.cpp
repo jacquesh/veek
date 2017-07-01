@@ -45,7 +45,7 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
     }
 }
 
-void ClientUserData::processIncomingVideoPacket(NetworkVideoPacket& packet)
+void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)
 {
     if(((packet.index < 20) && (this->lastReceivedVideoPacket > 235)) ||
             (this->lastReceivedVideoPacket < packet.index))
@@ -59,7 +59,7 @@ void ClientUserData::processIncomingVideoPacket(NetworkVideoPacket& packet)
 
         int outputImageBytes = packet.imageWidth * packet.imageHeight * 3;
         uint8* pixelValues = new uint8[outputImageBytes];
-        decodeRGBImage(packet.encodedDataLength, packet.encodedData, outputImageBytes, pixelValues);
+        Video::decodeRGBImage(packet.encodedDataLength, packet.encodedData, outputImageBytes, pixelValues);
         glBindTexture(GL_TEXTURE_2D, this->videoTexture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                      packet.imageWidth, packet.imageHeight, 0,

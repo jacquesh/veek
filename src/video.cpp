@@ -53,7 +53,7 @@ static FILE* ogvOutputFile;
 static ogg_stream_state ogvOutputStream;
 #endif
 
-bool enableCamera(int deviceID)
+bool Video::enableCamera(int deviceID)
 {
     if(cameraDeviceCount == 0)
     {
@@ -97,7 +97,7 @@ bool enableCamera(int deviceID)
     return false;
 }
 
-bool checkForNewVideoFrame()
+bool Video::checkForNewVideoFrame()
 {
     bool result = cc_isFrameNew(cameraDevice);
     if(result)
@@ -108,12 +108,12 @@ bool checkForNewVideoFrame()
     return result;
 }
 
-uint8* currentVideoFrame()
+uint8* Video::currentVideoFrame()
 {
     return pixelValues;
 }
 
-int encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
+int Video::encodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
 {
     // TODO: Support other/variable image sizes
     assert(inputLength == 320*240*3);
@@ -211,7 +211,7 @@ static float clamp(float x)
     return x;
 }
 
-int decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
+int Video::decodeRGBImage(int inputLength, uint8* inputBuffer, int outputLength, uint8* outputBuffer)
 {
     // TODO: Support other image sizes
     assert(outputLength == 320*240*3);
@@ -279,7 +279,7 @@ static void copyTheoraPacket(ogg_packet& out, ogg_packet& in)
     out.packetno = in.packetno;
 }
 
-bool initVideo()
+bool Video::Setup()
 {
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
@@ -400,7 +400,7 @@ bool initVideo()
     return true;
 }
 
-void deinitVideo()
+void Video::Shutdown()
 {
     logInfo("Deinitialize video subsystem\n");
     enableCamera(-1);
@@ -436,7 +436,7 @@ void deinitVideo()
 }
 
 template<typename Packet>
-bool NetworkVideoPacket::serialize(Packet& packet)
+bool Video::NetworkVideoPacket::serialize(Packet& packet)
 {
     packet.serializeuint8(this->index);
     packet.serializeuint16(this->imageWidth);
@@ -446,5 +446,5 @@ bool NetworkVideoPacket::serialize(Packet& packet)
 
     return true;
 }
-template bool NetworkVideoPacket::serialize(NetworkInPacket& packet);
-template bool NetworkVideoPacket::serialize(NetworkOutPacket& packet);
+template bool Video::NetworkVideoPacket::serialize(NetworkInPacket& packet);
+template bool Video::NetworkVideoPacket::serialize(NetworkOutPacket& packet);

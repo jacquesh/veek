@@ -21,7 +21,7 @@
 #include "video.h"
 const int cameraWidth = 320;
 const int cameraHeight = 240;
-#include "graphics.h"
+#include "render.h"
 #include "network.h"
 
 #ifndef BUILD_VERSION
@@ -78,13 +78,13 @@ void initGame(GameState* game)
     game->connState = NET_CONNSTATE_DISCONNECTED;
     game->micEnabled = Audio::enableMicrophone(true);
 
-    game->cameraTexture = createTexture();
+    game->cameraTexture = Render::createTexture();
 
     // TODO: Move this to user setup
     for(auto userIter=game->remoteUsers.begin(); userIter != game->remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
-        user->videoTexture = createTexture();
+        user->videoTexture = Render::createTexture();
     }
 
     game->lastSentAudioPacket = 1;
@@ -138,11 +138,11 @@ void renderGame(GameState* game, float deltaTime)
         {
             if(game->cameraEnabled)
             {
-                game->cameraEnabled = enableCamera(selectedCameraDevice);
+                game->cameraEnabled = Video::enableCamera(selectedCameraDevice);
             }
             else
             {
-                game->cameraEnabled = enableCamera(-1);
+                game->cameraEnabled = Video::enableCamera(-1);
             }
         }
 
@@ -155,7 +155,7 @@ void renderGame(GameState* game, float deltaTime)
             logInfo("Camera Device Changed\n");
             if(game->cameraEnabled)
             {
-                game->cameraEnabled = enableCamera(selectedCameraDevice);
+                game->cameraEnabled = Video::enableCamera(selectedCameraDevice);
             }
         }
     }
@@ -320,7 +320,7 @@ void glfwErrorCallback(int errorCode, const char* errorDescription)
 
 void windowResizeCallback(GLFWwindow* window, int newWidth, int newHeight)
 {
-    updateWindowSize(newWidth, newHeight);
+    Render::updateWindowSize(newWidth, newHeight);
 }
 
 void windowCloseRequestCallback(GLFWwindow* window)
@@ -371,15 +371,15 @@ void handleVideoInput(GameState& game)
         // TODO: If we can switch to using a callback for video (as with audio) then we can
         //       remove our dependency on calling "checkForNewVideoFrame" and shift the network
         //       stuff down into the "Send network output data" section
-        if(checkForNewVideoFrame())
+        if(Video::checkForNewVideoFrame())
         {
-            uint8* pixelValues = currentVideoFrame();
+            uint8* pixelValues = Video::currentVideoFrame();
 #if 0
             static uint8* encPx = new uint8[320*240*3];
             static uint8* decPx = new uint8[320*240*3];
-            int videoBytes = encodeRGBImage(320*240*3, pixelValues,
+            int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
                                             320*240*3, encPx);
-            decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
+            Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
             glBindTexture(GL_TEXTURE_2D, game.cameraTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
@@ -390,11 +390,11 @@ void handleVideoInput(GameState& game)
             if(game.connState == NET_CONNSTATE_CONNECTED)
             {
                 static uint8* encodedPixels = new uint8[320*240*3];
-                int videoBytes = encodeRGBImage(320*240*3, pixelValues,
+                int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
                                                 320*240*3, encodedPixels);
                 //logTerm("Encoded %d video bytes\n", videoBytes);
                 //delete[] encodedPixels;
-                NetworkVideoPacket videoPacket = {};
+                Video::NetworkVideoPacket videoPacket = {};
                 videoPacket.index = game.lastSentVideoPacket++;
                 videoPacket.imageWidth = 320;
                 videoPacket.imageHeight = 240;
@@ -513,7 +513,7 @@ void handleNetworkPacketReceive(GameState& game, NetworkInPacket& incomingPacket
         } break;
         case NET_MSGTYPE_VIDEO:
         {
-            NetworkVideoPacket videoInPacket;
+            Video::NetworkVideoPacket videoInPacket;
             if(!videoInPacket.serialize(incomingPacket))
                 break;
 
@@ -560,11 +560,14 @@ int main()
         return 1;
     }
 
+    // TODO: Do we actually need this?
+    /*
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    */
 
     int initialWindowWidth = 640;
     int initialWindowHeight = 480;
@@ -586,12 +589,12 @@ int main()
     logInfo("Initializing OpenGL...\n");
     glfwMakeContextCurrent(window);
     glfwSwapInterval(0);
-    if(!initGraphics())
+    if(!Render::Setup())
     {
         glfwTerminate();
         return 1;
     }
-    updateWindowSize(initialWindowWidth, initialWindowHeight);
+    Render::updateWindowSize(initialWindowWidth, initialWindowHeight);
     ImGui_ImplGlfwGL3_Init(window, false);
     ImGuiIO& imguiIO = ImGui::GetIO();
     imguiIO.IniFilename = 0;
@@ -600,17 +603,17 @@ int main()
     if(!Audio::Setup())
     {
         logFail("Unable to initialize audio subsystem\n");
-        deinitGraphics();
+        Render::Shutdown();
         glfwTerminate();
         return 1;
     }
 
     logInfo("Initializing video input subsystem...\n");
-    if(!initVideo())
+    if(!Video::Setup())
     {
         logFail("Unable to initialize camera video subsystem\n");
         Audio::Shutdown();
-        deinitGraphics();
+        Render::Shutdown();
         glfwTerminate();
         return 1;
     }
@@ -618,9 +621,9 @@ int main()
     if(enet_initialize() != 0)
     {
         logFail("Unable to initialize enet!\n");
-        deinitVideo();
+        Video::Shutdown();
         Audio::Shutdown();
-        deinitGraphics();
+        Render::Shutdown();
         glfwTerminate();
         return 1;
     }
@@ -638,7 +641,7 @@ int main()
 
     running = true;
 
-    glPrintError(true);
+    Render::glPrintError(true);
     logInfo("Setup complete, start running...\n");
     while(running)
     {
@@ -727,7 +730,7 @@ int main()
         ImGui::Render();
 
         glfwSwapBuffers(window);
-        glPrintError(false);
+        Render::glPrintError(false);
 
         // Sleep till next scheduled update
         newTime = glfwGetTime();
@@ -751,10 +754,10 @@ int main()
     logInfo("Deinitialize enet\n");
     enet_deinitialize();
 
-    deinitVideo();
+    Video::Shutdown();
     Audio::Shutdown();
     ImGui_ImplGlfwGL3_Shutdown();
-    deinitGraphics();
+    Render::Shutdown();
 
     logInfo("Destroy window\n");
     glfwDestroyWindow(window);

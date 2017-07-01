@@ -1,12 +1,12 @@
 #include <GL/gl3w.h>
 
-#include "graphics.h"
+#include "render.h"
 #include "logging.h"
 
 int screenWidth;
 int screenHeight;
 
-bool initGraphics()
+bool Render::Setup()
 {
     if(gl3wInit())
     {
@@ -19,19 +19,19 @@ bool initGraphics()
     return true;
 }
 
-void deinitGraphics()
+void Render::Shutdown()
 {
     logInfo("Deinitialize graphics subsystem\n");
 }
 
-void updateWindowSize(int newWidth, int newHeight)
+void Render::updateWindowSize(int newWidth, int newHeight)
 {
     screenWidth = newWidth;
     screenHeight = newHeight;
     glViewport(0,0, newWidth, newHeight);
 }
 
-GLuint createTexture()
+GLuint Render::createTexture()
 {
     GLuint result;
     glGenTextures(1, &result);
@@ -45,7 +45,7 @@ GLuint createTexture()
     return result;
 }
 
-void glPrintError(bool alwaysPrint)
+void Render::glPrintError(bool alwaysPrint)
 {
     GLenum error = glGetError();
     if(error == GL_NO_ERROR)
