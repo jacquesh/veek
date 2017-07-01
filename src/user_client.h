@@ -26,11 +26,11 @@ struct ClientUserData : UserData
     uint8 lastSendVideoPacket;
     uint8 lastReceivedAudioPacket;
     uint8 lastReceivedVideoPacket;
-    
+
     // Functions
     ClientUserData();
     explicit ClientUserData(NetworkUserConnectPacket& connectionPacket);
-    void processIncomingAudioPacket(NetworkAudioPacket& packet);
+    void processIncomingAudioPacket(Audio::NetworkAudioPacket& packet);
     void processIncomingVideoPacket(NetworkVideoPacket& packet);
 };
 

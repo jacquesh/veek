@@ -18,7 +18,27 @@
 #include "ringbuffer.h"
 #include "unorderedlist.h"
 
-AudioData audioState = {};
+struct AudioSource
+{
+    RingBuffer* buffer;
+};
+
+struct AudioData
+{
+    int inputDeviceCount;
+    SoundIoDevice** inputDeviceList;
+    char** inputDeviceNames;
+    int currentInputDevice;
+
+    int outputDeviceCount;
+    SoundIoDevice** outputDeviceList;
+    char** outputDeviceNames;
+    int currentOutputDevice;
+
+    bool isListeningToInput;
+};
+
+static AudioData audioState = {};
 
 static SoundIo* soundio = 0;
 static OpusEncoder* encoder = 0;
@@ -63,8 +83,8 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
     }
 }
 
-void resampleBuffer(int inSampleRate, int inBufferLen, float* inBuffer,
-                    int outSampleRate, int outBufferLen, float* outBuffer)
+static void resampleBuffer(int inSampleRate, int inBufferLen, float* inBuffer,
+                           int outSampleRate, int outBufferLen, float* outBuffer)
 {
     assert(inBufferLen > 0);
     assert(outBufferLen > 0);
@@ -109,7 +129,7 @@ void resampleBuffer(int inSampleRate, int inBufferLen, float* inBuffer,
     }
 }
 
-void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
+static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
     // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
     //       get an error during initialization since we specifically ask for MONO
@@ -151,7 +171,7 @@ void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMa
     }
 }
 
-void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
+static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
     // TODO: 0.025 is twice per frame, we should probably link that in to where we actually specify
     //       the tickrate
@@ -199,39 +219,55 @@ void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCoun
     }
 }
 
-void inOverflowCallback(SoundIoInStream* stream)
+static void inOverflowCallback(SoundIoInStream* stream)
 {
     logWarn("Input overflow on stream from %s\n", stream->device->name);
 }
 
-void outUnderflowCallback(SoundIoOutStream* stream)
+static void outUnderflowCallback(SoundIoOutStream* stream)
 {
     logTerm("Output underflow on stream to %s\n", stream->device->name);
 }
 
-void inErrorCallback(SoundIoInStream* stream, int error)
+static void inErrorCallback(SoundIoInStream* stream, int error)
 {
     logWarn("Input error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
-void outErrorCallback(SoundIoOutStream* stream, int error)
+static void outErrorCallback(SoundIoOutStream* stream, int error)
 {
     logWarn("Output error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
-void listenToInput(bool listening)
+void Audio::ListenToInput(bool listening)
 {
     audioState.isListeningToInput = listening;
 }
 
-void playTestSound()
+void Audio::PlayTestSound()
 {
-    // TODO
+    // Create the test sound based on the sample rate that we got
+    uint32 sampleSoundSampleCount = 1 << 16;
+    AudioSource sampleSource = {};
+    sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
+
+    float twopi = 2.0f*3.1415927f;
+    float frequency = 261.6f; // Middle C
+    float timestep = 1.0f/(float)outStream->sample_rate;
+    float sampleTime = 0.0f;
+    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
+    {
+        float sinVal = sinf(frequency*twopi*sampleTime);
+        sampleSource.buffer->write(1, &sinVal);
+        sampleTime += timestep;
+    }
+    sourceList.insert(sampleSource);
+    // TODO: This needs to be removed from the list of sources when it's finished playing
 }
 
-int decodePacket(OpusDecoder* decoder,
-                 int sourceLength, uint8_t* sourceBufferPtr,
-                 int targetLength, float* targetBufferPtr, int32 targetSampleRate)
+int Audio::decodePacket(OpusDecoder* decoder,
+                        int sourceLength, uint8_t* sourceBufferPtr,
+                        int targetLength, float* targetBufferPtr, int32 targetSampleRate)
 {
     int frameSize = 240;
     uint8_t* sourceBuffer = sourceBufferPtr;
@@ -270,8 +306,8 @@ int decodePacket(OpusDecoder* decoder,
     return framesWritten;
 }
 
-int encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSampleRate,
-                  int targetLength, uint8_t* targetBufferPtr)
+int Audio::encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSampleRate,
+                        int targetLength, uint8_t* targetBufferPtr)
 {
     if(sourceSampleRate != NETWORK_SAMPLE_RATE)
     {
@@ -312,7 +348,9 @@ int encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSampleRat
     return bytesWritten;
 }
 
-void initUserAudio(ClientUserData& user)
+/*
+TODO:
+void Audio::initUserAudio(ClientUserData& user)
 {
     int32 opusError;
     int32 channels = 1;
@@ -326,13 +364,14 @@ void initUserAudio(ClientUserData& user)
     sourceList.insert(userSource);
 }
 
-void deinitializeUserAudio(ClientUserData& user)
+void Audio::deinitUserAudio(ClientUserData& user)
 {
     opus_decoder_destroy(user.decoder);
     user.decoder = nullptr;
 }
+*/
 
-int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
+int Audio::readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
 {
     // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
     //       to be a single sample from a single channel, but its important to note that that is what
@@ -347,7 +386,7 @@ int readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
     return samplesToWrite;
 }
 
-bool enableMicrophone(bool enabled)
+bool Audio::enableMicrophone(bool enabled)
 {
     // TODO: Apparently some backends (e.g JACK) don't support pausing at all
     const char* toggleString = enabled ? "Enable" : "Disable";
@@ -369,7 +408,7 @@ bool enableMicrophone(bool enabled)
     }
 }
 
-bool setAudioInputDevice(int newInputDevice)
+bool Audio::SetAudioInputDevice(int newInputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
     if(inStream)
@@ -427,7 +466,7 @@ bool setAudioInputDevice(int newInputDevice)
     return true;
 }
 
-bool setAudioOutputDevice(int newOutputDevice)
+bool Audio::SetAudioOutputDevice(int newOutputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
     if(outStream)
@@ -482,23 +521,7 @@ bool setAudioOutputDevice(int newOutputDevice)
     logInfo("  Layout: %s\n", outStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
-    // Create the test sound based on the sample rate that we got
-    uint32 sampleSoundSampleCount = 1 << 16;
-    AudioSource sampleSource = {};
-    sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
-
-    float twopi = 2.0f*3.1415927f;
-    float frequency = 261.6f; // Middle C
-    float timestep = 1.0f/(float)outStream->sample_rate;
-    float sampleTime = 0.0f;
-    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
-    {
-        float sinVal = sinf(frequency*twopi*sampleTime);
-        sampleSource.buffer->write(1, &sinVal);
-        sampleTime += timestep;
-    }
-    //sourceList.insert(sampleSource);
-
+    // TODO: We need to clean up the old listenSource
     AudioSource listenSource = {};
     listenBuffer = new RingBuffer(1 << 13);
     listenSource.buffer = listenBuffer;
@@ -507,7 +530,7 @@ bool setAudioOutputDevice(int newOutputDevice)
     return true;
 }
 
-void backendDisconnectCallback(SoundIo* sio, int error)
+static void backendDisconnectCallback(SoundIo* sio, int error)
 {
     logWarn("SoundIo backend disconnected: %s\n", soundio_strerror(error));
     //NOTE: This assumes that we are only connected to a single backend, otherwise we
@@ -550,7 +573,7 @@ void backendDisconnectCallback(SoundIo* sio, int error)
     }
 }
 
-void devicesChangeCallback(SoundIo* sio)
+static void devicesChangeCallback(SoundIo* sio)
 {
     // TODO: Check that this works correctly now with PulseAudio which (on my laptop) calls this
     //       *very* frequently, it should at least not try re-opening a stream each time now
@@ -643,7 +666,7 @@ void devicesChangeCallback(SoundIo* sio)
         // NOTE: If there are no input devices then target will be -1 even if needNew is true
         if(targetInputDeviceIndex >= 0)
         {
-            if(!setAudioInputDevice(targetInputDeviceIndex))
+            if(!Audio::SetAudioInputDevice(targetInputDeviceIndex))
             {
                 logWarn("Error: Unable to initialize audio input device %s\n",
                         audioState.inputDeviceNames[targetInputDeviceIndex]);
@@ -739,7 +762,7 @@ void devicesChangeCallback(SoundIo* sio)
     {
         if(targetOutputDeviceIndex >= 0)
         {
-            if(!setAudioOutputDevice(targetOutputDeviceIndex))
+            if(!Audio::SetAudioOutputDevice(targetOutputDeviceIndex))
             {
                 logWarn("Error: Unable to initialize audio output device %s\n",
                         audioState.outputDeviceNames[targetOutputDeviceIndex]);
@@ -753,7 +776,7 @@ void devicesChangeCallback(SoundIo* sio)
     }
 }
 
-bool initAudio()
+bool Audio::Setup()
 {
     // Initialize the current devices to null so that we will connect automatically when we 
     // get a list of connected devices
@@ -812,12 +835,32 @@ bool initAudio()
     return true;
 }
 
-void updateAudio()
+void Audio::Update()
 {
     soundio_flush_events(soundio);
 }
 
-void deinitAudio()
+int Audio::InputDeviceCount()
+{
+    return audioState.inputDeviceCount;
+}
+
+const char** Audio::InputDeviceNames()
+{
+    return (const char**)audioState.inputDeviceNames;
+}
+
+int Audio::OutputDeviceCount()
+{
+    return audioState.outputDeviceCount;
+}
+
+const char** Audio::OutputDeviceNames()
+{
+    return (const char**)audioState.outputDeviceNames;
+}
+
+void Audio::Shutdown()
 {
     logInfo("Deinitialize audio subsystem\n");
     // TODO: Wraithy crashes inside this function
@@ -853,7 +896,7 @@ void deinitAudio()
 }
 
 template<typename Packet>
-bool NetworkAudioPacket::serialize(Packet& packet)
+bool Audio::NetworkAudioPacket::serialize(Packet& packet)
 {
     this->srcUser.serialize(packet);
     packet.serializeuint8(this->index);
@@ -862,5 +905,5 @@ bool NetworkAudioPacket::serialize(Packet& packet)
 
     return true;
 }
-template bool NetworkAudioPacket::serialize(NetworkInPacket& packet);
-template bool NetworkAudioPacket::serialize(NetworkOutPacket& packet);
+template bool Audio::NetworkAudioPacket::serialize(NetworkInPacket& packet);
+template bool Audio::NetworkAudioPacket::serialize(NetworkOutPacket& packet);

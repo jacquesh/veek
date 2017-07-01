@@ -76,7 +76,7 @@ void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
     game->connState = NET_CONNSTATE_DISCONNECTED;
-    game->micEnabled = enableMicrophone(true);
+    game->micEnabled = Audio::enableMicrophone(true);
 
     game->cameraTexture = createTexture();
 
@@ -168,37 +168,38 @@ void renderGame(GameState* game, float deltaTime)
         bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
         if(micToggled)
         {
-            game->micEnabled = enableMicrophone(game->micEnabled);
+            game->micEnabled = Audio::enableMicrophone(game->micEnabled);
         }
 
         bool micChanged = ImGui::Combo("Recording Device",
                                        &selectedRecordingDevice,
-                                       (const char**)audioState.inputDeviceNames,
-                                       audioState.inputDeviceCount);
+                                       Audio::InputDeviceNames(),
+                                       Audio::InputDeviceCount());
         if(micChanged)
         {
             logInfo("Mic Device Changed\n");
-            setAudioInputDevice(selectedRecordingDevice);
+            Audio::SetAudioInputDevice(selectedRecordingDevice);
         }
 
         bool listenChanged = ImGui::Checkbox("Listen", &listening);
         if(listenChanged)
         {
-            listenToInput(listening);
+            Audio::ListenToInput(listening);
         }
 
         bool speakerChanged = ImGui::Combo("Playback Device",
                                            &selectedPlaybackDevice,
-                                           (const char**)audioState.outputDeviceNames,
-                                           audioState.outputDeviceCount);
+                                           Audio::OutputDeviceNames(),
+                                           Audio::OutputDeviceCount());
         if(speakerChanged)
         {
             logInfo("Speaker Device Changed\n");
+            Audio::SetAudioOutputDevice(selectedPlaybackDevice);
         }
 
         if(ImGui::Button("Play test sound", ImVec2(120, 20)))
         {
-            playTestSound();
+            Audio::PlayTestSound();
         }
     }
 
@@ -339,15 +340,15 @@ void handleAudioInput(GameState& game)
 {
     if(game.micEnabled)
     {
-        int audioFrames = readAudioInputBuffer(micBufferLen, micBuffer);
+        int audioFrames = Audio::readAudioInputBuffer(micBufferLen, micBuffer);
 
         if(game.connState == NET_CONNSTATE_CONNECTED)
         {
             int encodedBufferLength = micBufferLen;
             uint8* encodedBuffer = new uint8[encodedBufferLength];
-            int audioBytes = encodePacket(audioFrames, micBuffer, game.localUser.audioSampleRate, encodedBufferLength, encodedBuffer);
+            int audioBytes = Audio::encodePacket(audioFrames, micBuffer, game.localUser.audioSampleRate, encodedBufferLength, encodedBuffer);
 
-            NetworkAudioPacket audioPacket = {};
+            Audio::NetworkAudioPacket audioPacket = {};
             audioPacket.srcUser = game.localUser.ID;
             audioPacket.index = game.lastSentAudioPacket++;
             audioPacket.encodedDataLength = audioBytes;
@@ -486,7 +487,7 @@ void handleNetworkPacketReceive(GameState& game, NetworkInPacket& incomingPacket
         case NET_MSGTYPE_AUDIO:
         {
 
-            NetworkAudioPacket audioInPacket;
+            Audio::NetworkAudioPacket audioInPacket;
             if(!audioInPacket.serialize(incomingPacket))
                 break;
 
@@ -596,7 +597,7 @@ int main()
     imguiIO.IniFilename = 0;
 
     logInfo("Initializing audio input/output subsystem...\n");
-    if(!initAudio())
+    if(!Audio::Setup())
     {
         logFail("Unable to initialize audio subsystem\n");
         deinitGraphics();
@@ -608,7 +609,7 @@ int main()
     if(!initVideo())
     {
         logFail("Unable to initialize camera video subsystem\n");
-        deinitAudio();
+        Audio::Shutdown();
         deinitGraphics();
         glfwTerminate();
         return 1;
@@ -618,7 +619,7 @@ int main()
     {
         logFail("Unable to initialize enet!\n");
         deinitVideo();
-        deinitAudio();
+        Audio::Shutdown();
         deinitGraphics();
         glfwTerminate();
         return 1;
@@ -653,7 +654,7 @@ int main()
         // Handle input
         glfwPollEvents();
 
-        updateAudio();
+        Audio::Update();
         handleAudioInput(game);
         handleVideoInput(game);
 
@@ -751,7 +752,7 @@ int main()
     enet_deinitialize();
 
     deinitVideo();
-    deinitAudio();
+    Audio::Shutdown();
     ImGui_ImplGlfwGL3_Shutdown();
     deinitGraphics();
 

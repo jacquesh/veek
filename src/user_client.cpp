@@ -19,7 +19,7 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     this->name[connectionPacket.nameLength] = 0;
 }
 
-void ClientUserData::processIncomingAudioPacket(NetworkAudioPacket& packet)
+void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
 {
     if(((packet.index < 20) && (this->lastReceivedAudioPacket > 235)) ||
             (this->lastReceivedAudioPacket < packet.index))
@@ -31,9 +31,9 @@ void ClientUserData::processIncomingAudioPacket(NetworkAudioPacket& packet)
         }
         this->lastReceivedAudioPacket = packet.index;
         float* decodedAudio = new float[micBufferLen];
-        int decodedFrames = decodePacket(this->decoder,
-                                         packet.encodedDataLength, packet.encodedData+1,
-                                         micBufferLen, decodedAudio, this->audioSampleRate);
+        int decodedFrames = Audio::decodePacket(this->decoder,
+                                                packet.encodedDataLength, packet.encodedData+1,
+                                                micBufferLen, decodedAudio, this->audioSampleRate);
         logTerm("Received %d samples\n", decodedFrames);
         assert(decodedFrames <= this->audioBuffer->free());
         this->audioBuffer->write(decodedFrames, decodedAudio);
