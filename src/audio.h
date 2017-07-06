@@ -6,11 +6,19 @@
 #include "soundio/soundio.h"
 #include "opus/opus.h"
 
-#include "user.h"
 #include "ringbuffer.h"
+#include "user.h"
+
+#ifndef _USER_CLIENT_H
+// TODO: This is a really sucky solution. We actually need a user_client_defs.h or something.
+//       This only works if you import audio.h before user_client.h
+struct ClientUserData;
+#endif
 
 namespace Audio
 {
+    const int32 NETWORK_SAMPLE_RATE = 48000;
+
     struct NetworkAudioPacket
     {
         UserIdentifier srcUser;
@@ -21,7 +29,12 @@ namespace Audio
         template<typename Packet> bool serialize(Packet& packet);
     };
 
-    const int32 NETWORK_SAMPLE_RATE = 48000;
+    struct UserAudioData
+    {
+        int32 sampleRate;
+        OpusDecoder* decoder;
+        RingBuffer* buffer;
+    };
 
     bool Setup();
     void Update();
@@ -43,6 +56,8 @@ namespace Audio
      * and equals the previous state if the function failed
      */
     bool enableMicrophone(bool enabled);
+
+    void SendAudioToUser(ClientUserData* user, int sourceLength, float* sourceBuffer);
 
     // TODO: It might be better to take the encoder here, as with decodePacket
     int encodePacket(int sourceLength, float* sourceBuffer, int sourceSampleRate, int targetLength, uint8_t* targetBuffer);

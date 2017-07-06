@@ -52,6 +52,7 @@ void deinitLogging()
     fclose(logFile);
 
     // Upload log file to server
+    /*
     logFile = fopen(logFileName, "rb");
     if(logFile)
     {
@@ -83,4 +84,5 @@ void deinitLogging()
 
         delete[] logData;
     }
+    */
 }

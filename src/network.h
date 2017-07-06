@@ -65,4 +65,21 @@ struct NetworkOutPacket
 
 NetworkOutPacket createNetworkOutPacket(NetworkMessageType msgType);
 
+namespace Network
+{
+    uint64_t TotalIncomingBytes();
+    uint64_t TotalOutgoingBytes();
+
+    NetConnectionState CurrentConnectionState();
+    bool IsConnectedToMasterServer();
+
+    bool Setup();
+    void Update();
+    void Shutdown();
+
+    void ConnectToMasterServer(const char* serverHostname);
+    ClientUserData* ConnectToPeer(NetworkUserConnectPacket& userPacket);
+    void DisconnectFromMasterServer();
+}
+
 #endif

@@ -1,5 +1,3 @@
-#include "audio.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -8,15 +6,16 @@
 #include "soundio/soundio.h"
 #include "opus/opus.h"
 
+#include "audio.h"
 #include "common.h"
-#include "user.h"
-#include "user_client.h"
+#include "logging.h"
 #include "math_utils.h"
 #include "network.h"
-#include "logging.h"
 #include "platform.h"
 #include "ringbuffer.h"
 #include "unorderedlist.h"
+#include "user.h"
+#include "user_client.h"
 
 struct AudioSource
 {
@@ -422,7 +421,7 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     inStream->read_callback = inReadCallback;
     inStream->overflow_callback = inOverflowCallback;
     inStream->error_callback = inErrorCallback;
-    inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 48000);
+    inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 44100);
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = inDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
@@ -480,7 +479,7 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     outStream->write_callback = outWriteCallback;
     outStream->underflow_callback = outUnderflowCallback;
     outStream->error_callback = outErrorCallback;
-    outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, 48000);
+    outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, 44100);
     outStream->format = SoundIoFormatFloat32NE;
     outStream->layout = outDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
@@ -833,6 +832,27 @@ bool Audio::Setup()
     logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
     return true;
+}
+
+void Audio::SendAudioToUser(ClientUserData* user, int sourceLength, float* sourceBuffer)
+{
+    int encodedBufferLength = sourceLength;
+    uint8* encodedBuffer = new uint8[encodedBufferLength];
+    int audioBytes = encodePacket(sourceLength, sourceBuffer,
+                                  localUser.audio.sampleRate,
+                                  encodedBufferLength, encodedBuffer);
+
+    NetworkAudioPacket audioPacket = {};
+    audioPacket.srcUser = localUser.ID;
+    audioPacket.index = user->lastSentAudioPacket++;
+    audioPacket.encodedDataLength = audioBytes;
+    memcpy(audioPacket.encodedData, encodedBuffer, audioBytes);
+
+    delete[] encodedBuffer;
+
+    NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
+    audioPacket.serialize(outPacket);
+    outPacket.send(user->netPeer, 0, false);
 }
 
 void Audio::Update()

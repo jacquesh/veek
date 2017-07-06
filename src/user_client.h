@@ -1,37 +1,43 @@
 #ifndef _USER_CLIENT_H
 #define _USER_CLIENT_H
 
-#include <GL/gl3w.h>
+#include <vector>
+
 #include "opus/opus.h"
 #include "enet/enet.h"
 
-#include "common.h"
-#include "ringbuffer.h"
 #include "audio.h"
-#include "video.h"
+#include "common.h"
+#include "render.h"
+#include "ringbuffer.h"
 #include "user.h"
+#include "video.h"
 
 struct ClientUserData : UserData
 {
-    // Audio Stuff
-    int32 audioSampleRate;
-    OpusDecoder* decoder;
-    RingBuffer* audioBuffer;
+    Audio::UserAudioData audio;
 
-    // Video Stuff
+    // Video
     GLuint videoTexture;
 
-    // Network stuff
+    // Network
     uint8 lastSentAudioPacket;
     uint8 lastSendVideoPacket;
     uint8 lastReceivedAudioPacket;
     uint8 lastReceivedVideoPacket;
 
     // Functions
-    ClientUserData();
+    ClientUserData() = default;
     explicit ClientUserData(NetworkUserConnectPacket& connectionPacket);
+    virtual ~ClientUserData();
+
+    void Initialize();
+
     void processIncomingAudioPacket(Audio::NetworkAudioPacket& packet);
     void processIncomingVideoPacket(Video::NetworkVideoPacket& packet);
 };
+
+extern ClientUserData localUser;
+extern std::vector<ClientUserData*> remoteUsers;
 
 #endif

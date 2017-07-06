@@ -7,22 +7,22 @@
 #include "imgui.h"
 #include "imgui_impl_glfw_gl3.h"
 
-#include <GL/gl3w.h>
-
+#include "GL/gl3w.h"
 #include "GLFW/glfw3.h"
-#include "enet/enet.h"
 
+#include "audio.h"
 #include "common.h"
-#include "user.h"
-#include "user_client.h"
+#include "network.h"
 #include "logging.h"
 #include "platform.h"
-#include "audio.h"
+#include "render.h"
+#include "user.h"
+#include "user_client.h"
+#ifdef VIDEO_ENABLED
 #include "video.h"
 const int cameraWidth = 320;
 const int cameraHeight = 240;
-#include "render.h"
-#include "network.h"
+#endif
 
 #ifndef BUILD_VERSION
 #define BUILD_VERSION "Unknown"
@@ -36,22 +36,8 @@ const int cameraHeight = 240;
 
 struct GameState
 {
-    uint8 lastSentAudioPacket;
-    uint8 lastSentVideoPacket;
-    uint8 lastReceivedAudioPacket;
-    uint8 lastReceivedVideoPacket;
-
-    GLuint cameraTexture;
-
     bool cameraEnabled;
     bool micEnabled;
-
-    NetConnectionState connState;
-    ENetHost* netHost;
-    ENetPeer* netPeer;
-
-    ClientUserData localUser;
-    std::vector<ClientUserData*> remoteUsers;
 };
 
 const int HOSTNAME_MAX_LENGTH = 26;
@@ -67,40 +53,24 @@ extern char** cameraDeviceNames;
 static uint32 micBufferLen;
 static float* micBuffer;
 
-static size_t netInBytes;
-static size_t netOutBytes;
-static float netOutput;
-static float netInput;
-
 void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
-    game->connState = NET_CONNSTATE_DISCONNECTED;
     game->micEnabled = Audio::enableMicrophone(true);
 
-    game->cameraTexture = Render::createTexture();
-
-    // TODO: Move this to user setup
-    for(auto userIter=game->remoteUsers.begin(); userIter != game->remoteUsers.end(); userIter++)
-    {
-        ClientUserData* user = *userIter;
-        user->videoTexture = Render::createTexture();
-    }
-
-    game->lastSentAudioPacket = 1;
-    game->lastReceivedVideoPacket = 1;
-
-    getCurrentUserName(MAX_USER_NAME_LENGTH, game->localUser.name);
+    getCurrentUserName(MAX_USER_NAME_LENGTH, localUser.name);
+    localUser.Initialize();
 }
 
 void renderGame(GameState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
+#if VIDEO_ENABLED
     ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
 
     ImGui::Begin("Video");
-    ImGui::Image((ImTextureID)game->cameraTexture, size);
+    ImGui::Image((ImTextureID)localUser.videoTexture, size);
 
     for(auto userIter=game->remoteUsers.begin(); userIter!=game->remoteUsers.end(); userIter++)
     {
@@ -108,6 +78,7 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Image((ImTextureID)user->videoTexture, size);
     }
     ImGui::End();
+#endif
 
     // Options window
     ImVec2 windowLoc(0.0f, 0.0f);
@@ -118,18 +89,19 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
-    if(game->connState == NET_CONNSTATE_DISCONNECTED)
+    if(Network::CurrentConnectionState() == NET_CONNSTATE_DISCONNECTED)
     {
         ImGui::Text("You are:");
         ImGui::SameLine();
-        ImGui::InputText("##userNameField", game->localUser.name, MAX_USER_NAME_LENGTH);
+        ImGui::InputText("##userNameField", localUser.name, MAX_USER_NAME_LENGTH);
     }
     else
     {
-        ImGui::Text("You are: %s", game->localUser.name);
+        ImGui::Text("You are: %s", localUser.name);
     }
     ImGui::Text("%.1fms", deltaTime*1000.0f);
 
+#ifdef VIDEO_ENABLED
     static int selectedCameraDevice = 0;
     if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
@@ -159,6 +131,7 @@ void renderGame(GameState* game, float deltaTime)
             }
         }
     }
+#endif
 
     static bool listening = false;
     static int selectedRecordingDevice = 0;
@@ -204,7 +177,7 @@ void renderGame(GameState* game, float deltaTime)
     }
 
     ImGui::Separator();
-    switch(game->connState)
+    switch(Network::CurrentConnectionState())
     {
         case NET_CONNSTATE_DISCONNECTED:
         {
@@ -213,19 +186,9 @@ void renderGame(GameState* game, float deltaTime)
             ImGui::InputText("##serverHostname", serverHostname, HOSTNAME_MAX_LENGTH);
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
-                game->localUser.nameLength = strlen(game->localUser.name);
+                localUser.nameLength = strlen(localUser.name);
 
-                game->connState = NET_CONNSTATE_CONNECTING;
-                ENetAddress peerAddr = {};
-                enet_address_set_host(&peerAddr, serverHostname);
-                peerAddr.port = NET_PORT;
-
-                game->netHost = enet_host_create(0, 1, 2, 0,0);
-                game->netPeer = enet_host_connect(game->netHost, &peerAddr, 2, 0);
-                if(!game->netHost)
-                {
-                    logFail("Unable to create client\n");
-                }
+                Network::ConnectToMasterServer(&serverHostname[0]);
             }
         } break;
 
@@ -236,15 +199,13 @@ void renderGame(GameState* game, float deltaTime)
 
         case NET_CONNSTATE_CONNECTED:
         {
-            ImGui::Text("Incoming: %.1fKB/s", netInput);
-            ImGui::Text("Outgoing: %.1fKB/s", netOutput);
-            ImGui::Text("Last Audio Sent/Received: %d/%d", game->lastSentAudioPacket, game->lastReceivedAudioPacket);
-            ImGui::Text("Last Video Sent/Received: %d/%d", game->lastSentVideoPacket, game->lastReceivedVideoPacket);
+            float netTotalIn = Network::TotalIncomingBytes()/1024.0f;
+            float netTotalOut = Network::TotalOutgoingBytes()/1024.0f;
+            ImGui::Text("Total Incoming: %.1fKB", netTotalIn);
+            ImGui::Text("Total Outgoing: %.1fKB", netTotalOut);
             if(ImGui::Button("Disconnect", ImVec2(80,20)))
             {
-                game->connState = NET_CONNSTATE_DISCONNECTED;
-                enet_peer_disconnect(game->netPeer, 0);
-                game->netPeer = 0;
+                Network::DisconnectFromMasterServer();
             }
         } break;
     }
@@ -275,7 +236,7 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::ProgressBar(rms, sizeArg, textOverlay);
     ImGui::End();
 
-    if(game->connState == NET_CONNSTATE_CONNECTED)
+    if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
     {
         UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize;
@@ -284,8 +245,8 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::SetWindowSize(ImVec2(150, 150));
         ImGui::Text("+");
         ImGui::SameLine();
-        ImGui::Text(game->localUser.name);
-        for(auto userIter=game->remoteUsers.begin(); userIter!=game->remoteUsers.end(); userIter++)
+        ImGui::Text(localUser.name);
+        for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
         {
             ClientUserData* user = *userIter;
             ImGui::Text("-");
@@ -298,18 +259,11 @@ void renderGame(GameState* game, float deltaTime)
 
 void cleanupGame(GameState* game)
 {
-    for(auto userIter=game->remoteUsers.begin(); userIter!=game->remoteUsers.end(); userIter++)
+    for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
         delete user;
     }
-#if 0
-    // TODO: Put this in user destructor
-    for(int i=0; i<MAX_USERS; i++)
-    {
-        glDeleteTextures(1, &game->remoteUsers[i]->videoTexture);
-    }
-#endif
 }
 
 void glfwErrorCallback(int errorCode, const char* errorDescription)
@@ -335,34 +289,23 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
         ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
 }
 
-void handleAudioInput(GameState& game)
+void broadcastAudioInput(GameState& game)
 {
-    if(game.micEnabled)
+    if(!game.micEnabled)
+        return;
+
+    int audioFrames = Audio::readAudioInputBuffer(micBufferLen, micBuffer);
+    if(Network::IsConnectedToMasterServer())
     {
-        int audioFrames = Audio::readAudioInputBuffer(micBufferLen, micBuffer);
-
-        if(game.connState == NET_CONNSTATE_CONNECTED)
+        for(int i=0; i<remoteUsers.size(); i++)
         {
-            int encodedBufferLength = micBufferLen;
-            uint8* encodedBuffer = new uint8[encodedBufferLength];
-            int audioBytes = Audio::encodePacket(audioFrames, micBuffer, game.localUser.audioSampleRate, encodedBufferLength, encodedBuffer);
-
-            Audio::NetworkAudioPacket audioPacket = {};
-            audioPacket.srcUser = game.localUser.ID;
-            audioPacket.index = game.lastSentAudioPacket++;
-            audioPacket.encodedDataLength = audioBytes;
-            memcpy(audioPacket.encodedData, encodedBuffer, audioBytes);
-
-            NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
-            audioPacket.serialize(outPacket);
-            outPacket.send(game.netPeer, 0, false);
-            //netOutBytes += outPacket->dataLength; // TODO
-
-            delete[] encodedBuffer;
+            ClientUserData* destinationUser = remoteUsers[i];
+            Audio::SendAudioToUser(destinationUser, audioFrames, micBuffer);
         }
     }
 }
 
+#ifdef VIDEO_ENABLED
 void handleVideoInput(GameState& game)
 {
     if(game.cameraEnabled)
@@ -380,13 +323,13 @@ void handleVideoInput(GameState& game)
                                             320*240*3, encPx);
             Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
-            glBindTexture(GL_TEXTURE_2D, game.cameraTexture);
+            glBindTexture(GL_TEXTURE_2D, game.localUser.videoTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                          cameraWidth, cameraHeight, 0,
                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
             glBindTexture(GL_TEXTURE_2D, 0);
 
-            if(game.connState == NET_CONNSTATE_CONNECTED)
+            if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
             {
                 static uint8* encodedPixels = new uint8[320*240*3];
                 int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
@@ -408,140 +351,7 @@ void handleVideoInput(GameState& game)
         }
     }
 }
-
-void handleNetworkPacketReceive(GameState& game, NetworkInPacket& incomingPacket)
-{
-    uint8 dataType;
-    incomingPacket.serializeuint8(dataType);
-    NetworkMessageType msgType = (NetworkMessageType)dataType;
-    logTerm("Received %llu bytes of type %d\n", incomingPacket.length, dataType);
-
-    switch(dataType)
-    {
-        // TODO: As mentioned elsewhere, we need to stop trusting network input
-        //       In particular we should check that the users being described
-        //       are now overriding others (which will also cause it to leak
-        //       the space allocated for the name)
-        // TODO: What happens if a user disconnects as we connect and we
-        //       only receive the init_data after the disconnect event?
-        case NET_MSGTYPE_USER_INIT:
-        {
-            NetworkUserInitPacket initPacket;
-            if(!initPacket.serialize(incomingPacket))
-                break;
-            // TODO: We should probably ignore these if we've already received one of them
-
-            logInfo("There are %d connected users\n", initPacket.userCount);
-            for(int i=0; i<initPacket.userCount; i++)
-            {
-                NetworkUserConnectPacket& userPacket = initPacket.existingUsers[i];
-                ClientUserData* newUser = new ClientUserData(userPacket);
-                // TODO: Move this into constructor (I don't really want to have to pass in a host)
-                newUser->netPeer = enet_host_connect(game.netHost, &userPacket.address, 1, 0);
-                game.remoteUsers.push_back(newUser);
-                logInfo("%s was already connected\n", userPacket.name);
-            }
-            game.connState = NET_CONNSTATE_CONNECTED;
-        } break;
-        case NET_MSGTYPE_USER_CONNECT:
-        {
-            NetworkUserConnectPacket connPacket;
-            if(!connPacket.serialize(incomingPacket))
-                break;
-
-            ClientUserData* newUser = new ClientUserData(connPacket);
-            // TODO: Move this into constructor (I don't really want to have to pass in a host)
-            newUser->netPeer = enet_host_connect(game.netHost, &connPacket.address, 1, 0);
-            game.remoteUsers.push_back(newUser);
-            logInfo("%s connected\n", connPacket.name);
-        } break;
-        case NET_MSGTYPE_USER_DISCONNECT:
-        {
-            // TODO: So for P2P we'll get these from the server AND we'll get enet DC events,
-            //       so do we need both? What if a user disconnects from ONE other user but not
-            //       the server/others? Surely they should not be considered to disconnect?
-            //       Does this ever happen even?
-            //       Also if we ever stop using enet and instead use our own thing (which we may
-            //       well do) then we won't necessarily get (dis)connection events, since we mostly
-            //       only need unreliable transport anyways.
-#if 0
-            logInfo("%s disconnected\n", sourceUser->name);
-            // TODO: We were previously crashing here sometimes - maybe because we're getting
-            //       a disconnect from a user that timed out before we connected (or something
-            //       like that)
-            // TODO: We're being generic here because we might change the remoteUsers datastructure
-            //       at some later point, we should probably come back and make this more optimized
-            auto userIter = game.remoteUsers.find(sourceUser);
-            if(userIter != game.remoteUsers.end())
-            {
-                game.remoteUsers.erase(userIter);
-                delete sourceUser;
-            }
-            else
-            {
-                logWarn("Received a disconnect from a previously disconnected user\n");
-            }
 #endif
-        } break;
-        case NET_MSGTYPE_AUDIO:
-        {
-
-            Audio::NetworkAudioPacket audioInPacket;
-            if(!audioInPacket.serialize(incomingPacket))
-                break;
-
-            ClientUserData* sourceUser = nullptr;
-            for(auto userIter=game.remoteUsers.begin();
-                     userIter!=game.remoteUsers.end();
-                     userIter++)
-            {
-                if(audioInPacket.srcUser == (*userIter)->ID)
-                {
-                    sourceUser = *userIter;
-                    break;
-                }
-            }
-            // TODO: Do something safer/more elegant here, else we can crash from malicious packets
-            //       In fact we probably want to have a serialize function for Users specifically,
-            //       not just UserIDs, since then we can quit if that fails and it will take into
-            //       account the situation in which the ID doesn't correspond to any users that we
-            //       know of
-            assert(sourceUser != nullptr);
-
-            sourceUser->processIncomingAudioPacket(audioInPacket);
-        } break;
-        case NET_MSGTYPE_VIDEO:
-        {
-            Video::NetworkVideoPacket videoInPacket;
-            if(!videoInPacket.serialize(incomingPacket))
-                break;
-
-            ClientUserData* sourceUser = nullptr;
-            for(auto userIter=game.remoteUsers.begin();
-                     userIter!=game.remoteUsers.end();
-                     userIter++)
-            {
-                if(videoInPacket.srcUser == (*userIter)->ID)
-                {
-                    sourceUser = *userIter;
-                    break;
-                }
-            }
-            // TODO: Do something safer/more elegant here, else we can crash from malicious packets
-            //       In fact we probably want to have a serialize function for Users specifically,
-            //       not just UserIDs, since then we can quit if that fails and it will take into
-            //       account the situation in which the ID doesn't correspond to any users that we
-            //       know of
-            assert(sourceUser != nullptr);
-
-            sourceUser->processIncomingVideoPacket(videoInPacket);
-        } break;
-        default:
-        {
-            logWarn("Received data of unknown type: %u\n", dataType);
-        } break;
-    }
-}
 
 int main()
 {
@@ -607,6 +417,7 @@ int main()
         return 1;
     }
 
+#ifdef VIDEO_ENABLED
     logInfo("Initializing video input subsystem...\n");
     if(!Video::Setup())
     {
@@ -616,11 +427,14 @@ int main()
         glfwTerminate();
         return 1;
     }
+#endif
 
-    if(enet_initialize() != 0)
+    if(!Network::Setup())
     {
         logFail("Unable to initialize enet!\n");
+#ifdef VIDEO_ENABLED
         Video::Shutdown();
+#endif
         Audio::Shutdown();
         Render::Shutdown();
         glfwTerminate();
@@ -650,78 +464,15 @@ int main()
         float deltaTime = (float)(newTime - currentTime);
         currentTime = newTime;
 
-        netInBytes = 0;
-        netOutBytes = 0;
-
         // Handle input
         glfwPollEvents();
 
         Audio::Update();
-        handleAudioInput(game);
+        broadcastAudioInput(game);
+#ifdef VIDEO_ENABLED
         handleVideoInput(game);
-
-        // Handle network events
-        ENetEvent netEvent;
-        int serviceResult = 0;
-        while(game.netHost && ((serviceResult = enet_host_service(game.netHost, &netEvent, 0)) > 0))
-        {
-            switch(netEvent.type)
-            {
-                case ENET_EVENT_TYPE_CONNECT:
-                {
-                    logInfo("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                    if(netEvent.peer == game.netPeer)
-                    {
-                        logInfo("Connected to the server\n");
-                        NetworkUserSetupPacket setupPkt = {};
-                        setupPkt.userID = game.localUser.ID;
-                        setupPkt.nameLength = game.localUser.nameLength;
-                        strcpy(setupPkt.name, game.localUser.name);
-
-                        NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_USER_SETUP);
-                        setupPkt.serialize(outPacket);
-                        outPacket.send(game.netPeer, 0, true);
-                    }
-                } break;
-
-                case ENET_EVENT_TYPE_RECEIVE:
-                {
-                    NetworkInPacket incomingPacket;
-                    incomingPacket.length = netEvent.packet->dataLength;
-                    incomingPacket.contents = netEvent.packet->data;
-                    incomingPacket.currentPosition = 0;
-
-                    netInBytes += incomingPacket.length;
-                    handleNetworkPacketReceive(game, incomingPacket);
-
-                    enet_packet_destroy(netEvent.packet);
-                } break;
-
-                case ENET_EVENT_TYPE_DISCONNECT:
-                {
-                    // TODO
-#if 0
-                    // TODO: As with the todo on the clear() line below, this was written with
-                    //       client-server in mind, for P2P we just clean up the DC'd user and
-                    //       then clean up all users if we decide to DC ourselves
-                    logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                    for(auto userIter=game.remoteUsers.begin(); userIter!=game.remoteUsers.end(); userIter++)
-                    {
-                        delete *userIter;
-                    }
-                    game.remoteUsers.clear(); // TODO: This is wrong for P2P
 #endif
-                } break;
-            }
-        }
-        if(serviceResult < 0)
-        {
-            logWarn("ENET service error\n");
-        }
-
-        float netT = 0.8f;
-        netInput = netT*netInput + (1.0f - netT)*((float)netInBytes*(float)tickRate*(1.0f/1024.0f));
-        netOutput = netT*netOutput + (1.0f - netT)*((float)netOutBytes*(float)tickRate*(1.0f/1024.0f));
+        Network::Update();
 
         // Rendering
         ImGui_ImplGlfwGL3_NewFrame();
@@ -741,19 +492,15 @@ int main()
         }
     }
 
-    logInfo("Stop running, begin deinitialization\n");
-    if(game.netPeer)
-    {
-        enet_peer_disconnect_now(game.netPeer, 0);
-    }
+    logInfo("Stop running, begin shutdown\n");
 
     delete[] micBuffer;
     cleanupGame(&game);
 
-    logInfo("Deinitialize enet\n");
-    enet_deinitialize();
-
+    Network::Shutdown();
+#ifdef VIDEO_ENABLED
     Video::Shutdown();
+#endif
     Audio::Shutdown();
     ImGui_ImplGlfwGL3_Shutdown();
     Render::Shutdown();

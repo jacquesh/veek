@@ -1,15 +1,17 @@
 #include "assert.h"
 
+#include "audio.h"
 #include "common.h"
 #include "logging.h"
+#include "network.h"
+#include "render.h"
 #include "user.h"
 #include "user_client.h"
 
-static uint32 micBufferLen = 2400; // TODO: Make this a constant in audio.h or something
+ClientUserData localUser;
+std::vector<ClientUserData*> remoteUsers;
 
-ClientUserData::ClientUserData()
-{
-}
+static uint32 micBufferLen = 2400; // TODO: Make this a constant in audio.h or something
 
 ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
 {
@@ -18,6 +20,17 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     memcpy(this->name, connectionPacket.name, connectionPacket.nameLength);
     this->name[connectionPacket.nameLength] = 0;
 }
+
+void ClientUserData::Initialize()
+{
+    videoTexture = Render::createTexture();
+}
+
+ClientUserData::~ClientUserData()
+{
+    glDeleteTextures(1, &videoTexture);
+}
+
 
 void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
 {
@@ -31,12 +44,12 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
         }
         this->lastReceivedAudioPacket = packet.index;
         float* decodedAudio = new float[micBufferLen];
-        int decodedFrames = Audio::decodePacket(this->decoder,
+        int decodedFrames = Audio::decodePacket(this->audio.decoder,
                                                 packet.encodedDataLength, packet.encodedData+1,
-                                                micBufferLen, decodedAudio, this->audioSampleRate);
+                                                micBufferLen, decodedAudio, this->audio.sampleRate);
         logTerm("Received %d samples\n", decodedFrames);
-        assert(decodedFrames <= this->audioBuffer->free());
-        this->audioBuffer->write(decodedFrames, decodedAudio);
+        assert(decodedFrames <= this->audio.buffer->free());
+        this->audio.buffer->write(decodedFrames, decodedAudio);
         delete[] decodedAudio;
     }
     else
@@ -47,6 +60,7 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)
 {
+#ifdef VIDEO_ENABLED
     if(((packet.index < 20) && (this->lastReceivedVideoPacket > 235)) ||
             (this->lastReceivedVideoPacket < packet.index))
     {
@@ -72,4 +86,7 @@ void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packe
     {
         logWarn("Video packet %d received out of order\n", packet.index);
     }
+#else
+    logWarn("Attempting to call a video-related function without video enabled, define VIDEO_ENABLED\n");
+#endif
 }
