@@ -3,6 +3,8 @@
 
 #include "common.h"
 
+// TODO: Docs, what do these functions return?
+
 struct Mutex;
 Mutex* createMutex();
 void destroyMutex(Mutex* mutex);

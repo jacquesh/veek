@@ -60,7 +60,7 @@ struct NetworkOutPacket
 
     bool serializestring(char* value, uint16 bufferLen);
 
-    void send(ENetPeer* peer, uint8 channelID, bool isReliable);
+    void send(ENetPeer* peer, uint8 channelID, bool isReliable); // TODO: Do we even need channels? If so then we should probably pick some channel constants
 };
 
 NetworkOutPacket createNetworkOutPacket(NetworkMessageType msgType);

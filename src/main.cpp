@@ -307,7 +307,6 @@ void cleanupGame(GameState* game)
     // TODO: Put this in user destructor
     for(int i=0; i<MAX_USERS; i++)
     {
-        // TODO: Could probably just delete users[0].videoTexture with MAX_USERS
         glDeleteTextures(1, &game->remoteUsers[i]->videoTexture);
     }
 #endif

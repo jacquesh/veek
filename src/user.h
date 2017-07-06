@@ -63,19 +63,12 @@ struct NetworkUserDisconnectPacket
     template<typename Packet> bool serialize(Packet& packet);
 };
 
-
-// TODO: Have a ClientUserData and a ServerUserData, each of which contain UserData.
-//       That way we can only put the common bits in UserData and for example we then won't need
-//       to store pointers to OpusDecoders or RingBuffers on the server
 struct UserData
 {
-    // Identification stuff
     UserIdentifier ID;
-
     int nameLength;
     char name[MAX_USER_NAME_LENGTH+1];
 
-    // Network stuff
     ENetPeer* netPeer;
 };
 
