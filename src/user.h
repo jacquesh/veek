@@ -8,13 +8,7 @@
 
 struct UserData; // TODO: We forward-declare this here so we can use it for constructors of packets, probably not ideal
 
-struct UserIdentifier
-{
-    uint8 value;
-
-    bool operator==(const UserIdentifier& other);
-    template<typename Packet> bool serialize(Packet& packet);
-};
+typedef uint8_t UserIdentifier;
 
 // Client -> Server
 // Sent as a first message when/after connecting to the server

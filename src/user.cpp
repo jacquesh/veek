@@ -8,25 +8,10 @@
 #include "network.h"
 
 
-bool UserIdentifier::operator ==(const UserIdentifier& other)
-{
-    return this->value == other.value;
-}
-
-template<typename Packet>
-bool UserIdentifier::serialize(Packet& packet)
-{
-    packet.serializeuint8(this->value);
-    return true;
-}
-template bool UserIdentifier::serialize(NetworkInPacket& packet);
-template bool UserIdentifier::serialize(NetworkOutPacket& packet);
-
 template<typename Packet>
 bool NetworkUserSetupPacket::serialize(Packet& packet)
 {
-    if(!userID.serialize(packet))
-        return false;
+    packet.serializeuint8(this->userID);
     packet.serializeuint8(this->nameLength);
     packet.serializestring(this->name, MAX_USER_NAME_LENGTH);
 
@@ -47,9 +32,7 @@ void NetworkUserConnectPacket::populate(UserData& user)
 template<typename Packet>
 bool NetworkUserConnectPacket::serialize(Packet& packet)
 {
-    if(!this->userID.serialize(packet))
-        return false;
-
+    packet.serializeuint8(this->userID);
     packet.serializeuint32(this->address.host);
     packet.serializeuint16(this->address.port);
 
@@ -78,8 +61,7 @@ template bool NetworkUserInitPacket::serialize(NetworkOutPacket& packet);
 template<typename Packet>
 bool NetworkUserDisconnectPacket::serialize(Packet& packet)
 {
-    if(!this->userID.serialize(packet))
-        return false;
+    packet.serializeuint8(this->userID);
     return true;
 }
 template bool NetworkUserDisconnectPacket::serialize(NetworkInPacket& packet);
