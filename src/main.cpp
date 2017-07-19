@@ -34,10 +34,20 @@ const int cameraHeight = 240;
 //       - wxWidgets
 //       - Qt (pls no....maybe?)
 
+enum class MicActivationMode
+{
+    Always = 0,
+    PushToTalk,
+    Automatic
+};
+
 struct GameState
 {
     bool cameraEnabled;
     bool micEnabled;
+
+    MicActivationMode micActivationMode;
+    bool micActive;
 };
 
 const int HOSTNAME_MAX_LENGTH = 26;
@@ -56,6 +66,8 @@ void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
     game->micEnabled = Audio::enableMicrophone(true);
+    game->micActivationMode = MicActivationMode::Always;
+    game->micActive = true;
 
     getCurrentUserName(MAX_USER_NAME_LENGTH, localUser.name);
     localUser.Initialize();
@@ -98,7 +110,7 @@ void renderGame(GameState* game, float deltaTime)
     {
         ImGui::Text("You are: %s", localUser.name);
     }
-    ImGui::Text("%.1fms", deltaTime*1000.0f);
+    ImGui::Text("%.1ffps", 1.0f/deltaTime);
 
 #ifdef VIDEO_ENABLED
     static int selectedCameraDevice = 0;
@@ -141,6 +153,26 @@ void renderGame(GameState* game, float deltaTime)
         if(micToggled)
         {
             game->micEnabled = Audio::enableMicrophone(game->micEnabled);
+        }
+
+        const char* micModeNames[3] = {"Always", "Push to Talk", "Automatic"};
+        bool micModeChanged = ImGui::Combo("Mic Activation Mode",
+                                           (int*)&game->micActivationMode,
+                                           &micModeNames[0],
+                                           3);
+        if(micModeChanged)
+        {
+            switch(game->micActivationMode)
+            {
+                case MicActivationMode::Always:
+                    game->micActive = true;
+                    break;
+                case MicActivationMode::PushToTalk:
+                case MicActivationMode::Automatic:
+                    game->micActive = false;
+                    break;
+            }
+            logInfo("Set audio input activation mode to: %s\n", micModeNames[(int)game->micActivationMode]);
         }
 
         bool micChanged = ImGui::Combo("Recording Device",
@@ -222,17 +254,18 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::Begin("Stats", 0, UIFlags);
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
-    const char* textOverlay = 0;
     ImVec2 sizeArg(-1, 0);
 
-    float rms = 0.0f;
-    for(uint32 i=0; i<micBufferLen; ++i)
+    float rms = Audio::ComputeRMS(micBuffer);
+    ImVec4 volumeColor = {0.13f, 0.82f, 0.46f, 1.0f};
+    if(game->micActive)
     {
-        rms += micBuffer[i]*micBuffer[i];
+        volumeColor = {0.82f, 0.13f, 0.46f, 1.0f};
     }
-    rms /= micBufferLen;
-    rms = sqrtf(rms);
-    ImGui::ProgressBar(rms, sizeArg, textOverlay);
+    ImGui::Text("Mic Volume");
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, volumeColor);
+    ImGui::ProgressBar(rms, sizeArg, nullptr);
+    ImGui::PopStyleColor();
     ImGui::End();
 
     if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
@@ -294,6 +327,25 @@ void handleAudioInput(GameState& game)
         return;
 
     Audio::readAudioInputBuffer(micBuffer);
+    float rms = Audio::ComputeRMS(micBuffer);
+    switch(game.micActivationMode)
+    {
+        case MicActivationMode::Always:
+            break; // Active is already true
+
+        case MicActivationMode::PushToTalk:
+            game.micActive = isPushToTalkKeyPushed();
+            break;
+
+        case MicActivationMode::Automatic:
+            game.micActive = (rms >= 0.1f);
+            break;
+
+        default:
+            logWarn("Unrecognized audio input activation mode: %d\n", game.micActivationMode);
+    }
+
+    if(game.micActive && Network::IsConnectedToMasterServer())
     {
         for(int i=0; i<remoteUsers.size(); i++)
         {
