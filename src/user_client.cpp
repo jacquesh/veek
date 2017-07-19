@@ -25,6 +25,7 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
 void ClientUserData::Initialize()
 {
     videoTexture = Render::createTexture();
+    localUser.ID = (uint8_t)(1 + (getClockValue() & 0xFE));
 }
 
 ClientUserData::~ClientUserData()

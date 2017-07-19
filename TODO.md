@@ -1,5 +1,5 @@
 - Latest bugs:
-    - If you connect to the server, disconnect, and then reconnect again, the server crashes
+    - If you connect to the server, disconnect, and then reconnect again, the server crashes (sometimes)
     - We currently ignore any and all disconnect messages
 
 - Pre-video things:

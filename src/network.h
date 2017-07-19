@@ -8,6 +8,8 @@
 const int NET_PORT = 12345;
 
 // NOTE: Interesting reading i.t.o network architecture (for auth/etc): https://core.telegram.org/mtproto
+// Secure client-server protocol: https://github.com/networkprotocol/netcode.io
+// Simple UDP reliability protocol: https://github.com/networkprotocol/reliable.io
 
 enum NetConnectionState
 {
