@@ -19,6 +19,15 @@ namespace Audio
 {
     const int32 NETWORK_SAMPLE_RATE = 48000;
 
+    struct AudioBuffer
+    {
+        float* Data;
+        int Capacity;
+        int Length;
+
+        int SampleRate;
+    };
+
     struct NetworkAudioPacket
     {
         UserIdentifier srcUser;
@@ -27,13 +36,6 @@ namespace Audio
         uint8 encodedData[2400]; // TODO: Sizing (currently =2400=micBufferLen from main.cpp)
 
         template<typename Packet> bool serialize(Packet& packet);
-    };
-
-    struct UserAudioData
-    {
-        int32 sampleRate;
-        OpusDecoder* decoder;
-        RingBuffer* buffer;
     };
 
     bool Setup();
@@ -57,14 +59,22 @@ namespace Audio
      */
     bool enableMicrophone(bool enabled);
 
-    void SendAudioToUser(ClientUserData* user, int sourceLength, float* sourceBuffer);
+    void AddAudioUser(UserIdentifier userId);
+    void RemoveAudioUser(UserIdentifier userId);
 
-    // TODO: It might be better to take the encoder here, as with decodePacket
-    int encodePacket(int sourceLength, float* sourceBuffer, int sourceSampleRate, int targetLength, uint8_t* targetBuffer);
-    int decodePacket(OpusDecoder* decoder, int sourceLength, uint8_t* sourceBuffer, int targetLength, float* targetBuffer, int targetSampleRate);
+    void ProcessIncomingPacket(NetworkAudioPacket& packet);
 
+    void SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer);
+
+    int encodePacket(AudioBuffer& sourceBuffer, int targetLength, uint8_t* targetBufferPtr);
+    void decodePacket(OpusDecoder* decoder, int sourceLength, uint8_t* sourceBuffer, AudioBuffer& targetAudioBuffer);
+
+    // TODO: Maybe return true/false to indicate if the buffer was large enough?
     // Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
-    int readAudioInputBuffer(int bufferLength, float* buffer);
+    void readAudioInputBuffer(AudioBuffer& buffer);
+
+    // Returns the root-mean-square amplitude of the samples in buffer.
+    float ComputeRMS(AudioBuffer& buffer);
 
     void writeAudioToFile(int length, uint8_t* data);
 

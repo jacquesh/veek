@@ -15,8 +15,6 @@
 
 struct ClientUserData : UserData
 {
-    Audio::UserAudioData audio;
-
     // Video
     GLuint videoTexture;
 

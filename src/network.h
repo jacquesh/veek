@@ -18,6 +18,7 @@ enum NetConnectionState
 
 enum NetworkMessageType : uint8
 {
+    NET_MSGTYPE_UNKNOWN,
     NET_MSGTYPE_AUDIO,
     NET_MSGTYPE_VIDEO,
     NET_MSGTYPE_USER_SETUP,
@@ -41,6 +42,7 @@ struct NetworkInPacket
     bool serializefloat(float& value);
 
     bool serializestring(char* value, uint16 bufferLen);
+    bool serializebytes(uint8_t* data, uint16_t length);
 };
 
 struct NetworkOutPacket
@@ -59,27 +61,14 @@ struct NetworkOutPacket
     bool serializefloat(float& value);
 
     bool serializestring(char* value, uint16 bufferLen);
+    bool serializebytes(uint8_t* data, uint16_t dataLength);
 
     void send(ENetPeer* peer, uint8 channelID, bool isReliable); // TODO: Do we even need channels? If so then we should probably pick some channel constants
 };
 
 NetworkOutPacket createNetworkOutPacket(NetworkMessageType msgType);
 
-namespace Network
-{
-    uint64_t TotalIncomingBytes();
-    uint64_t TotalOutgoingBytes();
-
-    NetConnectionState CurrentConnectionState();
-    bool IsConnectedToMasterServer();
-
-    bool Setup();
-    void Update();
-    void Shutdown();
-
-    void ConnectToMasterServer(const char* serverHostname);
-    ClientUserData* ConnectToPeer(NetworkUserConnectPacket& userPacket);
-    void DisconnectFromMasterServer();
-}
+uint64_t TotalNetworkIncomingBytes();
+uint64_t TotalNetworkOutgoingBytes();
 
 #endif

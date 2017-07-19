@@ -2,11 +2,13 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include <unordered_map>
 
 #include "soundio/soundio.h"
 #include "opus/opus.h"
 
 #include "audio.h"
+#include "audio_resample.h"
 #include "common.h"
 #include "logging.h"
 #include "math_utils.h"
@@ -35,6 +37,16 @@ struct AudioData
     int currentOutputDevice;
 
     bool isListeningToInput;
+    ResampleStreamContext inputListenResampler;
+};
+
+struct UserAudioData
+{
+    uint8_t lastReceivedPacketIndex;
+
+    int32 sampleRate;
+    OpusDecoder* decoder;
+    RingBuffer* buffer;
 };
 
 static AudioData audioState = {};
@@ -52,6 +64,8 @@ static SoundIoOutStream* outStream = 0;
 static UnorderedList<AudioSource> sourceList(10); // TODO: Pick a correct max value here, 8 users + test sound + listening? I dunno
 
 static RingBuffer* listenBuffer;
+
+static std::unordered_map<UserIdentifier, UserAudioData> audioUsers;
 
 static void printDevice(SoundIoDevice* device, bool isDefault)
 {
@@ -82,58 +96,10 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
     }
 }
 
-static void resampleBuffer(int inSampleRate, int inBufferLen, float* inBuffer,
-                           int outSampleRate, int outBufferLen, float* outBuffer)
-{
-    assert(inBufferLen > 0);
-    assert(outBufferLen > 0);
-    outBuffer[0] = inBuffer[0];
-
-    float inTimePerSample = 1.0f/(float)inSampleRate;
-    float outTimePerSample = 1.0f/(float)outSampleRate;
-
-    // TODO: Apparently its a good idea to lowpass filter the output here
-    //       We can achieve that with a simple averaging
-    int inIndex = 1;
-    int outIndex = 1;
-    float timeTillNextInSample = inTimePerSample;
-    float timeTillNextOutSample = outTimePerSample;
-    while((inIndex < inBufferLen) && (outIndex < outBufferLen))
-    {
-        float advanceTime = minf(timeTillNextInSample, timeTillNextOutSample);
-        timeTillNextInSample -= advanceTime;
-        timeTillNextOutSample -= advanceTime;
-
-        if(timeTillNextInSample <= 0.0f)
-        {
-            timeTillNextInSample += inTimePerSample;
-            inIndex++;
-        }
-        if(timeTillNextOutSample <= 0.0f)
-        {
-            timeTillNextOutSample += outTimePerSample;
-            float previousInSample = inBuffer[inIndex-1];
-            float nextInSample = inBuffer[inIndex];
-            float lerpFactor = 1.0f - (timeTillNextInSample/inTimePerSample);
-            outBuffer[outIndex] = lerp(previousInSample, nextInSample, lerpFactor);
-            outIndex++;
-        }
-    }
-
-    // NOTE: If the inBuffer is shorter than the outBuffer, we just fill the rest of the
-    //       outBuffer with silence
-    while(outIndex < outBufferLen)
-    {
-        outBuffer[outIndex++] = 0.0f;
-    }
-}
-
 static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
     // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
     //       get an error during initialization since we specifically ask for MONO
-    int channelCount = stream->layout.channel_count;
-
     // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
@@ -153,19 +119,27 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
 
         for(int frame=0; frame<frameCount; ++frame)
         {
-            // NOTE: We assume here that our input stream is MONO, see assertions above
+            // NOTE: We assume here that our input stream is MONO
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
             inBuffer->write(1, &val);
 
+#if 0
             if(audioState.isListeningToInput)
             {
-                listenBuffer->write(1, &val);
+                float newOutSamples[2];
+                int newOutSampleCount = resampleStream(audioState.inputListenResampler,
+                                                       val, &newOutSamples[0], 2);
+                listenBuffer->write(newOutSampleCount, &newOutSamples[0]);
             }
+#endif
         }
 
-        soundio_instream_end_read(stream);
+        if(frameCount > 0)
+        {
+            soundio_instream_end_read(stream);
+        }
         framesRemaining -= frameCount;
     }
 }
@@ -195,6 +169,23 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
         {
             // TODO: Proper audio mixing. Reading: http://www.voegler.eu/pub/audio/digital-audio-mixing-and-normalization.html
             float val = 0.0f;
+            if(audioState.isListeningToInput)
+                listenBuffer->read(1, &val);
+#if 0
+            for(auto userKV : audioUsers)
+            {
+                if(userKV.second.buffer->count() != 0)
+                {
+                    logTerm("Callback samples for user %d: %d\n", userKV.first, userKV.second.buffer->count());
+                }
+                if(userKV.second.buffer->count() > 0)
+                {
+                    float temp;
+                    userKV.second.buffer->read(1, &temp);
+                    val += temp;
+                }
+            }
+#endif
             for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
             {
                 if(sourceList[sourceIndex].buffer->count() > 0)
@@ -250,33 +241,76 @@ void Audio::PlayTestSound()
     AudioSource sampleSource = {};
     sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
 
+    float* tempbuffer = new float[sampleSoundSampleCount];
     float twopi = 2.0f*3.1415927f;
     float frequency = 261.6f; // Middle C
     float timestep = 1.0f/(float)outStream->sample_rate;
     float sampleTime = 0.0f;
     for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
     {
-        float sinVal = sinf(frequency*twopi*sampleTime);
-        sampleSource.buffer->write(1, &sinVal);
+        float sinVal = 0.0f;
+        for(int i=0; i<4; i++)
+        {
+            sinVal += ((5-i)/(5.0f))*sinf(((1 << i)*frequency)*twopi*sampleTime);
+        }
+        //sampleSource.buffer->write(1, &sinVal);
+        tempbuffer[sampleIndex] = sinVal;
         sampleTime += timestep;
     }
+
+    int32 opusError;
+    int32 channels = 1;
+    UserAudioData newUser = {};
+    OpusDecoder* decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
+    if(opusError != OPUS_OK)
+    {
+        logWarn("Failed to create Opus decoder: %d\n", opusError);
+    }
+
+    AudioBuffer sampleBuffer = {};
+    sampleBuffer.Capacity = sampleSoundSampleCount;
+    sampleBuffer.Length = sampleBuffer.Capacity;
+    sampleBuffer.SampleRate = outStream->sample_rate;
+    sampleBuffer.Data = tempbuffer;
+    AudioBuffer outputBuffer = {};
+    outputBuffer.Capacity = sampleSoundSampleCount;
+    outputBuffer.Length = 0;
+    outputBuffer.SampleRate = outStream->sample_rate;
+    outputBuffer.Data = new float[sampleSoundSampleCount];
+
+    int encSize = 1 << 16;
+    uint8_t* encodedData = new uint8_t[encSize];
+    int encodedLength = encodePacket(sampleBuffer, encSize, encodedData);
+    decodePacket(decoder, encodedLength, encodedData, outputBuffer);
+    delete[] encodedData;
+
+    sampleSource.buffer->write(outputBuffer.Length, outputBuffer.Data);
     sourceList.insert(sampleSource);
     // TODO: This needs to be removed from the list of sources when it's finished playing
+
+    delete[] outputBuffer.Data;
+    opus_decoder_destroy(decoder);
 }
 
-int Audio::decodePacket(OpusDecoder* decoder,
-                        int sourceLength, uint8_t* sourceBufferPtr,
-                        int targetLength, float* targetBufferPtr, int32 targetSampleRate)
+void Audio::decodePacket(OpusDecoder* decoder,
+                         int sourceLength, uint8_t* sourceBufferPtr,
+                         AudioBuffer& targetAudioBuffer)
 {
     int frameSize = 240;
     uint8_t* sourceBuffer = sourceBufferPtr;
-    float* targetBuffer = targetBufferPtr;
+    float* targetBuffer = targetAudioBuffer.Data;
     int sourceLengthRemaining = sourceLength;
-    int targetLengthRemaining = targetLength;
+    int targetLengthRemaining = targetAudioBuffer.Capacity;
 
     while((sourceLengthRemaining >= sizeof(int)) && (targetLengthRemaining >= frameSize))
     {
         int packetLength = *((int*)sourceBuffer); // TODO: Byte order checking/swapping
+        static bool printLen = true;
+        if(printLen)
+        {
+            logInfo("Decode packet with length %d\n", packetLength);
+            printLen = false;
+        }
 
         int correctErrors = 0; // TODO
         int framesDecoded = opus_decode_float(decoder,
@@ -295,32 +329,34 @@ int Audio::decodePacket(OpusDecoder* decoder,
         targetBuffer += framesDecoded;
     }
 
-    if(targetSampleRate != NETWORK_SAMPLE_RATE)
+    if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
         // TODO: Resample
         //resampleBuffer(inSampleRate, sourceBufferLength, sourceBufferPtr, outSampleRate, targetBufferLength, targetBufferPtr);
+        logWarn("We should be resampling from %d to %d, but we arent!\n", NETWORK_SAMPLE_RATE, targetAudioBuffer.SampleRate);
     }
 
-    int framesWritten = targetLength - targetLengthRemaining;
-    return framesWritten;
+    int framesWritten = targetAudioBuffer.Capacity - targetLengthRemaining;
+    targetAudioBuffer.Length = framesWritten;
 }
 
-int Audio::encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSampleRate,
+int Audio::encodePacket(AudioBuffer& sourceBuffer,
                         int targetLength, uint8_t* targetBufferPtr)
 {
-    if(sourceSampleRate != NETWORK_SAMPLE_RATE)
+    if(sourceBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
-
         // TODO: Resample
+        logWarn("We should be resampling from %d to %d, but we arent!\n",
+                sourceBuffer.SampleRate, NETWORK_SAMPLE_RATE);
     }
 
     // TODO: Opus can only create packets from a given set of sample counts, we should probably
     //       try support other packet sizes (is larger better? can it be dynamic? are we always
     //       going to have a sample rate of 48k? etc)
     int frameSize = 240;
-    float* sourceBuffer = sourceBufferPtr;
-    uint8_t* targetBuffer = targetBufferPtr;
-    int sourceLengthRemaining = sourceLength;
+    float* sourceData = sourceBuffer.Data;
+    uint8_t* targetData = targetBufferPtr;
+    int sourceLengthRemaining = sourceBuffer.Length;
     int targetLengthRemaining = targetLength;
 
     // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
@@ -328,9 +364,15 @@ int Audio::encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSa
     {
         // TODO: Multiple channels, this currently assumes a single channel
         int packetLength = opus_encode_float(encoder,
-                                             sourceBuffer, frameSize,
-                                             targetBuffer+4, targetLengthRemaining);
-        *((int*)targetBuffer) = packetLength; // TODO: Byte order checking/swapping
+                                             sourceData, frameSize,
+                                             targetData+4, targetLengthRemaining);
+        *((int*)targetData) = packetLength; // TODO: Byte order checking/swapping
+        static bool printLen = true;
+        if(printLen)
+        {
+            logInfo("Encode packet with length %d\n", packetLength);
+            printLen = false;
+        }
         if(packetLength < 0)
         {
             logWarn("Error encoding audio. Error code %d\n", packetLength);
@@ -338,51 +380,127 @@ int Audio::encodePacket(int sourceLength, float* sourceBufferPtr, int32 sourceSa
         }
 
         sourceLengthRemaining -= frameSize;
-        sourceBuffer += frameSize;
+        sourceData += frameSize;
         targetLengthRemaining -= packetLength+4;
-        targetBuffer += packetLength+4;
+        targetData += packetLength+4;
     }
 
     int bytesWritten = targetLength - targetLengthRemaining;
     return bytesWritten;
 }
 
-/*
-TODO:
-void Audio::initUserAudio(ClientUserData& user)
+void Audio::AddAudioUser(UserIdentifier userId)
 {
+    logInfo("Added audio user with ID: %d\n", userId);
     int32 opusError;
     int32 channels = 1;
-    user.decoder = opus_decoder_create(user.audioSampleRate, channels, &opusError);
+    UserAudioData newUser = {};
+    // TODO: Don't create the decoder here, create it when we receive a packet and we know what the sample rate is
+    newUser.decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
     logInfo("Opus decoder created: %d\n", opusError);
 
-    user.audioBuffer = new RingBuffer(8192);
+    newUser.buffer = new RingBuffer(8192);
 
     AudioSource userSource = {};
-    userSource.buffer = user.audioBuffer;
+    userSource.buffer = newUser.buffer;
     sourceList.insert(userSource);
+
+    audioUsers[userId] = newUser;
 }
 
-void Audio::deinitUserAudio(ClientUserData& user)
+void Audio::RemoveAudioUser(UserIdentifier userId)
 {
-    opus_decoder_destroy(user.decoder);
-    user.decoder = nullptr;
-}
-*/
+    auto oldUserIter = audioUsers.find(userId);
+    if(oldUserIter == audioUsers.end())
+        return;
 
-int Audio::readAudioInputBuffer(int targetBufferLength, float* targetBufferPtr)
+    UserAudioData& oldUser = oldUserIter->second;
+    if(oldUser.decoder)
+    {
+        opus_decoder_destroy(oldUser.decoder);
+    }
+    audioUsers.erase(userId);
+}
+
+void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
+{
+    auto srcUserIter = audioUsers.find(packet.srcUser);
+    if(srcUserIter == audioUsers.end())
+    {
+        logWarn("Received an audio packet from unknown user ID %d\n", packet.srcUser);
+       return;
+    }
+
+    UserAudioData& srcUser = srcUserIter->second;
+    if(srcUser.lastReceivedPacketIndex + 1 != packet.index)
+    {
+        logWarn("Dropped audio packets %d to %d (inclusive)\n",
+                srcUser.lastReceivedPacketIndex+1, packet.index-1);
+    }
+    srcUser.lastReceivedPacketIndex = packet.index;
+
+    AudioBuffer tempBuffer = {};
+    tempBuffer.Capacity = 2400;
+    tempBuffer.Data = new float[tempBuffer.Capacity];
+    tempBuffer.SampleRate = NETWORK_SAMPLE_RATE; // TODO: srcUser.sampleRate
+
+    decodePacket(srcUser.decoder,
+                 packet.encodedDataLength, packet.encodedData,
+                 tempBuffer);
+    logTerm("Received %d samples\n", tempBuffer.Length);
+    assert(tempBuffer.Length <= srcUser.buffer->free()); // TODO: This is probably not a sensible assert? We don't want this to happen but if it does we don't want to crash.
+    srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
+    logTerm("New sample count for user %d: %d\n", packet.srcUser, srcUser.buffer->count());
+    delete[] tempBuffer.Data;
+}
+
+void Audio::readAudioInputBuffer(AudioBuffer& buffer)
 {
     // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
     //       to be a single sample from a single channel, but its important to note that that is what
     //       we're currently doing
-    int samplesToWrite = targetBufferLength;
+    int samplesToWrite = buffer.Capacity;
     int samplesAvailable = inBuffer->count();
     if(samplesAvailable < samplesToWrite)
         samplesToWrite = samplesAvailable;
 
-    inBuffer->read(samplesToWrite, targetBufferPtr);
+    inBuffer->read(samplesToWrite, buffer.Data);
+    buffer.Length = samplesToWrite;
+    buffer.SampleRate = inDevice->sample_rate_current;
 
-    return samplesToWrite;
+
+#if 1
+    if(audioState.isListeningToInput)
+    {
+#if 0
+        Audio::AudioBuffer resampledBuffer = {};
+        resampledBuffer.Capacity = 1024*1024;
+        resampledBuffer.Data = new float[resampledBuffer.Capacity];
+        resampledBuffer.SampleRate = 48000;
+        resampleBuffer(buffer, resampledBuffer);
+#endif
+        Audio::AudioBuffer& resampledBuffer = buffer;
+        listenBuffer->write(resampledBuffer.Length, resampledBuffer.Data);
+
+        int32_t opusError;
+        static uint8_t opusData[2400];
+        static OpusDecoder* opusDec = opus_decoder_create(48000, 1, &opusError);
+        Audio::AudioBuffer testBuffer = {};
+        testBuffer.Capacity = 2400;
+        testBuffer.Data = new float[2400];
+        testBuffer.SampleRate = 48000;
+
+        int opusLen = Audio::encodePacket(resampledBuffer, 2400, &opusData[0]);
+        Audio::decodePacket(opusDec, opusLen, &opusData[0], testBuffer);
+        if(testBuffer.Length != resampledBuffer.Length)
+        {
+            logWarn("Audio buffer length modified by Opus: Encoded %d samples. Decoded %d samples\n", resampledBuffer.Length, testBuffer.Length);
+        }
+        //listenBuffer->write(testBuffer.Length, testBuffer.Data);
+
+        delete[] resampledBuffer.Data;
+    }
+#endif
 }
 
 bool Audio::enableMicrophone(bool enabled)
@@ -421,7 +539,7 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     inStream->read_callback = inReadCallback;
     inStream->overflow_callback = inOverflowCallback;
     inStream->error_callback = inErrorCallback;
-    inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, 44100);
+    inStream->sample_rate = soundio_device_nearest_sample_rate(inDevice, NETWORK_SAMPLE_RATE);
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = inDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
@@ -462,6 +580,9 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     logInfo("  Latency: %0.8f\n", inStream->software_latency);
     logInfo("  Layout: %s\n", inStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(inStream->format));
+
+    audioState.inputListenResampler.InputSampleRate = inStream->sample_rate;
+
     return true;
 }
 
@@ -479,7 +600,7 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     outStream->write_callback = outWriteCallback;
     outStream->underflow_callback = outUnderflowCallback;
     outStream->error_callback = outErrorCallback;
-    outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, 44100);
+    outStream->sample_rate = soundio_device_nearest_sample_rate(outDevice, NETWORK_SAMPLE_RATE);
     outStream->format = SoundIoFormatFloat32NE;
     outStream->layout = outDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
@@ -520,11 +641,7 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     logInfo("  Layout: %s\n", outStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
-    // TODO: We need to clean up the old listenSource
-    AudioSource listenSource = {};
-    listenBuffer = new RingBuffer(1 << 13);
-    listenSource.buffer = listenBuffer;
-    sourceList.insert(listenSource);
+    audioState.inputListenResampler.OutputSampleRate = outStream->sample_rate;
 
     return true;
 }
@@ -777,11 +894,31 @@ static void devicesChangeCallback(SoundIo* sio)
 
 bool Audio::Setup()
 {
+    logInfo("Initializing %s\n", opus_get_version_string());
+    int opusError;
+    int opusChannels = 1;
+    int opusApplication = OPUS_APPLICATION_VOIP;
+    encoder = opus_encoder_create(NETWORK_SAMPLE_RATE, opusChannels, opusApplication, &opusError);
+    logInfo("Opus Error from encoder creation: %d\n", opusError);
+
+    opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(6));
+    opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
+    opus_encoder_ctl(encoder, OPUS_SET_APPLICATION(OPUS_APPLICATION_VOIP));
+    //opus_encoder_ctl(encoder, OPUS_SET_BITRATE(OPUS_BITRATE_MAX));
+
+    opus_int32 complexity;
+    opus_int32 bitrate;
+    opus_encoder_ctl(encoder, OPUS_GET_COMPLEXITY(&complexity));
+    opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
+    logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
+
     // Initialize the current devices to null so that we will connect automatically when we 
     // get a list of connected devices
     audioState.currentInputDevice = -1;
     audioState.currentOutputDevice = -1;
     inBuffer = new RingBuffer(4096);
+
+    listenBuffer = new RingBuffer(1 << 13);
 
     // Initialize SoundIO
     logInfo("Initializing libsoundio %s\n", soundio_version_string());
@@ -813,34 +950,15 @@ bool Audio::Setup()
     logInfo("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
-    logInfo("Initializing %s\n", opus_get_version_string());
-    int opusError;
-    int opusChannels = 1;
-    int opusApplication = OPUS_APPLICATION_VOIP;
-    encoder = opus_encoder_create(NETWORK_SAMPLE_RATE, opusChannels, opusApplication, &opusError);
-    logInfo("Opus Error from encoder creation: %d\n", opusError);
-
-    opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(6));
-    opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
-    opus_encoder_ctl(encoder, OPUS_SET_APPLICATION(OPUS_APPLICATION_VOIP));
-    //opus_encoder_ctl(encoder, OPUS_SET_BITRATE(OPUS_BITRATE_MAX));
-
-    opus_int32 complexity;
-    opus_int32 bitrate;
-    opus_encoder_ctl(encoder, OPUS_GET_COMPLEXITY(&complexity));
-    opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
-    logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
-
     return true;
 }
 
-void Audio::SendAudioToUser(ClientUserData* user, int sourceLength, float* sourceBuffer)
+void Audio::SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer)
 {
-    int encodedBufferLength = sourceLength;
+    int encodedBufferLength = sourceBuffer.Length;
     uint8* encodedBuffer = new uint8[encodedBufferLength];
-    int audioBytes = encodePacket(sourceLength, sourceBuffer,
-                                  localUser.audio.sampleRate,
-                                  encodedBufferLength, encodedBuffer);
+    memset(encodedBuffer, 0, encodedBufferLength);
+    int audioBytes = encodePacket(sourceBuffer, encodedBufferLength, encodedBuffer);
 
     NetworkAudioPacket audioPacket = {};
     audioPacket.srcUser = localUser.ID;
@@ -852,6 +970,15 @@ void Audio::SendAudioToUser(ClientUserData* user, int sourceLength, float* sourc
 
     NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
     audioPacket.serialize(outPacket);
+
+    NetworkInPacket inPacketTest = {};
+    inPacketTest.contents = outPacket.contents;
+    inPacketTest.length = outPacket.length;
+    uint8_t packetType;
+    inPacketTest.serializeuint8(packetType);
+    NetworkAudioPacket audioInPacket;
+    audioInPacket.serialize(inPacketTest);
+
     outPacket.send(user->netPeer, 0, false);
 }
 
@@ -915,13 +1042,23 @@ void Audio::Shutdown()
     soundio_destroy(soundio);
 }
 
+float Audio::ComputeRMS(AudioBuffer& buffer)
+{
+    float result = 0.0f;
+    for(int i=0; i<buffer.Length; ++i)
+    {
+        result += (buffer.Data[i]*buffer.Data[i])/buffer.Length;
+    }
+    return sqrtf(result);
+}
+
 template<typename Packet>
 bool Audio::NetworkAudioPacket::serialize(Packet& packet)
 {
-    this->srcUser.serialize(packet);
+    packet.serializeuint8(this->srcUser);
     packet.serializeuint8(this->index);
     packet.serializeuint16(this->encodedDataLength);
-    packet.serializestring((char*)this->encodedData, this->encodedDataLength);
+    packet.serializebytes(this->encodedData, this->encodedDataLength);
 
     return true;
 }

@@ -19,6 +19,7 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     this->nameLength = connectionPacket.nameLength;
     memcpy(this->name, connectionPacket.name, connectionPacket.nameLength);
     this->name[connectionPacket.nameLength] = 0;
+    logInfo("Connected to user %d with name of length %d: %s\n", ID, nameLength, name);
 }
 
 void ClientUserData::Initialize()
@@ -34,28 +35,19 @@ ClientUserData::~ClientUserData()
 
 void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
 {
+#if 1
+        Audio::ProcessIncomingPacket(packet);
+#else
     if(((packet.index < 20) && (this->lastReceivedAudioPacket > 235)) ||
             (this->lastReceivedAudioPacket < packet.index))
     {
-        if(this->lastReceivedAudioPacket + 1 != packet.index)
-        {
-            logWarn("Dropped audio packets %d to %d (inclusive)\n",
-                    this->lastReceivedAudioPacket+1, packet.index-1);
-        }
-        this->lastReceivedAudioPacket = packet.index;
-        float* decodedAudio = new float[micBufferLen];
-        int decodedFrames = Audio::decodePacket(this->audio.decoder,
-                                                packet.encodedDataLength, packet.encodedData+1,
-                                                micBufferLen, decodedAudio, this->audio.sampleRate);
-        logTerm("Received %d samples\n", decodedFrames);
-        assert(decodedFrames <= this->audio.buffer->free());
-        this->audio.buffer->write(decodedFrames, decodedAudio);
-        delete[] decodedAudio;
+        Audio::ProcessIncomingPacket(packet);
     }
     else
     {
         logWarn("Audio packet %u received out of order\n", packet.index);
     }
+#endif
 }
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)

@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <time.h>
-#include <math.h>
 
 #include <vector>
 
@@ -13,6 +12,7 @@
 #include "audio.h"
 #include "common.h"
 #include "network.h"
+#include "network_client.h"
 #include "logging.h"
 #include "platform.h"
 #include "render.h"
@@ -50,8 +50,7 @@ extern int screenHeight;
 extern int cameraDeviceCount;
 extern char** cameraDeviceNames;
 
-static uint32 micBufferLen;
-static float* micBuffer;
+static Audio::AudioBuffer micBuffer;
 
 void initGame(GameState* game)
 {
@@ -199,8 +198,8 @@ void renderGame(GameState* game, float deltaTime)
 
         case NET_CONNSTATE_CONNECTED:
         {
-            float netTotalIn = Network::TotalIncomingBytes()/1024.0f;
-            float netTotalOut = Network::TotalOutgoingBytes()/1024.0f;
+            float netTotalIn = TotalNetworkIncomingBytes()/1024.0f;
+            float netTotalOut = TotalNetworkOutgoingBytes()/1024.0f;
             ImGui::Text("Total Incoming: %.1fKB", netTotalIn);
             ImGui::Text("Total Outgoing: %.1fKB", netTotalOut);
             if(ImGui::Button("Disconnect", ImVec2(80,20)))
@@ -257,7 +256,7 @@ void renderGame(GameState* game, float deltaTime)
     }
 }
 
-void cleanupGame(GameState* game)
+void cleanupGame()
 {
     for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
     {
@@ -289,18 +288,17 @@ void keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int
         ImGui_ImplGlfwGL3_KeyCallback(window, key, scancode, action, mods);
 }
 
-void broadcastAudioInput(GameState& game)
+void handleAudioInput(GameState& game)
 {
     if(!game.micEnabled)
         return;
 
-    int audioFrames = Audio::readAudioInputBuffer(micBufferLen, micBuffer);
-    if(Network::IsConnectedToMasterServer())
+    Audio::readAudioInputBuffer(micBuffer);
     {
         for(int i=0; i<remoteUsers.size(); i++)
         {
             ClientUserData* destinationUser = remoteUsers[i];
-            Audio::SendAudioToUser(destinationUser, audioFrames, micBuffer);
+            Audio::SendAudioToUser(destinationUser, micBuffer);
         }
     }
 }
@@ -447,8 +445,11 @@ int main()
     double currentTime = glfwGetTime();
     double nextTickTime = currentTime;
 
-    micBufferLen = 2400;
-    micBuffer = new float[micBufferLen];
+    micBuffer = {};
+    micBuffer.Capacity = 2400;
+    micBuffer.Data = new float[micBuffer.Capacity];
+    memset(micBuffer.Data, 0, sizeof(float)*micBuffer.Length);
+
     GameState game = {};
     initGame(&game);
 
@@ -468,7 +469,7 @@ int main()
         glfwPollEvents();
 
         Audio::Update();
-        broadcastAudioInput(game);
+        handleAudioInput(game);
 #ifdef VIDEO_ENABLED
         handleVideoInput(game);
 #endif
@@ -494,8 +495,8 @@ int main()
 
     logInfo("Stop running, begin shutdown\n");
 
-    delete[] micBuffer;
-    cleanupGame(&game);
+    delete[] micBuffer.Data;
+    cleanupGame();
 
     Network::Shutdown();
 #ifdef VIDEO_ENABLED
