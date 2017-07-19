@@ -18,4 +18,6 @@ int64 getClockFrequency();
 
 int getCurrentUserName(size_t bufferLen, char* buffer);
 
+bool isPushToTalkKeyPushed();
+
 #endif
