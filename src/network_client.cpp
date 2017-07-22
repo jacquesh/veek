@@ -97,6 +97,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
 
             sourceUser->processIncomingAudioPacket(audioInPacket);
         } break;
+
 #ifdef VIDEO_ENABLED
         case NET_MSGTYPE_VIDEO:
         {
@@ -141,34 +142,34 @@ void Network::Update()
     {
         switch(netEvent.type)
         {
-            case ENET_EVENT_TYPE_CONNECT:
+        case ENET_EVENT_TYPE_CONNECT:
+        {
+            logInfo("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
+            if(netEvent.peer == networkState.netPeer)
             {
-                logInfo("Connection from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                if(netEvent.peer == networkState.netPeer)
-                {
-                    logInfo("Connected to the server\n");
-                    NetworkUserSetupPacket setupPkt = {};
-                    setupPkt.userID = localUser.ID;
-                    setupPkt.nameLength = localUser.nameLength;
-                    strcpy(setupPkt.name, localUser.name);
+                logInfo("Connected to the server\n");
+                NetworkUserSetupPacket setupPkt = {};
+                setupPkt.userID = localUser.ID;
+                setupPkt.nameLength = localUser.nameLength;
+                strcpy(setupPkt.name, localUser.name);
 
-                    NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_USER_SETUP);
-                    setupPkt.serialize(outPacket);
-                    outPacket.send(networkState.netPeer, 0, true);
-                }
-            } break;
+                NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_USER_SETUP);
+                setupPkt.serialize(outPacket);
+                outPacket.send(networkState.netPeer, 0, true);
+            }
+        } break;
 
-            case ENET_EVENT_TYPE_RECEIVE:
-            {
-                NetworkInPacket incomingPacket;
-                incomingPacket.length = netEvent.packet->dataLength;
-                incomingPacket.contents = netEvent.packet->data;
-                incomingPacket.currentPosition = 0;
+        case ENET_EVENT_TYPE_RECEIVE:
+        {
+            NetworkInPacket incomingPacket;
+            incomingPacket.length = netEvent.packet->dataLength;
+            incomingPacket.contents = netEvent.packet->data;
+            incomingPacket.currentPosition = 0;
 
-                handleNetworkPacketReceive(incomingPacket);
+            handleNetworkPacketReceive(incomingPacket);
 
-                enet_packet_destroy(netEvent.packet);
-            } break;
+            enet_packet_destroy(netEvent.packet);
+        } break;
 
         case ENET_EVENT_TYPE_DISCONNECT:
         {
