@@ -16,7 +16,7 @@ namespace Network
 
     void ConnectToMasterServer(const char* serverHostname);
     ClientUserData* ConnectToPeer(NetworkUserConnectPacket& userPacket);
-    void DisconnectFromMasterServer();
+    void DisconnectFromAllPeers();
 }
 
 #endif // _NETWORK_CLIENT_H

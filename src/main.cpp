@@ -236,7 +236,7 @@ void renderGame(GameState* game, float deltaTime)
             ImGui::Text("Total Outgoing: %.1fKB", netTotalOut);
             if(ImGui::Button("Disconnect", ImVec2(80,20)))
             {
-                Network::DisconnectFromMasterServer();
+                Network::DisconnectFromAllPeers();
             }
         } break;
     }
@@ -291,11 +291,6 @@ void renderGame(GameState* game, float deltaTime)
 
 void cleanupGame()
 {
-    for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
-    {
-        ClientUserData* user = *userIter;
-        delete user;
-    }
 }
 
 void glfwErrorCallback(int errorCode, const char* errorDescription)

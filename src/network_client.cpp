@@ -240,6 +240,11 @@ void Network::Shutdown()
         enet_peer_disconnect_now(networkState.netPeer, 0);
     }
 
+    for(ClientUserData* peer : remoteUsers)
+    {
+        enet_peer_disconnect_now(peer->netPeer, 0);
+    }
+
     enet_deinitialize();
 }
 
@@ -271,10 +276,18 @@ ClientUserData* Network::ConnectToPeer(NetworkUserConnectPacket& userPacket)
     return newUser;
 }
 
-void Network::DisconnectFromMasterServer()
+void Network::DisconnectFromAllPeers()
 {
-    networkState.connState = NET_CONNSTATE_DISCONNECTED;
+    for(ClientUserData* peer : remoteUsers)
+    {
+        enet_peer_disconnect_now(peer->netPeer, 0);
+        delete peer;
+    }
+    remoteUsers.clear();
+
     enet_peer_disconnect(networkState.netPeer, 0);
-    networkState.netPeer = 0;
+    networkState.netPeer = nullptr;
+
+    networkState.connState = NET_CONNSTATE_DISCONNECTED;
 }
 
