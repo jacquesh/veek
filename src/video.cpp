@@ -30,6 +30,14 @@
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 // https://people.xiph.org/~jm/daala/revisiting/
 
+// Screen Capture:
+// https://msdn.microsoft.com/en-us/library/windows/desktop/dd183402(v=vs.85).aspx
+// https://stackoverflow.com/questions/3291167/how-can-i-take-a-screenshot-in-a-windows-application
+// https://stackoverflow.com/questions/5069104/fastest-method-of-screen-capturing
+// https://www.codeproject.com/Articles/20367/Screen-Capture-Simple-Win-Dialog-Based
+// https://www.codeproject.com/Articles/5051/Various-methods-for-capturing-the-screen
+// https://github.com/reterVision/win32-screencapture
+
 int cameraDeviceCount;
 char** cameraDeviceNames;
 

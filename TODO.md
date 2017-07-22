@@ -1,6 +1,3 @@
-- Latest bugs:
-    - If you connect to the server, disconnect, and then reconnect again, the server crashes (sometimes)
-    - We currently ignore any and all disconnect messages
 
 - Pre-video things:
     - Move the server over to using the network serialization functions
@@ -10,6 +7,7 @@
     - Always resample to the network audio sample rate (if we aren't at it already)
     - Check what happens when you join the server in the middle of a conversation/after a bunch of data has been transfered, because the codecs are stateful so we might have to do some shenanigans to make sure that it can handle that and setup the correct state to continue
     - The decoder docs state that we need to call decode with empty values for every lost packet. We do actually keep track of time but we have yet to use that to check for packet loss
+    - Allow existing users to continue functioning/being connected to each other, even when they disconnect from the master server? Maybe? Just try reconnect all the time and tell the user that they might not see new peers.
 
 - Bugs in current functionality:
     - Cleanup old AudioSources (e.g the sine-wave generated for the "test sound")
@@ -47,6 +45,7 @@ Functionality Improvements:
     - Try to shrink distributable down to a single exe (so statically link everything possible)
         - Read http://www.codeproject.com/Articles/15156/Tiny-C-Runtime-Library
         - Read http://www.catch22.net/tuts/reducing-executable-size
+        - Remove reliance on windows.h as far as possible (possibly just define the bits we need?)
     - Maybe look at https://ninja-build.org/ for a nicer build system (as necessary)
 
 - Misc:
