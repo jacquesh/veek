@@ -50,13 +50,6 @@ struct NetworkUserInitPacket
     template<typename Packet> bool serialize(Packet& packet);
 };
 
-struct NetworkUserDisconnectPacket
-{
-    UserIdentifier userID;
-
-    template<typename Packet> bool serialize(Packet& packet);
-};
-
 struct UserData
 {
     UserIdentifier ID;

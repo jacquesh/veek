@@ -66,35 +66,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
             Audio::AddAudioUser(newUser->ID);
             logInfo("%s connected\n", connPacket.name);
         } break;
-        case NET_MSGTYPE_USER_DISCONNECT:
-        {
-            // TODO: So for P2P we'll get these from the server AND we'll get enet DC events,
-            //       so do we need both? What if a user disconnects from ONE other user but not
-            //       the server/others? Surely they should not be considered to disconnect?
-            //       Does this ever happen even?
-            //       Also if we ever stop using enet and instead use our own thing (which we may
-            //       well do) then we won't necessarily get (dis)connection events, since we mostly
-            //       only need unreliable transport anyways.
-#if 0
-            logInfo("%s disconnected\n", sourceUser->name);
-            // TODO: We were previously crashing here sometimes - maybe because we're getting
-            //       a disconnect from a user that timed out before we connected (or something
-            //       like that)
-            // TODO: We're being generic here because we might change the remoteUsers datastructure
-            //       at some later point, we should probably come back and make this more optimized
-            auto userIter = remoteUsers.find(sourceUser);
-            if(userIter != remoteUsers.end())
-            {
-                remoteUsers.erase(userIter);
-                Audio::RemoveAudioUser(sourceUser->ID);
-                delete sourceUser;
-            }
-            else
-            {
-                logWarn("Received a disconnect from a previously disconnected user\n");
-            }
-#endif
-        } break;
+
         case NET_MSGTYPE_AUDIO:
         {
 
@@ -198,21 +170,42 @@ void Network::Update()
                 enet_packet_destroy(netEvent.packet);
             } break;
 
-            case ENET_EVENT_TYPE_DISCONNECT:
+        case ENET_EVENT_TYPE_DISCONNECT:
+        {
+            ENetAddress oldAddr = netEvent.peer->address;
+            if(networkState.netPeer)
             {
-                // TODO
-#if 0
-                // TODO: As with the todo on the clear() line below, this was written with
-                //       client-server in mind, for P2P we just clean up the DC'd user and
-                //       then clean up all users if we decide to DC ourselves
-                logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
+                ENetAddress serverAddr = networkState.netPeer->address;
+                if((oldAddr.host == serverAddr.host) && (oldAddr.port == serverAddr.port))
                 {
-                    delete *userIter;
+                    logInfo("Disconnected from the server\n");
+                    DisconnectFromAllPeers();
+                    break;
                 }
-                remoteUsers.clear(); // TODO: This is wrong for P2P
-#endif
-            } break;
+            }
+
+            // TODO: What if a user disconnects from ONE other user but not
+            //       the server/others? Surely they should not be considered to disconnect?
+            int userIndex = -1;
+            for(int i=0; i<remoteUsers.size(); i++)
+            {
+                ENetAddress userAddr = remoteUsers[i]->netPeer->address;
+                if((userAddr.host == oldAddr.host) && (userAddr.port == oldAddr.port))
+                {
+                    userIndex = i;
+                }
+            }
+
+            if(userIndex == -1)
+                break;
+
+            ClientUserData* sourceUser = remoteUsers[userIndex];
+            remoteUsers.erase(remoteUsers.begin()+userIndex);
+            Audio::RemoveAudioUser(sourceUser->ID);
+            logInfo("%s (%x:%u) disconnected\n", sourceUser->name, oldAddr.host, oldAddr.port);
+
+            delete sourceUser;
+        } break;
         }
     }
     if(serviceResult < 0)

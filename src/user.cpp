@@ -58,15 +58,6 @@ bool NetworkUserInitPacket::serialize(Packet& packet)
 template bool NetworkUserInitPacket::serialize(NetworkInPacket& packet);
 template bool NetworkUserInitPacket::serialize(NetworkOutPacket& packet);
 
-template<typename Packet>
-bool NetworkUserDisconnectPacket::serialize(Packet& packet)
-{
-    packet.serializeuint8(this->userID);
-    return true;
-}
-template bool NetworkUserDisconnectPacket::serialize(NetworkInPacket& packet);
-template bool NetworkUserDisconnectPacket::serialize(NetworkOutPacket& packet);
-
 ServerUserData::ServerUserData(NetworkUserSetupPacket& setupPacket)
 {
     this->ID = setupPacket.userID;

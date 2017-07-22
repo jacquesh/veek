@@ -26,7 +26,6 @@ enum NetworkMessageType : uint8
     NET_MSGTYPE_USER_SETUP,
     NET_MSGTYPE_USER_INIT,
     NET_MSGTYPE_USER_CONNECT,
-    NET_MSGTYPE_USER_DISCONNECT,
 };
 
 struct NetworkInPacket
