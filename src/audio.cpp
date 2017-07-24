@@ -1052,6 +1052,21 @@ float Audio::ComputeRMS(AudioBuffer& buffer)
     return sqrtf(result);
 }
 
+Audio::AudioBuffer::AudioBuffer(int initialCapacity)
+{
+    Data = new float[initialCapacity];
+    Capacity = initialCapacity;
+    Length = 0;
+}
+
+Audio::AudioBuffer::~AudioBuffer()
+{
+    if(Data)
+    {
+        delete[] Data;
+    }
+}
+
 template<typename Packet>
 bool Audio::NetworkAudioPacket::serialize(Packet& packet)
 {

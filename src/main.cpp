@@ -492,10 +492,7 @@ int main()
     double currentTime = glfwGetTime();
     double nextTickTime = currentTime;
 
-    micBuffer = {};
-    micBuffer.Capacity = 2400;
-    micBuffer.Data = new float[micBuffer.Capacity];
-    memset(micBuffer.Data, 0, sizeof(float)*micBuffer.Length);
+    micBuffer = Audio::AudioBuffer(2400);
 
     GameState game = {};
     initGame(&game);
@@ -542,7 +539,6 @@ int main()
 
     logInfo("Stop running, begin shutdown\n");
 
-    delete[] micBuffer.Data;
     cleanupGame();
 
     Network::Shutdown();

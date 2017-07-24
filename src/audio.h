@@ -17,6 +17,7 @@ struct ClientUserData;
 
 namespace Audio
 {
+    // NOTE: This should a sample rate that is supported by opus (e.g 48k, 24k)
     const int32 NETWORK_SAMPLE_RATE = 48000;
 
     struct AudioBuffer
@@ -26,6 +27,10 @@ namespace Audio
         int Length;
 
         int SampleRate;
+
+        AudioBuffer() = default;
+        explicit AudioBuffer(int initialCapacity);
+        ~AudioBuffer();
     };
 
     struct NetworkAudioPacket
