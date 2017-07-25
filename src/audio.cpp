@@ -254,7 +254,7 @@ void Audio::PlayTestSound()
             sinVal += ((5-i)/(5.0f))*sinf(((1 << i)*frequency)*twopi*sampleTime);
         }
         //sampleSource.buffer->write(1, &sinVal);
-        tempbuffer[sampleIndex] = sinVal;
+        tempbuffer[sampleIndex] = 0.1f*sinVal;
         sampleTime += timestep;
     }
 
