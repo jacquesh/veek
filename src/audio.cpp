@@ -124,16 +124,6 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
             inArea[0].ptr += inArea[0].step;
 
             inBuffer->write(1, &val);
-
-#if 0
-            if(audioState.isListeningToInput)
-            {
-                float newOutSamples[2];
-                int newOutSampleCount = resampleStream(audioState.inputListenResampler,
-                                                       val, &newOutSamples[0], 2);
-                listenBuffer->write(newOutSampleCount, &newOutSamples[0]);
-            }
-#endif
         }
 
         if(frameCount > 0)
@@ -469,38 +459,22 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
     buffer.SampleRate = inDevice->sample_rate_current;
 
 
-#if 1
     if(audioState.isListeningToInput)
     {
-#if 0
-        Audio::AudioBuffer resampledBuffer = {};
-        resampledBuffer.Capacity = 1024*1024;
-        resampledBuffer.Data = new float[resampledBuffer.Capacity];
-        resampledBuffer.SampleRate = 48000;
-        resampleBuffer(buffer, resampledBuffer);
-#endif
-        Audio::AudioBuffer& resampledBuffer = buffer;
-        listenBuffer->write(resampledBuffer.Length, resampledBuffer.Data);
-
-        int32_t opusError;
-        static uint8_t opusData[2400];
-        static OpusDecoder* opusDec = opus_decoder_create(48000, 1, &opusError);
-        Audio::AudioBuffer testBuffer = {};
-        testBuffer.Capacity = 2400;
-        testBuffer.Data = new float[2400];
-        testBuffer.SampleRate = 48000;
-
-        int opusLen = Audio::encodePacket(resampledBuffer, 2400, &opusData[0]);
-        Audio::decodePacket(opusDec, opusLen, &opusData[0], testBuffer);
-        if(testBuffer.Length != resampledBuffer.Length)
+        ResampleStreamContext ctx = {};
+        ctx.InputSampleRate = buffer.SampleRate;
+        ctx.OutputSampleRate = 48000;
+        for(int i=0; i<samplesToWrite; i++)
         {
-            logWarn("Audio buffer length modified by Opus: Encoded %d samples. Decoded %d samples\n", resampledBuffer.Length, testBuffer.Length);
-        }
-        //listenBuffer->write(testBuffer.Length, testBuffer.Data);
+            float resampledSamples[3];
+            int resampleCount = resampleStream(ctx, buffer.Data[i], resampledSamples, 3);
 
-        delete[] resampledBuffer.Data;
+            for(int j=0; j<resampleCount; j++)
+            {
+                listenBuffer->write(1, &resampledSamples[j]);
+            }
+        }
     }
-#endif
 }
 
 bool Audio::enableMicrophone(bool enabled)
