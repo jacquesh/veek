@@ -485,9 +485,9 @@ bool Audio::enableMicrophone(bool enabled)
     {
         logInfo("%s audio input\n", toggleString);
         int error = soundio_instream_pause(inStream, !enabled);
-        if(error)
+        if(error != SoundIoErrorNone)
         {
-            logWarn("Error toggling microhpone\n");
+            logWarn("Error toggling microhpone: %s\n", soundio_strerror(error));
             return false; // TODO: libsoundio doesn't let us query the current state of the stream
         }
         return enabled;
@@ -495,6 +495,28 @@ bool Audio::enableMicrophone(bool enabled)
     else
     {
         logWarn("%s audio input failed: No open input stream\n", toggleString);
+        return false;
+    }
+}
+
+bool Audio::enableSpeakers(bool enabled)
+{
+    // TODO: Apparently some backends (e.g JACK) don't support pausing at all
+    const char* toggleString = enabled ? "Enable" : "Disable";
+    if(outStream)
+    {
+        logInfo("%s audio output\n", toggleString);
+        int error = soundio_outstream_pause(outStream, !enabled);
+        if(error != SoundIoErrorNone)
+        {
+            logWarn("Error toggling speakers: %s\n", soundio_strerror(error));
+            return false;
+        }
+        return enabled;
+    }
+    else
+    {
+        logWarn("%s audio output failed: No open input stream\n", toggleString);
         return false;
     }
 }

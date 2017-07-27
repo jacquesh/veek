@@ -44,7 +44,9 @@ enum class MicActivationMode
 struct GameState
 {
     bool cameraEnabled;
+
     bool micEnabled;
+    bool speakersEnabled;
 
     MicActivationMode micActivationMode;
     bool micActive;
@@ -65,6 +67,7 @@ static Audio::AudioBuffer micBuffer;
 void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
+    game->speakersEnabled = Audio::enableSpeakers(true);
     game->micEnabled = Audio::enableMicrophone(true);
     game->micActivationMode = MicActivationMode::Always;
     game->micActive = true;
@@ -149,6 +152,12 @@ void renderGame(GameState* game, float deltaTime)
     static int selectedPlaybackDevice = 0;
     if(ImGui::CollapsingHeader("Audio", 0, true, false))
     {
+        bool speakersToggled = ImGui::Checkbox("Speakers Enabled", &game->speakersEnabled);
+        if(speakersToggled)
+        {
+            game->speakersEnabled = Audio::enableSpeakers(game->speakersEnabled);
+        }
+
         bool micToggled = ImGui::Checkbox("Microphone Enabled", &game->micEnabled);
         if(micToggled)
         {

@@ -64,6 +64,12 @@ namespace Audio
      */
     bool enableMicrophone(bool enabled);
 
+    /**
+     * \return The new state of the speakers, which equals enabled if the function succeeded,
+     * and equals the previous state if the function failed
+     */
+    bool enableSpeakers(bool enabled);
+
     void AddAudioUser(UserIdentifier userId);
     void RemoveAudioUser(UserIdentifier userId);
 
