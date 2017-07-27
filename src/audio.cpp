@@ -38,6 +38,9 @@ struct AudioData
 
     bool isListeningToInput;
     ResampleStreamContext inputListenResampler;
+
+    Audio::AudioBuffer encodingBuffer; // Used for resampling before encoding, when necessary
+    Audio::AudioBuffer decodingBuffer; // Used for resampling after decoding, when necessary
 };
 
 struct UserAudioData
@@ -291,6 +294,13 @@ void Audio::decodePacket(OpusDecoder* decoder,
     float* targetBuffer = targetAudioBuffer.Data;
     int sourceLengthRemaining = sourceLength;
     int targetLengthRemaining = targetAudioBuffer.Capacity;
+    int totalFramesDecoded = 0;
+
+    if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
+    {
+        targetBuffer = audioState.decodingBuffer.Data;
+        targetLengthRemaining = audioState.decodingBuffer.Capacity;
+    }
 
     while((sourceLengthRemaining >= sizeof(int)) && (targetLengthRemaining >= frameSize))
     {
@@ -302,7 +312,7 @@ void Audio::decodePacket(OpusDecoder* decoder,
             printLen = false;
         }
 
-        int correctErrors = 0; // TODO
+        int correctErrors = 0; // TODO: What value do we actually want here?
         int framesDecoded = opus_decode_float(decoder,
                                               sourceBuffer+4, packetLength,
                                               targetBuffer, targetLengthRemaining,
@@ -317,37 +327,39 @@ void Audio::decodePacket(OpusDecoder* decoder,
         sourceBuffer += packetLength+4;
         targetLengthRemaining -= framesDecoded;
         targetBuffer += framesDecoded;
+        totalFramesDecoded += framesDecoded;
     }
 
     if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
-        // TODO: Resample
-        //resampleBuffer(inSampleRate, sourceBufferLength, sourceBufferPtr, outSampleRate, targetBufferLength, targetBufferPtr);
-        logWarn("We should be resampling from %d to %d, but we arent!\n", NETWORK_SAMPLE_RATE, targetAudioBuffer.SampleRate);
+        audioState.decodingBuffer.Length = totalFramesDecoded;
+        resampleBuffer(audioState.decodingBuffer, targetAudioBuffer);
     }
-
-    int framesWritten = targetAudioBuffer.Capacity - targetLengthRemaining;
-    targetAudioBuffer.Length = framesWritten;
+    else
+    {
+        targetAudioBuffer.Length = totalFramesDecoded;
+    }
 }
 
 int Audio::encodePacket(AudioBuffer& sourceBuffer,
                         int targetLength, uint8_t* targetBufferPtr)
 {
+    uint8_t* targetData = targetBufferPtr;
+    int targetLengthRemaining = targetLength;
+
+    float* sourceData = sourceBuffer.Data;
+    int sourceLengthRemaining = sourceBuffer.Length;
     if(sourceBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
-        // TODO: Resample
-        logWarn("We should be resampling from %d to %d, but we arent!\n",
-                sourceBuffer.SampleRate, NETWORK_SAMPLE_RATE);
+        resampleBuffer(sourceBuffer, audioState.encodingBuffer);
+        sourceData = audioState.encodingBuffer.Data;
+        sourceLengthRemaining = audioState.encodingBuffer.Length;
     }
 
     // TODO: Opus can only create packets from a given set of sample counts, we should probably
     //       try support other packet sizes (is larger better? can it be dynamic? are we always
     //       going to have a sample rate of 48k? etc)
     int frameSize = 240;
-    float* sourceData = sourceBuffer.Data;
-    uint8_t* targetData = targetBufferPtr;
-    int sourceLengthRemaining = sourceBuffer.Length;
-    int targetLengthRemaining = targetLength;
 
     // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
     while((sourceLengthRemaining >= frameSize) && (targetLengthRemaining >= frameSize))
@@ -357,12 +369,6 @@ int Audio::encodePacket(AudioBuffer& sourceBuffer,
                                              sourceData, frameSize,
                                              targetData+4, targetLengthRemaining);
         *((int*)targetData) = packetLength; // TODO: Byte order checking/swapping
-        static bool printLen = true;
-        if(printLen)
-        {
-            logInfo("Encode packet with length %d\n", packetLength);
-            printLen = false;
-        }
         if(packetLength < 0)
         {
             logWarn("Error encoding audio. Error code %d\n", packetLength);
@@ -908,6 +914,12 @@ bool Audio::Setup()
     opus_encoder_ctl(encoder, OPUS_GET_BITRATE(&bitrate));
     logInfo("Complexity=%d, Bitrate=%d\n", complexity, bitrate);
 
+    audioState.encodingBuffer = AudioBuffer(2880);
+    audioState.encodingBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+    audioState.decodingBuffer = AudioBuffer(2880);
+    audioState.decodingBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
     // Initialize the current devices to null so that we will connect automatically when we 
     // get a list of connected devices
     audioState.currentInputDevice = -1;
@@ -1059,7 +1071,8 @@ Audio::AudioBuffer::~AudioBuffer()
 {
     if(Data)
     {
-        delete[] Data;
+        // TODO: We obviously can't do this if we're passing AudioBuffers arround by value
+        // delete[] Data;
     }
 }
 
