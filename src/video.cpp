@@ -29,6 +29,10 @@
 // https://github.com/roxlu/video_capture
 // https://people.xiph.org/~tterribe/pubs/lca2012/auckland/intro_to_video1.pdf
 // https://people.xiph.org/~jm/daala/revisiting/
+//
+// https://sidbala.com/h-264-is-magic/
+// https://github.com/leandromoreira/digital_video_introduction
+// https://blogs.gnome.org/rbultje/2016/12/13/overview-of-the-vp9-video-codec/
 
 // Screen Capture:
 // https://msdn.microsoft.com/en-us/library/windows/desktop/dd183402(v=vs.85).aspx

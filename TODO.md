@@ -8,9 +8,6 @@
 ## Bugs
 * The resampler causes lots of little clicks
     * Set the CABLE Recording device to 48k, no clicks. Set it to 44.1k, lots of clicks.
-* We crash if the window gets dragged around while connected to another client.
-    * This is in the assert at the bottom of Audio::ProcessIncomingPacket because there isn't enough space in the ringbuffer for the user we received from (presumably because theres a bunch of network packets lined up and they all get sent at the same time, so we immediately just fill the buffer on receipt of all the packets)
-    * It'd simply not be an issue if we rewrote the ringbuffer to do the sane thing and just overwrite the things at the end when you write to it.
 
 ## Pre-video things:
 * Move the server over to using the network serialization functions

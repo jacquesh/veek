@@ -8,6 +8,7 @@
 // TODO: Improve resample speed/quality.
 //       E.g Opus FAQ (https://wiki.xiph.org/OpusFAQ) lists one from opus-tools:
 //       https://github.com/xiph/opus-tools/blob/master/src/resample.c
+//       https://ccrma.stanford.edu/~jos/resample/
 
 int resampleStream(ResampleStreamContext& ctx,
                    float inputSample, float* outputSamples, int maxOutputSamples)
