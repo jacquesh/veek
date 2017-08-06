@@ -55,6 +55,7 @@ namespace Audio
     const char** OutputDeviceNames();
     bool SetAudioOutputDevice(int newOutputDevice);
 
+    void GenerateToneInput(bool generateTone);
     void ListenToInput(bool listen);
     void PlayTestSound();
 

@@ -48,6 +48,8 @@ struct GameState
     bool micEnabled;
     bool speakersEnabled;
 
+    bool sendTone;
+
     MicActivationMode micActivationMode;
     bool micActive;
 };
@@ -162,6 +164,12 @@ void renderGame(GameState* game, float deltaTime)
         if(micToggled)
         {
             game->micEnabled = Audio::enableMicrophone(game->micEnabled);
+        }
+
+        bool toneToggled = ImGui::Checkbox("Send Tone", &game->sendTone);
+        if(toneToggled)
+        {
+            Audio::GenerateToneInput(game->sendTone);
         }
 
         const char* micModeNames[3] = {"Always", "Push to Talk", "Automatic"};

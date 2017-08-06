@@ -36,6 +36,7 @@ struct AudioData
     char** outputDeviceNames;
     int currentOutputDevice;
 
+    bool generateToneInput;
     bool isListeningToInput;
     ResampleStreamContext inputListenResampler;
 
@@ -225,6 +226,11 @@ static void outErrorCallback(SoundIoOutStream* stream, int error)
 void Audio::ListenToInput(bool listening)
 {
     audioState.isListeningToInput = listening;
+}
+
+void Audio::GenerateToneInput(bool generateTone)
+{
+    audioState.generateToneInput = generateTone;
 }
 
 void Audio::PlayTestSound()
@@ -464,6 +470,19 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
     buffer.Length = samplesToWrite;
     buffer.SampleRate = inDevice->sample_rate_current;
 
+    if(audioState.generateToneInput)
+    {
+        float twopi = 2.0f*3.1415927f;
+        float frequency = 261.6f; // Middle C
+        float timestep = 1.0f/buffer.SampleRate;
+        static float sampleTime = 0.0f;
+        for(uint32 sampleIndex=0; sampleIndex<buffer.Length; sampleIndex++)
+        {
+            float sinVal = sinf(frequency*twopi*sampleTime);
+            buffer.Data[sampleIndex] = 0.1f*sinVal;
+            sampleTime += timestep;
+        }
+    }
 
     if(audioState.isListeningToInput)
     {
