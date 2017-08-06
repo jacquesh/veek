@@ -472,23 +472,23 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
 
     if(audioState.generateToneInput)
     {
-        float twopi = 2.0f*3.1415927f;
-        float frequency = 261.6f; // Middle C
-        float timestep = 1.0f/buffer.SampleRate;
-        static float sampleTime = 0.0f;
-        for(uint32 sampleIndex=0; sampleIndex<buffer.Length; sampleIndex++)
+        double twopi = 2.0*3.1415927;
+        double frequency = 261.6; // Middle C
+        double timestep = 1.0/buffer.SampleRate;
+        static double sampleTime = 0.0;
+        for(int sampleIndex=0; sampleIndex<buffer.Length; sampleIndex++)
         {
-            float sinVal = sinf(frequency*twopi*sampleTime);
-            buffer.Data[sampleIndex] = 0.1f*sinVal;
+            double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
+            buffer.Data[sampleIndex] = (float)sinVal;
             sampleTime += timestep;
         }
     }
 
     if(audioState.isListeningToInput)
     {
-        ResampleStreamContext ctx = {};
+        static ResampleStreamContext ctx = {};
         ctx.InputSampleRate = buffer.SampleRate;
-        ctx.OutputSampleRate = 48000;
+        ctx.OutputSampleRate = outDevice->sample_rate_current;
         for(int i=0; i<samplesToWrite; i++)
         {
             float resampledSamples[3];
