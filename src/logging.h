@@ -4,33 +4,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-bool initLogging(const char* filename);
-void deinitLogging();
-
-void _logTerm(const char* format, ...);
-void _log(const char* format, ...);
-
-#ifdef NDEBUG
-#define logTerm(MSG, ...);
-#define logInfo(MSG, ...);
-#define logWarn(MSG, ...);
-#define logFail(MSG, ...);
-#else
-static inline const char* __file_baseName(const char* fileName)
-{
-    const char* baseName = fileName;
-
-    for(const char* currentName=fileName; *currentName != 0; ++currentName)
-    {
-        char currentChar = *currentName;
-        if((currentChar == '/') || (currentChar == '\\'))
-        {
-            baseName = currentName+1;
-        }
-    }
-
-    return baseName;
-}
 
 /* Log Levels:
  * Term: Logs only to the terminal, used for very high-frequency or low-impact messages
@@ -38,10 +11,29 @@ static inline const char* __file_baseName(const char* fileName)
  * Warn: Logs to terminal and file, use for errors/situations that are bad but recoverable
  * Fail: Logs to terminal and file, use for errors/failures that we cannot recover from
  */
-#define logTerm(MSG, ...); _logTerm("TERM: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logInfo(MSG, ...);     _log("INFO: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logWarn(MSG, ...);     _log("WARN: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
-#define logFail(MSG, ...);     _log("FAIL: %16s:%-3d - " MSG, __file_baseName(__FILE__), __LINE__, ##__VA_ARGS__);
+enum LogLevel
+{
+    LOG_TERM,
+    LOG_INFO,
+    LOG_WARN,
+    LOG_FAIL
+};
+
+bool initLogging(const char* filename);
+void deinitLogging();
+
+void _log(LogLevel level, const char* filePath, int lineNumber, const char* msgFormat, ...);
+
+#ifdef NDEBUG
+#define logTerm(MSG, ...);
+#define logInfo(MSG, ...);
+#define logWarn(MSG, ...);
+#define logFail(MSG, ...);
+#else
+#define logTerm(MSG, ...);     _log(LOG_TERM, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#define logInfo(MSG, ...);     _log(LOG_INFO, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#define logWarn(MSG, ...);     _log(LOG_WARN, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#define logFail(MSG, ...);     _log(LOG_FAIL, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
 #endif // NDEBUG
 
 #endif

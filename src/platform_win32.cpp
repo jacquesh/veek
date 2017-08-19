@@ -66,3 +66,19 @@ bool isPushToTalkKeyPushed()
     uint16_t keyPressed = GetAsyncKeyState(VK_LCONTROL);
     return (keyPressed >> 15) != 0;
 }
+
+DateTime getLocalDateTime()
+{
+    SYSTEMTIME time;
+    GetLocalTime(&time);
+
+    DateTime result = {};
+    result.Year = time.wYear;
+    result.Month = time.wMonth;
+    result.Day = time.wDay;
+    result.Hour = time.wHour;
+    result.Minute = time.wMinute;
+    result.Second = time.wSecond;
+    result.Millisecond = time.wMilliseconds;
+    return result;
+}

@@ -1,30 +1,55 @@
-#include "logging.h"
-
 #include <stdio.h>
+#include <time.h>
 
 #include "happyhttp.h"
 
+#include "assert.h"
+#include "logging.h"
 #include "platform.h"
 
 static const char* logFileName;
 static FILE* logFile;
 
-void _logTerm(const char* format, ...)
+static const char* getFileNameFromPath(const char* filePath)
 {
-    va_list stderrArgs;
-    va_start(stderrArgs, format);
-    vfprintf(stderr, format, stderrArgs);
-    va_end(stderrArgs);
+    const char* baseName = filePath;
+
+    for(const char* currentName=filePath; *currentName != 0; ++currentName)
+    {
+        char currentChar = *currentName;
+        if((currentChar == '/') || (currentChar == '\\'))
+        {
+            baseName = currentName+1;
+        }
+    }
+
+    return baseName;
 }
 
-void _log(const char* format, ...)
+void _log(LogLevel level, const char* filePath, int lineNumber, const char* msgFormat, ...)
 {
+    assert((level >= LOG_TERM) && (level <= LOG_FAIL));
+    const char* logLevelLabels[] = {"TERM", "INFO", "WARN", "FAIL"};
+
+    const char* fileName = getFileNameFromPath(filePath);
+
+    DateTime currentTime = getLocalDateTime();
+    char timeBuffer[64];
+    snprintf(timeBuffer, sizeof(timeBuffer), "%02u:%02u:%02u.%03u",
+             currentTime.Hour, currentTime.Minute, currentTime.Second, currentTime.Millisecond);
+
+    fprintf(stderr, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
+    fprintf(logFile, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
+
     va_list stderrArgs;
     va_list fileArgs;
-    va_start(stderrArgs, format);
+    va_start(stderrArgs, msgFormat);
     va_copy(fileArgs, stderrArgs);
-    vfprintf(stderr, format, stderrArgs);
-    vfprintf(logFile, format, fileArgs);
+    vfprintf(stderr, msgFormat, stderrArgs);
+    if(level != LOG_TERM)
+    {
+        vfprintf(logFile, msgFormat, fileArgs);
+    }
     va_end(fileArgs);
     va_end(stderrArgs);
 
