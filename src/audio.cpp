@@ -488,7 +488,7 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
     {
         static ResampleStreamContext ctx = {};
         ctx.InputSampleRate = buffer.SampleRate;
-        ctx.OutputSampleRate = outDevice->sample_rate_current;
+        ctx.OutputSampleRate = outStream->sample_rate;
         for(int i=0; i<samplesToWrite; i++)
         {
             float resampledSamples[3];
