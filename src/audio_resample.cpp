@@ -16,8 +16,17 @@ int resampleStream(ResampleStreamContext& ctx,
     float inTimePerSample = 1.0f/(float)ctx.InputSampleRate;
     float outTimePerSample = 1.0f/(float)ctx.OutputSampleRate;
 
+    if(!ctx.HasPreviousSample)
+    {
+        ctx.PreviousInputSample = inputSample;
+        ctx.HasPreviousSample = true;
+        ctx.InterSampleTime += outTimePerSample;
+        outputSamples[0] = inputSample;
+        return 1;
+    }
+
     int outputSampleIndex = 0;
-    while(ctx.InterSampleTime < inTimePerSample)
+    while(ctx.InterSampleTime <= inTimePerSample)
     {
         if(outputSampleIndex >= maxOutputSamples)
         {
@@ -26,12 +35,14 @@ int resampleStream(ResampleStreamContext& ctx,
         }
 
         float t = ctx.InterSampleTime/inTimePerSample;
-        outputSamples[outputSampleIndex++] = lerp(ctx.PreviousSample, inputSample, t);
+        float newSample = lerp(ctx.PreviousInputSample, inputSample, t);
+        outputSamples[outputSampleIndex++] = newSample;
+
         ctx.InterSampleTime += outTimePerSample;
     }
 
     ctx.InterSampleTime -= inTimePerSample;
-    ctx.PreviousSample = inputSample;
+    ctx.PreviousInputSample = inputSample;
     return outputSampleIndex;
 }
 

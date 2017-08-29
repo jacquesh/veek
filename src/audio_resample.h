@@ -10,7 +10,8 @@ struct ResampleStreamContext
 
     float InterSampleTime;
 
-    float PreviousSample;
+    bool HasPreviousSample;
+    float PreviousInputSample;
 };
 
 int resampleStream(ResampleStreamContext& ctx,
