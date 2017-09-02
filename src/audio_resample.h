@@ -2,6 +2,9 @@
 #define _AUDIO_RESAMPLE_H
 
 #include "audio.h"
+#include "ringbuffer.h"
+
+#define RESAMPLE_CONTEXT_MAX_OUTPUT_SAMPLES 8
 
 struct ResampleStreamContext
 {
@@ -12,11 +15,19 @@ struct ResampleStreamContext
 
     bool HasPreviousSample;
     float PreviousInputSample;
+
+    float PreviousOutputSamples[RESAMPLE_CONTEXT_MAX_OUTPUT_SAMPLES];
+    int PreviousOutputSampleCount;
+    int PreviousOutputSampleIndex;
 };
 
 int resampleStream(ResampleStreamContext& ctx,
                    float inputSample, float* outputSamples, int maxOutputSamples);
 
-void resampleBuffer(Audio::AudioBuffer& inputBuffer, Audio::AudioBuffer& outputBuffer);
+bool resampleStreamRequiresInput(ResampleStreamContext& ctx);
+void resampleStreamInput(ResampleStreamContext& ctx, float inputSample);
+float resampleStreamOutput(ResampleStreamContext& ctx);
+
+float resampleStreamFrom(ResampleStreamContext& ctx, RingBuffer& buffer);
 
 #endif // _AUDIO_RESAMPLE_H

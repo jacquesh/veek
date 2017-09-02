@@ -10,9 +10,45 @@
 //       https://github.com/xiph/opus-tools/blob/master/src/resample.c
 //       https://ccrma.stanford.edu/~jos/resample/
 
+bool resampleStreamRequiresInput(ResampleStreamContext& ctx)
+{
+    return ctx.PreviousOutputSampleIndex >= ctx.PreviousOutputSampleCount;
+}
+
+void resampleStreamInput(ResampleStreamContext& ctx, float inputSample)
+{
+    int outCount = resampleStream(ctx, inputSample, &ctx.PreviousOutputSamples[0],
+                                  RESAMPLE_CONTEXT_MAX_OUTPUT_SAMPLES);
+    ctx.PreviousOutputSampleIndex = 0;
+    ctx.PreviousOutputSampleCount = outCount;
+}
+
+float resampleStreamOutput(ResampleStreamContext& ctx)
+{
+    assert(ctx.PreviousOutputSampleIndex < ctx.PreviousOutputSampleCount);
+
+    float result = ctx.PreviousOutputSamples[ctx.PreviousOutputSampleIndex];
+    ctx.PreviousOutputSampleIndex++;
+    return result;
+}
+
+float resampleStreamFrom(ResampleStreamContext& ctx, RingBuffer& buffer)
+{
+    if(resampleStreamRequiresInput(ctx))
+    {
+        float val;
+        buffer.read(1, &val);
+        resampleStreamInput(ctx, val);
+    }
+
+    return resampleStreamOutput(ctx);
+}
+
 int resampleStream(ResampleStreamContext& ctx,
                    float inputSample, float* outputSamples, int maxOutputSamples)
 {
+    // TODO: Apparently its a good idea to lowpass filter the output here
+    //       We can achieve that with a simple averaging
     float inTimePerSample = 1.0f/(float)ctx.InputSampleRate;
     float outTimePerSample = 1.0f/(float)ctx.OutputSampleRate;
 
@@ -45,51 +81,3 @@ int resampleStream(ResampleStreamContext& ctx,
     ctx.PreviousInputSample = inputSample;
     return outputSampleIndex;
 }
-
-void resampleBuffer(Audio::AudioBuffer& inputBuffer, Audio::AudioBuffer& outputBuffer)
-{
-    assert(inputBuffer.Capacity > 0);
-    assert(outputBuffer.Capacity > 0);
-    outputBuffer.Data[0] = inputBuffer.Data[0];
-
-    float inTimePerSample = 1.0f/(float)inputBuffer.SampleRate;
-    float outTimePerSample = 1.0f/(float)outputBuffer.SampleRate;
-
-    // TODO: Apparently its a good idea to lowpass filter the output here
-    //       We can achieve that with a simple averaging
-    int inIndex = 1;
-    int outIndex = 1;
-    float timeTillNextInSample = inTimePerSample;
-    float timeTillNextOutSample = outTimePerSample;
-    while((inIndex < inputBuffer.Capacity) && (outIndex < outputBuffer.Capacity))
-    {
-        float advanceTime = minf(timeTillNextInSample, timeTillNextOutSample);
-        timeTillNextInSample -= advanceTime;
-        timeTillNextOutSample -= advanceTime;
-
-        if(timeTillNextInSample <= 0.0f)
-        {
-            timeTillNextInSample += inTimePerSample;
-            inIndex++;
-        }
-        if(timeTillNextOutSample <= 0.0f)
-        {
-            timeTillNextOutSample += outTimePerSample;
-            float previousInSample = inputBuffer.Data[inIndex-1];
-            float nextInSample = inputBuffer.Data[inIndex];
-            float lerpFactor = 1.0f - (timeTillNextInSample/inTimePerSample);
-            outputBuffer.Data[outIndex] = lerp(previousInSample, nextInSample, lerpFactor);
-            outIndex++;
-        }
-    }
-    outputBuffer.Length = outIndex;
-
-    // NOTE: If the inBuffer is shorter than the outBuffer, we just fill the rest of the
-    //       outBuffer with silence
-    while(outIndex < outputBuffer.Capacity)
-    {
-        outputBuffer.Data[outIndex++] = 0.0f;
-    }
-    //outputBuffer.Length = outputBuffer.Capacity;
-}
-

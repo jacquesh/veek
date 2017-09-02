@@ -338,8 +338,23 @@ void Audio::decodePacket(OpusDecoder* decoder,
 
     if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
+        logTerm("Resample a buffer after decoding\n");
+        static ResampleStreamContext ctx = {};
+        ctx.InputSampleRate = audioState.decodingBuffer.SampleRate;
+        ctx.OutputSampleRate = targetAudioBuffer.SampleRate;
+        targetAudioBuffer.Length = 0;
         audioState.decodingBuffer.Length = totalFramesDecoded;
-        resampleBuffer(audioState.decodingBuffer, targetAudioBuffer);
+
+        for(int i=0; i<audioState.decodingBuffer.Length; i++)
+        {
+            resampleStreamInput(ctx, audioState.decodingBuffer.Data[i]);
+            while(!resampleStreamRequiresInput(ctx))
+            {
+                float sample = resampleStreamOutput(ctx);
+                targetAudioBuffer.Data[targetAudioBuffer.Length++] = sample;
+            }
+
+        }
     }
     else
     {
@@ -357,7 +372,19 @@ int Audio::encodePacket(AudioBuffer& sourceBuffer,
     int sourceLengthRemaining = sourceBuffer.Length;
     if(sourceBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
-        resampleBuffer(sourceBuffer, audioState.encodingBuffer);
+        static ResampleStreamContext ctx = {};
+        ctx.InputSampleRate = sourceBuffer.SampleRate;
+        ctx.OutputSampleRate = NETWORK_SAMPLE_RATE;
+        audioState.encodingBuffer.Length = 0;
+        for(int i=0; i<sourceBuffer.Length; i++)
+        {
+            resampleStreamInput(ctx, sourceBuffer.Data[i]);
+            while(!resampleStreamRequiresInput(ctx))
+            {
+                float sample = resampleStreamOutput(ctx);
+                audioState.encodingBuffer.Data[audioState.encodingBuffer.Length++] = sample;
+            }
+        }
         sourceData = audioState.encodingBuffer.Data;
         sourceLengthRemaining = audioState.encodingBuffer.Length;
     }
