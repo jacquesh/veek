@@ -10,7 +10,17 @@ RingBuffer::RingBuffer(int size)
     : capacity(size), readIndex(0), writeIndex(0)
 {
     buffer = new float[size];
+
+    // TODO: Note that this memset masks an error whereby we read before writing when we
+    //       start listening to input (on the listenBuffer).
+    //       We can reliably reproduce the issue by simply setting everything to some very large
+    //       value (10e10) and looking at the output wave.
+    memset(buffer, 0, sizeof(float)*size);
+
     lock = createMutex();
+
+    totalWrites = 0;
+    totalReads = 0;
 }
 
 RingBuffer::~RingBuffer()
@@ -61,6 +71,7 @@ void RingBuffer::write(int valCount, float* vals)
     {
         writeIndex -= capacity;
     }
+    totalWrites += valCount;
     unlockMutex(lock);
 }
 
@@ -74,6 +85,10 @@ void RingBuffer::read(int valCount, float* vals)
     {
         for(int i=0; i<valCount; ++i)
         {
+            if(readIndex+i == writeIndex)
+            {
+                logTerm("ERROR: Reading past the write pointer @ %d\n", writeIndex);
+            }
             vals[i] = buffer[readIndex+i];
         }
     }
@@ -81,12 +96,20 @@ void RingBuffer::read(int valCount, float* vals)
     {
         for(int i=0; i<contiguousAvailableValues; ++i)
         {
+            if(readIndex+i == writeIndex)
+            {
+                logTerm("ERROR: Reading past the write pointer @ %d\n", writeIndex);
+            }
             vals[i] = buffer[readIndex+i];
         }
 
         int wrappedValCount = valCount - contiguousAvailableValues;
         for(int i=0; i<wrappedValCount; ++i)
         {
+            if(i == writeIndex)
+            {
+                logTerm("ERROR: Reading past the write pointer @ %d\n", writeIndex);
+            }
             vals[contiguousAvailableValues+i] = buffer[i];
         }
     }
@@ -96,14 +119,12 @@ void RingBuffer::read(int valCount, float* vals)
     {
         readIndex -= capacity;
     }
+    totalReads += valCount;
     unlockMutex(lock);
 }
 
 int RingBuffer::count()
 {
-    // NOTE: The order is important here, if we read the writeIndex second, we might get
-    //       a count that is larger than it really is. This is bad but we're ok with getting one
-    //       that is smaller (since we'll just miss a couple values instead of getting wrong ones)
     lockMutex(lock);
     int localWriteIndex = writeIndex;
     int localReadIndex = readIndex;
@@ -117,8 +138,6 @@ int RingBuffer::count()
 
 int RingBuffer::free()
 {
-    // NOTE: As with count(), order is important here. We load read first then write so that we
-    //       err on the side of giving a smaller-than-correct value
     lockMutex(lock);
     int localReadIndex = readIndex;
     int localWriteIndex = writeIndex;

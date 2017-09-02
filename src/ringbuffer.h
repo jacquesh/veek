@@ -36,6 +36,9 @@ private:
     int readIndex;
     int writeIndex;
     Mutex* lock;
+
+    uint64_t totalWrites;
+    uint64_t totalReads;
 };
 
 #endif

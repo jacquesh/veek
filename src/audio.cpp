@@ -66,7 +66,7 @@ static SoundIoOutStream* outStream = 0;
 
 static UnorderedList<AudioSource> sourceList(10); // TODO: Pick a correct max value here, 8 users + test sound + listening? I dunno
 
-RingBuffer* listenBuffer;
+static RingBuffer* listenBuffer;
 
 static std::unordered_map<UserIdentifier, UserAudioData> audioUsers;
 
