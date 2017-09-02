@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <assert.h>
 #include <unordered_map>
 
 #include "soundio/soundio.h"
@@ -67,7 +66,7 @@ static SoundIoOutStream* outStream = 0;
 
 static UnorderedList<AudioSource> sourceList(10); // TODO: Pick a correct max value here, 8 users + test sound + listening? I dunno
 
-static RingBuffer* listenBuffer;
+RingBuffer* listenBuffer;
 
 static std::unordered_map<UserIdentifier, UserAudioData> audioUsers;
 
@@ -164,7 +163,10 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             // TODO: Proper audio mixing. Reading: http://www.voegler.eu/pub/audio/digital-audio-mixing-and-normalization.html
             float val = 0.0f;
             if(audioState.isListeningToInput)
+            {
                 listenBuffer->read(1, &val);
+            }
+
 #if 0
             for(auto userKV : audioUsers)
             {
@@ -477,7 +479,6 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
                  packet.encodedDataLength, packet.encodedData,
                  tempBuffer);
     logTerm("Received %d samples\n", tempBuffer.Length);
-    assert(tempBuffer.Length <= srcUser.buffer->free()); // TODO: This is probably not a sensible assert? We don't want this to happen but if it does we don't want to crash.
     srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
     logTerm("New sample count for user %d: %d\n", packet.srcUser, srcUser.buffer->count());
     delete[] tempBuffer.Data;
@@ -516,14 +517,14 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
         static ResampleStreamContext ctx = {};
         ctx.InputSampleRate = buffer.SampleRate;
         ctx.OutputSampleRate = outStream->sample_rate;
+
         for(int i=0; i<samplesToWrite; i++)
         {
-            float resampledSamples[3];
-            int resampleCount = resampleStream(ctx, buffer.Data[i], resampledSamples, 3);
-
-            for(int j=0; j<resampleCount; j++)
+            resampleStreamInput(ctx, buffer.Data[i]);
+            while(!resampleStreamRequiresInput(ctx))
             {
-                listenBuffer->write(1, &resampledSamples[j]);
+                float sample = resampleStreamOutput(ctx);
+                listenBuffer->write(1, &sample);
             }
         }
     }
