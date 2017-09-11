@@ -1,5 +1,9 @@
 #include "ringbuffer.h"
 
+#ifdef __linux__
+#include <string.h>
+#endif
+
 #include <assert.h>
 #include <atomic>
 

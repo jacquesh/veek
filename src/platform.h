@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __linux__
+#include <stddef.h>
+#endif
+
 // TODO: Docs, what do these functions return?
 
 struct DateTime

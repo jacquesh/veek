@@ -1,5 +1,9 @@
 #include "user.h"
 
+#ifdef __linux__
+#include <string.h>
+#endif
+
 #include <assert.h>
 
 #include "audio.h"
