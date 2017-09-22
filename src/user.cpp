@@ -14,6 +14,8 @@ bool NetworkUserSetupPacket::serialize(Packet& packet)
     packet.serializeuint8(this->userID);
     packet.serializeuint8(this->nameLength);
     packet.serializestring(this->name, MAX_USER_NAME_LENGTH);
+    packet.serializebool(this->createRoom);
+    packet.serializeuint8(this->roomId);
 
     return true;
 }
@@ -46,6 +48,7 @@ template bool NetworkUserConnectPacket::serialize(NetworkOutPacket& packet);
 template<typename Packet>
 bool NetworkUserInitPacket::serialize(Packet& packet)
 {
+    packet.serializeuint8(this->roomId);
     packet.serializeuint8(this->userCount);
 
     for(int i=0; i<this->userCount; i++)

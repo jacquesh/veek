@@ -1,6 +1,5 @@
 # Milestones
 ## v0.1
-* Basic room support (even if its just a random number).
 * Audio transfer that records/plays without artefacts, independant of input or output sample rate
 
 

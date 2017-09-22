@@ -57,6 +57,8 @@ struct GameState
 const int HOSTNAME_MAX_LENGTH = 26;
 static char serverHostname[HOSTNAME_MAX_LENGTH];
 
+static char roomToJoinBuffer[4];
+
 static bool running;
 extern int screenWidth;
 extern int screenHeight;
@@ -69,6 +71,8 @@ static Audio::AudioBuffer micBuffer;
 void initGame(GameState* game)
 {
     strcpy(serverHostname, "localhost");
+    roomToJoinBuffer[0] = '\0';
+
     game->speakersEnabled = Audio::enableSpeakers(true);
     game->micEnabled = Audio::enableMicrophone(true);
     game->micActivationMode = MicActivationMode::Always;
@@ -232,11 +236,23 @@ void renderGame(GameState* game, float deltaTime)
             ImGui::Text("Server:");
             ImGui::SameLine();
             ImGui::InputText("##serverHostname", serverHostname, HOSTNAME_MAX_LENGTH);
+
+            int roomIdFlags = ImGuiInputTextFlags_CharsDecimal;
+            ImGui::Text("Room ID:");
+            ImGui::SameLine();
+            ImGui::InputText("##roomId", roomToJoinBuffer, sizeof(roomToJoinBuffer), roomIdFlags);
+
+            ImGui::Text("Create room:");
+            ImGui::SameLine();
+            bool createRoom = (strlen(roomToJoinBuffer) == 0);
+            ImGui::Checkbox("##createNewRoom", &createRoom);
+
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
-                localUser.nameLength = strlen(localUser.name);
+                localUser.nameLength = (int)strlen(localUser.name);
 
-                Network::ConnectToMasterServer(&serverHostname[0]);
+                RoomIdentifier roomId = (RoomIdentifier)atoi(roomToJoinBuffer);
+                Network::ConnectToMasterServer(&serverHostname[0], createRoom, roomId);
             }
         } break;
 
@@ -289,7 +305,11 @@ void renderGame(GameState* game, float deltaTime)
     {
         UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize;
-        ImGui::Begin("Connected users", 0, UIFlags);
+        char userWindowTitle[64];
+        snprintf(userWindowTitle, sizeof(userWindowTitle),
+                 "Users in room: %u", Network::CurrentRoom());
+
+        ImGui::Begin(userWindowTitle, 0, UIFlags);
         ImGui::SetWindowPos(ImVec2(300, 0));
         ImGui::SetWindowSize(ImVec2(150, 150));
         ImGui::Text("+");

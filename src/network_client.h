@@ -9,12 +9,13 @@ namespace Network
 {
     NetConnectionState CurrentConnectionState();
     bool IsConnectedToMasterServer();
+    RoomIdentifier CurrentRoom();
 
     bool Setup();
     void Update();
     void Shutdown();
 
-    void ConnectToMasterServer(const char* serverHostname);
+    void ConnectToMasterServer(const char* serverHostname, bool createRoom, RoomIdentifier roomToJoin);
     ClientUserData* ConnectToPeer(NetworkUserConnectPacket& userPacket);
     void DisconnectFromAllPeers();
 }

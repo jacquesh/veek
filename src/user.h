@@ -9,6 +9,7 @@
 struct UserData; // TODO: We forward-declare this here so we can use it for constructors of packets, probably not ideal
 
 typedef uint8_t UserIdentifier;
+typedef uint8_t RoomIdentifier;
 
 // Client -> Server
 // Sent as a first message when/after connecting to the server
@@ -18,6 +19,9 @@ struct NetworkUserSetupPacket
     UserIdentifier userID;
     uint8 nameLength;
     char name[MAX_USER_NAME_LENGTH];
+
+    bool createRoom;
+    RoomIdentifier roomId;
 
     template<typename Packet> bool serialize(Packet& packet);
 };
@@ -44,6 +48,7 @@ struct NetworkUserConnectPacket
 // Tells the new client about all the existing clients (each of which receive a CONNECT packet)
 struct NetworkUserInitPacket
 {
+    RoomIdentifier roomId;
     uint8 userCount;
     NetworkUserConnectPacket existingUsers[MAX_USERS];
 
@@ -61,6 +66,8 @@ struct UserData
 
 struct ServerUserData : UserData
 {
+    RoomIdentifier room;
+
     explicit ServerUserData(NetworkUserSetupPacket& setupPacket);
 };
 

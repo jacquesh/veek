@@ -11,6 +11,11 @@ struct NetworkData
     ENetHost* netHost;
     ENetPeer* netPeer;
 
+    bool shouldCreateRoomOnConnect;
+    RoomIdentifier roomToJoinOnConnect;
+
+    RoomIdentifier currentRoomId;
+
     uint8 lastSentAudioPacket;
     uint8 lastSentVideoPacket;
     uint8 lastReceivedAudioPacket;
@@ -41,7 +46,8 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
                 break;
             // TODO: We should probably ignore these if we've already received one of them
 
-            logInfo("There are %d connected users\n", initPacket.userCount);
+            logInfo("Initialization data received: In room %u with %d other users\n",
+                    initPacket.roomId, initPacket.userCount);
             for(int i=0; i<initPacket.userCount; i++)
             {
                 NetworkUserConnectPacket& userPacket = initPacket.existingUsers[i];
@@ -51,6 +57,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
 
                 logInfo("%s was already connected\n", userPacket.name);
             }
+            networkState.currentRoomId = initPacket.roomId;
             networkState.connState = NET_CONNSTATE_CONNECTED;
         } break;
         case NET_MSGTYPE_USER_CONNECT:
@@ -150,8 +157,10 @@ void Network::Update()
                 logInfo("Connected to the server\n");
                 NetworkUserSetupPacket setupPkt = {};
                 setupPkt.userID = localUser.ID;
-                setupPkt.nameLength = localUser.nameLength;
+                setupPkt.nameLength = (uint8_t)localUser.nameLength;
                 strcpy(setupPkt.name, localUser.name);
+                setupPkt.createRoom = networkState.shouldCreateRoomOnConnect;
+                setupPkt.roomId = networkState.roomToJoinOnConnect;
 
                 NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_USER_SETUP);
                 setupPkt.serialize(outPacket);
@@ -234,6 +243,11 @@ bool Network::IsConnectedToMasterServer()
     return networkState.connState == NET_CONNSTATE_CONNECTED;
 }
 
+RoomIdentifier Network::CurrentRoom()
+{
+    return networkState.currentRoomId;
+}
+
 void Network::Shutdown()
 {
     if(networkState.netPeer)
@@ -249,12 +263,17 @@ void Network::Shutdown()
     enet_deinitialize();
 }
 
-void Network::ConnectToMasterServer(const char* serverHostname)
+void Network::ConnectToMasterServer(const char* serverHostname,
+                                    bool createRoom,
+                                    RoomIdentifier roomToJoin)
 {
     networkState.connState = NET_CONNSTATE_CONNECTING;
     ENetAddress peerAddr = {};
     enet_address_set_host(&peerAddr, serverHostname);
     peerAddr.port = NET_PORT;
+
+    networkState.shouldCreateRoomOnConnect = createRoom;
+    networkState.roomToJoinOnConnect = roomToJoin;
 
     networkState.netHost = enet_host_create(0, 8, 2, 0,0);
     networkState.netPeer = enet_host_connect(networkState.netHost, &peerAddr, 2, 0);
