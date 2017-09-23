@@ -609,14 +609,15 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     if(openError != SoundIoErrorNone)
     {
         logFail("Error opening input stream: %s\n", soundio_strerror(openError));
-        if(inStream->layout_error)
-        {
-            logFail("  Stream layout error: %s\n", soundio_strerror(inStream->layout_error));
-        }
         soundio_instream_destroy(inStream);
         inStream = 0;
         return false;
     }
+    if(inStream->layout_error)
+    {
+        logFail("Input stream layout error: %s\n", soundio_strerror(inStream->layout_error));
+    }
+
     int startError = soundio_instream_start(inStream);
     if(startError != SoundIoErrorNone)
     {
@@ -669,14 +670,15 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     if(openError != SoundIoErrorNone)
     {
         logFail("Error opening output stream: %s\n", soundio_strerror(openError));
-        if(outStream->layout_error)
-        {
-            logFail("  Stream layout error: %s\n", soundio_strerror(outStream->layout_error));
-        }
         soundio_outstream_destroy(outStream);
         outStream = 0;
         return false;
     }
+    if(outStream->layout_error)
+    {
+        logFail("Output stream layout error: %s\n", soundio_strerror(outStream->layout_error));
+    }
+
     int startError = soundio_outstream_start(outStream);
     if(startError != SoundIoErrorNone)
     {
