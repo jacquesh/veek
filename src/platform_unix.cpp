@@ -89,16 +89,19 @@ bool isPushToTalkKeyPushed()
 
 DateTime getLocalDateTime()
 {
-    time_t t = time(0);
-    struct tm* now = localtime(&t);
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+
+    uint16_t nowMillis = (uint16_t)(now.tv_nsec/1000000);
+    struct tm nowSplit = localtime_r(&now.tv_sec, &nowSplit);
 
     DateTime result = {};
-    result.Year = now->tm_year + 1990;
-    result.Month = now->tm_mon;
-    result.Day = now->tm_mday;
-    result.Hour = now->tm_hour;
-    result.Minute = now->tm_min;
-    result.Second = now->tm_sec;
-    result.Millisecond = 0;
+    result.Year = nowSplit.tm_year + 1990;
+    result.Month = nowSplit.tm_mon;
+    result.Day = nowSplit.tm_mday;
+    result.Hour = nowSplit.tm_hour;
+    result.Minute = nowSplit.tm_min;
+    result.Second = nowSplit.tm_sec;
+    result.Millisecond = nowMillis;
     return result;
 }
