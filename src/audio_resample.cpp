@@ -4,6 +4,10 @@
 #include "logging.h"
 #include "math_utils.h"
 
+#ifdef UNIX
+#include <stddef.h>
+#endif
+
 
 // TODO: Improve resample speed/quality.
 //       E.g Opus FAQ (https://wiki.xiph.org/OpusFAQ) lists one from opus-tools:
