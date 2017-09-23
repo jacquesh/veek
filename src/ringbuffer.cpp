@@ -38,9 +38,9 @@ void RingBuffer::write(int valCount, float* vals)
     lockMutex(lock);
     assert(valCount < capacity);
 
-    if(valCount > free())
+    if(valCount > freeInternal())
     {
-        int readIndexIncrement = valCount - free();
+        int readIndexIncrement = valCount - freeInternal();
         readIndex += readIndexIncrement;
         if(readIndex >= capacity)
         {
@@ -143,9 +143,16 @@ int RingBuffer::count()
 int RingBuffer::free()
 {
     lockMutex(lock);
+    int result = freeInternal();
+    unlockMutex(lock);
+
+    return result;
+}
+
+int RingBuffer::freeInternal()
+{
     int localReadIndex = readIndex;
     int localWriteIndex = writeIndex;
-    unlockMutex(lock);
 
     int numberOfSlots;
     if(localReadIndex <= localWriteIndex)

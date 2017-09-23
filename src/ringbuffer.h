@@ -39,6 +39,9 @@ private:
 
     uint64_t totalWrites;
     uint64_t totalReads;
+
+    // NOTE: This function is not thread-safe
+    int freeInternal();
 };
 
 #endif
