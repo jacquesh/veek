@@ -40,12 +40,6 @@ void sleepForMilliseconds(uint32 milliseconds)
     usleep(1000*milliseconds);
 }
 
-int getCurrentUsername(size_t bufferLen, char* buffer)
-{
-    int result = getlogin_r(buffer, bufferLen);
-    return result;
-}
-
 int getCurrentUserName(size_t bufferLen, char* buffer)
 {
     int result = getlogin_r(buffer, bufferLen);
@@ -93,7 +87,8 @@ DateTime getLocalDateTime()
     clock_gettime(CLOCK_REALTIME, &now);
 
     uint16_t nowMillis = (uint16_t)(now.tv_nsec/1000000);
-    struct tm nowSplit = localtime_r(&now.tv_sec, &nowSplit);
+    struct tm nowSplit = {};
+    localtime_r(&now.tv_sec, &nowSplit);
 
     DateTime result = {};
     result.Year = nowSplit.tm_year + 1990;
