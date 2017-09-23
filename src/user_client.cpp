@@ -1,8 +1,5 @@
-#include "assert.h"
-
-#ifdef __linux__
+#include <assert.h>
 #include <string.h>
-#endif
 
 #include "audio.h"
 #include "common.h"

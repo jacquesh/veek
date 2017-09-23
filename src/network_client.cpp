@@ -1,8 +1,5 @@
 #include <assert.h>
-
-#ifdef __linux__
 #include <string.h>
-#endif
 
 #include "logging.h"
 #include "network.h"

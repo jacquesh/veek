@@ -1,11 +1,8 @@
 #ifndef _PLATFORM_H
 #define _PLATFORM_H
 
-#include <stdint.h>
-
-#ifdef __linux__
 #include <stddef.h>
-#endif
+#include <stdint.h>
 
 // TODO: Docs, what do these functions return?
 

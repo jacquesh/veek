@@ -1,14 +1,9 @@
-#include "ringbuffer.h"
-
-#ifdef __linux__
-#include <string.h>
-#endif
-
 #include <assert.h>
-#include <atomic>
+#include <string.h>
 
 #include "platform.h"
 #include "logging.h"
+#include "ringbuffer.h"
 
 RingBuffer::RingBuffer(int size)
     : capacity(size), readIndex(0), writeIndex(0)

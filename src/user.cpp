@@ -1,15 +1,11 @@
-#include "user.h"
-
-#ifdef __linux__
-#include <string.h>
-#endif
-
 #include <assert.h>
+#include <string.h>
 
 #include "audio.h"
-#include "video.h"
 #include "logging.h"
 #include "network.h"
+#include "user.h"
+#include "video.h"
 
 
 template<typename Packet>
