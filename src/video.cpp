@@ -1,7 +1,7 @@
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 
 #include "theora/theoraenc.h"
 #include "theora/theoradec.h"
@@ -16,11 +16,11 @@
 #include <stdlib.h> // For srand/rand
 #endif
 
-#include "video.h"
 #include "common.h"
-#include "crossCap.h"
 #include "logging.h"
 #include "network.h"
+#include "video.h"
+#include "videoinput.h"
 
 // https://www.reddit.com/r/programming/comments/4rljty/got_fed_up_with_skype_wrote_my_own_toy_video_chat?st=iql0rqn9&sh=7602e95d
 // https://github.com/rygorous/kkapture
@@ -53,6 +53,8 @@ int cameraHeight = 240;
 static int pixelBytes = 0;
 static uint8* pixelValues = 0;
 
+static videoInput VI;
+
 static th_enc_ctx* encoderContext;
 static th_dec_ctx* decoderContext;
 
@@ -74,9 +76,9 @@ bool Video::enableCamera(int deviceID)
 
     if(((deviceID < 0) || (deviceID != cameraDevice)) && (cameraDevice >= 0))
     {
-        const char* deviceName = cc_deviceName(cameraDevice);
+        const char* deviceName = VI.getDeviceName(cameraDevice);
         logInfo("Disable camera: %s\n", deviceName);
-        cc_disableDevice(cameraDevice);
+        VI.stopDevice(cameraDevice);
         cameraDevice = -1;
     }
 
@@ -88,14 +90,14 @@ bool Video::enableCamera(int deviceID)
         }
 
         cameraDevice = deviceID;
-        const char* deviceName = cc_deviceName(cameraDevice);
+        const char* deviceName = VI.getDeviceName(cameraDevice);
         logInfo("Enable camera: %s\n", deviceName);
 
-        bool success = cc_enableDevice(cameraDevice, cameraWidth, cameraHeight);
+        bool success = VI.setupDevice(cameraDevice, cameraWidth, cameraHeight);
         if(success)
         {
             logInfo("Begin video capture using %s - Dimensions are %dx%d\n", deviceName,
-                    cc_getWidth(cameraDevice), cc_getHeight(cameraDevice));
+                    VI.getWidth(cameraDevice), VI.getHeight(cameraDevice));
             return true;
         }
         else
@@ -110,11 +112,11 @@ bool Video::enableCamera(int deviceID)
 
 bool Video::checkForNewVideoFrame()
 {
-    bool result = cc_isFrameNew(cameraDevice);
+    bool result = VI.isFrameNew(cameraDevice);
     if(result)
     {
         //logTerm("Recevied video input frame from local camera\n"); // TODO: Wraithy gets none of these
-        cc_getPixels(cameraDevice, pixelValues);
+        VI.getPixels(cameraDevice, pixelValues, true, true);
     }
     return result;
 }
@@ -295,12 +297,13 @@ bool Video::Setup()
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
 
-    cc_initialize();
-    cameraDeviceCount = cc_deviceCount();
+    // TODO: Remove the first list here? Surely its irrelevant?
+    VI.listDevices(); // NOTE: This serves to initialize videoInput
+    cameraDeviceCount = VI.listDevices(true);
     cameraDeviceNames = new char*[cameraDeviceCount];
     for(int i=0; i<cameraDeviceCount; i++)
     {
-        const char* deviceName = cc_deviceName(i);
+        const char* deviceName = VI.getDeviceName(i);
         cameraDeviceNames[i] = new char[strlen(deviceName)+1];
         strcpy(cameraDeviceNames[i], deviceName);
     }
@@ -449,6 +452,7 @@ void Video::Shutdown()
 template<typename Packet>
 bool Video::NetworkVideoPacket::serialize(Packet& packet)
 {
+    packet.serializeuint8(this->srcUser);
     packet.serializeuint8(this->index);
     packet.serializeuint16(this->imageWidth);
     packet.serializeuint16(this->imageHeight);
