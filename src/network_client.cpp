@@ -106,7 +106,6 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
             sourceUser->processIncomingAudioPacket(audioInPacket);
         } break;
 
-#ifdef VIDEO_ENABLED
         case NET_MSGTYPE_VIDEO:
         {
             Video::NetworkVideoPacket videoInPacket;
@@ -133,7 +132,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
 
             sourceUser->processIncomingVideoPacket(videoInPacket);
         } break;
-#endif
+
         default:
         {
             logWarn("Received data of unknown type: %u\n", dataType);

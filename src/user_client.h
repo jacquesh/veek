@@ -20,7 +20,7 @@ struct ClientUserData : UserData
 
     // Network
     uint8 lastSentAudioPacket;
-    uint8 lastSendVideoPacket;
+    uint8 lastSentVideoPacket;
     uint8 lastReceivedAudioPacket;
     uint8 lastReceivedVideoPacket;
 

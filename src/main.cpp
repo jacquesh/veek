@@ -18,11 +18,9 @@
 #include "render.h"
 #include "user.h"
 #include "user_client.h"
-#ifdef VIDEO_ENABLED
 #include "video.h"
 const int cameraWidth = 320;
 const int cameraHeight = 240;
-#endif
 
 #ifndef BUILD_VERSION
 #define BUILD_VERSION "Unknown"
@@ -86,19 +84,17 @@ void renderGame(GameState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
-#if VIDEO_ENABLED
     ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
 
     ImGui::Begin("Video");
     ImGui::Image((ImTextureID)localUser.videoTexture, size);
 
-    for(auto userIter=game->remoteUsers.begin(); userIter!=game->remoteUsers.end(); userIter++)
+    for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
         ImGui::Image((ImTextureID)user->videoTexture, size);
     }
     ImGui::End();
-#endif
 
     // Options window
     ImVec2 windowLoc(0.0f, 0.0f);
@@ -121,7 +117,6 @@ void renderGame(GameState* game, float deltaTime)
     }
     ImGui::Text("%.1ffps", 1.0f/deltaTime);
 
-#ifdef VIDEO_ENABLED
     static int selectedCameraDevice = 0;
     if(ImGui::CollapsingHeader("Video", 0, true, false))
     {
@@ -151,7 +146,6 @@ void renderGame(GameState* game, float deltaTime)
             }
         }
     }
-#endif
 
     static bool listening = false;
     static int selectedRecordingDevice = 0;
@@ -387,7 +381,6 @@ void handleAudioInput(GameState& game)
     }
 }
 
-#ifdef VIDEO_ENABLED
 void handleVideoInput(GameState& game)
 {
     if(game.cameraEnabled)
@@ -405,13 +398,13 @@ void handleVideoInput(GameState& game)
                                             320*240*3, encPx);
             Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
-            glBindTexture(GL_TEXTURE_2D, game.localUser.videoTexture);
+            glBindTexture(GL_TEXTURE_2D, localUser.videoTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                          cameraWidth, cameraHeight, 0,
                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
             glBindTexture(GL_TEXTURE_2D, 0);
 
-            if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
+            if(Network::IsConnectedToMasterServer())
             {
                 static uint8* encodedPixels = new uint8[320*240*3];
                 int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
@@ -419,21 +412,25 @@ void handleVideoInput(GameState& game)
                 //logTerm("Encoded %d video bytes\n", videoBytes);
                 //delete[] encodedPixels;
                 Video::NetworkVideoPacket videoPacket = {};
-                videoPacket.index = game.lastSentVideoPacket++;
                 videoPacket.imageWidth = 320;
                 videoPacket.imageHeight = 240;
                 videoPacket.encodedDataLength = videoBytes;
                 memcpy(videoPacket.encodedData, encodedPixels, videoBytes);
 
-                NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_VIDEO);
-                videoPacket.serialize(outPacket);
-                outPacket.send(game.netPeer, 0, false);
-                //netOutBytes += packet->dataLength; // TODO
+                for(int i=0; i<remoteUsers.size(); i++)
+                {
+                    ClientUserData* destinationUser = remoteUsers[i];
+                    videoPacket.srcUser = localUser.ID;
+                    videoPacket.index = destinationUser->lastSentVideoPacket++;
+
+                    NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_VIDEO);
+                    videoPacket.serialize(outPacket);
+                    outPacket.send(destinationUser->netPeer, 0, false);
+                }
             }
         }
     }
 }
-#endif
 
 int main()
 {
@@ -499,7 +496,6 @@ int main()
         return 1;
     }
 
-#ifdef VIDEO_ENABLED
     logInfo("Initializing video input subsystem...\n");
     if(!Video::Setup())
     {
@@ -509,14 +505,11 @@ int main()
         glfwTerminate();
         return 1;
     }
-#endif
 
     if(!Network::Setup())
     {
         logFail("Unable to initialize enet!\n");
-#ifdef VIDEO_ENABLED
         Video::Shutdown();
-#endif
         Audio::Shutdown();
         Render::Shutdown();
         glfwTerminate();
@@ -551,9 +544,7 @@ int main()
 
         Audio::Update();
         handleAudioInput(game);
-#ifdef VIDEO_ENABLED
         handleVideoInput(game);
-#endif
         Network::Update();
 
         // Rendering
@@ -579,9 +570,7 @@ int main()
     cleanupGame();
 
     Network::Shutdown();
-#ifdef VIDEO_ENABLED
     Video::Shutdown();
-#endif
     Audio::Shutdown();
     ImGui_ImplGlfwGL3_Shutdown();
     Render::Shutdown();

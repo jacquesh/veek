@@ -54,7 +54,6 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)
 {
-#ifdef VIDEO_ENABLED
     if(((packet.index < 20) && (this->lastReceivedVideoPacket > 235)) ||
             (this->lastReceivedVideoPacket < packet.index))
     {
@@ -80,7 +79,4 @@ void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packe
     {
         logWarn("Video packet %d received out of order\n", packet.index);
     }
-#else
-    logWarn("Attempting to call a video-related function without video enabled, define VIDEO_ENABLED\n");
-#endif
 }
