@@ -86,9 +86,12 @@ void renderGame(GameState* game, float deltaTime)
 
     ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
 
-    ImGui::Begin("Video");
+    ImGui::Begin("Local Video");
+    size = ImGui::GetContentRegionAvail();
     ImGui::Image((ImTextureID)localUser.videoTexture, size);
+    ImGui::End();
 
+    ImGui::Begin("Remote Video");
     for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
