@@ -9,10 +9,15 @@
 #include "user.h"
 #include "user_client.h"
 
-ClientUserData localUser;
+ClientUserData* localUser;
 std::vector<ClientUserData*> remoteUsers;
 
 static uint32 micBufferLen = 2400; // TODO: Make this a constant in audio.h or something
+
+ClientUserData::ClientUserData()
+{
+    this->videoTexture = Render::createTexture();
+}
 
 ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
 {
@@ -20,13 +25,8 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     this->nameLength = connectionPacket.nameLength;
     memcpy(this->name, connectionPacket.name, connectionPacket.nameLength);
     this->name[connectionPacket.nameLength] = 0;
+    this->videoTexture = Render::createTexture();
     logInfo("Connected to user %d with name of length %d: %s\n", ID, nameLength, name);
-}
-
-void ClientUserData::Initialize()
-{
-    videoTexture = Render::createTexture();
-    localUser.ID = (uint8_t)(1 + (getClockValue() & 0xFE));
 }
 
 ClientUserData::~ClientUserData()

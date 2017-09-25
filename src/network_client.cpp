@@ -77,7 +77,6 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
 
         case NET_MSGTYPE_AUDIO:
         {
-
             Audio::NetworkAudioPacket audioInPacket;
             if(!audioInPacket.serialize(incomingPacket))
             {
@@ -156,9 +155,9 @@ void Network::Update()
             {
                 logInfo("Connected to the server\n");
                 NetworkUserSetupPacket setupPkt = {};
-                setupPkt.userID = localUser.ID;
-                setupPkt.nameLength = (uint8_t)localUser.nameLength;
-                strcpy(setupPkt.name, localUser.name);
+                setupPkt.userID = localUser->ID;
+                setupPkt.nameLength = (uint8_t)localUser->nameLength;
+                strcpy(setupPkt.name, localUser->name);
                 setupPkt.createRoom = networkState.shouldCreateRoomOnConnect;
                 setupPkt.roomId = networkState.roomToJoinOnConnect;
 

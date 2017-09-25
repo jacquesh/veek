@@ -25,17 +25,15 @@ struct ClientUserData : UserData
     uint8 lastReceivedVideoPacket;
 
     // Functions
-    ClientUserData() = default;
+    ClientUserData();
     explicit ClientUserData(NetworkUserConnectPacket& connectionPacket);
     virtual ~ClientUserData();
-
-    void Initialize();
 
     void processIncomingAudioPacket(Audio::NetworkAudioPacket& packet);
     void processIncomingVideoPacket(Video::NetworkVideoPacket& packet);
 };
 
-extern ClientUserData localUser;
+extern ClientUserData* localUser;
 extern std::vector<ClientUserData*> remoteUsers;
 
 #endif

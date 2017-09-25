@@ -76,8 +76,9 @@ void initGame(GameState* game)
     game->micActivationMode = MicActivationMode::Always;
     game->micActive = true;
 
-    getCurrentUserName(MAX_USER_NAME_LENGTH, localUser.name);
-    localUser.Initialize();
+    localUser = new ClientUserData();
+    localUser->ID = (uint8_t)(1 + (getClockValue() & 0xFE));
+    getCurrentUserName(MAX_USER_NAME_LENGTH, localUser->name);
 }
 
 void renderGame(GameState* game, float deltaTime)
@@ -88,7 +89,7 @@ void renderGame(GameState* game, float deltaTime)
 
     ImGui::Begin("Local Video");
     size = ImGui::GetContentRegionAvail();
-    ImGui::Image((ImTextureID)localUser.videoTexture, size);
+    ImGui::Image((ImTextureID)localUser->videoTexture, size);
     ImGui::End();
 
     ImGui::Begin("Remote Video");
@@ -112,11 +113,11 @@ void renderGame(GameState* game, float deltaTime)
     {
         ImGui::Text("You are:");
         ImGui::SameLine();
-        ImGui::InputText("##userNameField", localUser.name, MAX_USER_NAME_LENGTH);
+        ImGui::InputText("##userNameField", localUser->name, MAX_USER_NAME_LENGTH);
     }
     else
     {
-        ImGui::Text("You are: %s", localUser.name);
+        ImGui::Text("You are: %s", localUser->name);
     }
     ImGui::Text("%.1ffps", 1.0f/deltaTime);
 
@@ -246,7 +247,7 @@ void renderGame(GameState* game, float deltaTime)
 
             if(ImGui::Button("Connect", ImVec2(60,20)))
             {
-                localUser.nameLength = (int)strlen(localUser.name);
+                localUser->nameLength = (int)strlen(localUser->name);
 
                 RoomIdentifier roomId = (RoomIdentifier)atoi(roomToJoinBuffer);
                 Network::ConnectToMasterServer(&serverHostname[0], createRoom, roomId);
@@ -311,7 +312,7 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::SetWindowSize(ImVec2(150, 150));
         ImGui::Text("+");
         ImGui::SameLine();
-        ImGui::Text(localUser.name);
+        ImGui::Text(localUser->name);
         for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
         {
             ClientUserData* user = *userIter;
@@ -325,6 +326,7 @@ void renderGame(GameState* game, float deltaTime)
 
 void cleanupGame()
 {
+    delete localUser;
 }
 
 void glfwErrorCallback(int errorCode, const char* errorDescription)
@@ -401,7 +403,7 @@ void handleVideoInput(GameState& game)
                                             320*240*3, encPx);
             Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
-            glBindTexture(GL_TEXTURE_2D, localUser.videoTexture);
+            glBindTexture(GL_TEXTURE_2D, localUser->videoTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                          cameraWidth, cameraHeight, 0,
                          GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
@@ -423,7 +425,7 @@ void handleVideoInput(GameState& game)
                 for(int i=0; i<remoteUsers.size(); i++)
                 {
                     ClientUserData* destinationUser = remoteUsers[i];
-                    videoPacket.srcUser = localUser.ID;
+                    videoPacket.srcUser = localUser->ID;
                     videoPacket.index = destinationUser->lastSentVideoPacket++;
 
                     NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_VIDEO);

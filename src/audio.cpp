@@ -1020,7 +1020,7 @@ void Audio::SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer)
     int audioBytes = encodePacket(sourceBuffer, encodedBufferLength, encodedBuffer);
 
     NetworkAudioPacket audioPacket = {};
-    audioPacket.srcUser = localUser.ID;
+    audioPacket.srcUser = localUser->ID;
     audioPacket.index = user->lastSentAudioPacket++;
     audioPacket.encodedDataLength = audioBytes;
     memcpy(audioPacket.encodedData, encodedBuffer, audioBytes);
