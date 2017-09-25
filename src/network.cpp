@@ -126,8 +126,13 @@ NetworkOutPacket createNetworkOutPacket(NetworkMessageType msgType)
 {
     // TODO: Constructors?
     NetworkOutPacket result = {};
-    int MTU = 1200;
-    ENetPacket* enetPacket = enet_packet_create(NULL, MTU, 0);
+
+    // TODO: This used to be 1200 so that all packets were guaranteed to fit into one internet MTU.
+    //       It was increased so that video keyframes would fit into a single packet easily.
+    //       This should absolutely be changed to either set the size dynamically or to split out
+    //       packets into smaller segments.
+    int maxPacketBytes = 8*1024;
+    ENetPacket* enetPacket = enet_packet_create(NULL, maxPacketBytes, 0);
     result.enetPacket = enetPacket;
     result.contents = enetPacket->data;
     result.length = enetPacket->dataLength;
