@@ -87,16 +87,23 @@ void renderGame(GameState* game, float deltaTime)
 
     ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
 
-    ImGui::Begin("Local Video");
-    size = ImGui::GetContentRegionAvail();
+    ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
+    ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
     ImGui::Image((ImTextureID)localUser->videoTexture, size);
     ImGui::End();
 
-    ImGui::Begin("Remote Video");
+    ImGui::SetNextWindowPos(ImVec2(0,0));
+    ImGuiWindowFlags remoteVideoWindowFlags = ImGuiWindowFlags_NoMove |
+                                              ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                              ImGuiWindowFlags_NoTitleBar;
+    ImGui::Begin("Remote Video", nullptr, size, -1.0f, remoteVideoWindowFlags);
     for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
     {
         ClientUserData* user = *userIter;
+        ImGui::BeginGroup();
+        ImGui::Text(user->name);
         ImGui::Image((ImTextureID)user->videoTexture, size);
+        ImGui::EndGroup();
     }
     ImGui::End();
 
