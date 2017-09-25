@@ -5,12 +5,10 @@
 
 # More specifically
 ## Pre-video things:
-* Move the server over to using the network serialization functions
 * Fix the RingBuffer not preventing you from reading a value multiple times if you wrap around because you aren't writing to it. The effect of this problem is that if you listen to the input for a bit and then disable the mic, the listen buffer just loops.
-* Add user-specific audio setup/shutdown code (setup each user's decoder etc)
 * Check what happens when you join the server in the middle of a conversation/after a bunch of data has been transfered, because the codecs are stateful so we might have to do some shenanigans to make sure that it can handle that and setup the correct state to continue
 * The decoder docs state that we need to call decode with empty values for every lost packet. We do actually keep track of time but we have yet to use that to check for packet loss
-* Allow existing users to continue functioning/being connected to each other, even when they disconnect from the master server? Maybe? Just try reconnect all the time and tell the user that they might not see new peers.
+* Gracefully handle disconnecting from the master-server (try reconnecting and just continue working for the peers)
 
 ## Bugs in current functionality:
 * Cleanup old AudioSources (e.g the sine-wave generated for the "test sound")

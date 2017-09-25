@@ -407,7 +407,7 @@ void handleVideoInput(GameState& game)
             static uint8* encPx = new uint8[320*240*3];
             static uint8* decPx = new uint8[320*240*3];
             int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
-                                            320*240*3, encPx);
+                                                        320*240*3, encPx);
             Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
             glBindTexture(GL_TEXTURE_2D, localUser->videoTexture);

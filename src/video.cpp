@@ -297,9 +297,7 @@ bool Video::Setup()
     pixelBytes = cameraWidth*cameraHeight*3;
     pixelValues = new uint8[pixelBytes];
 
-    // TODO: Remove the first list here? Surely its irrelevant?
-    VI.listDevices(); // NOTE: This serves to initialize videoInput
-    cameraDeviceCount = VI.listDevices(true);
+    cameraDeviceCount = VI.listDevices();
     cameraDeviceNames = new char*[cameraDeviceCount];
     for(int i=0; i<cameraDeviceCount; i++)
     {
@@ -457,7 +455,7 @@ bool Video::NetworkVideoPacket::serialize(Packet& packet)
     packet.serializeuint16(this->imageWidth);
     packet.serializeuint16(this->imageHeight);
     packet.serializeuint16(this->encodedDataLength);
-    packet.serializestring((char*)this->encodedData, this->encodedDataLength);
+    packet.serializebytes(this->encodedData, this->encodedDataLength);
 
     return true;
 }
