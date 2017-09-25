@@ -478,9 +478,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     decodePacket(srcUser.decoder,
                  packet.encodedDataLength, packet.encodedData,
                  tempBuffer);
-    logTerm("Received %d samples\n", tempBuffer.Length);
     srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
-    logTerm("New sample count for user %d: %d\n", packet.srcUser, srcUser.buffer->count());
     delete[] tempBuffer.Data;
 }
 

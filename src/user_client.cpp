@@ -37,9 +37,9 @@ ClientUserData::~ClientUserData()
 
 void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
 {
-#if 1
-        Audio::ProcessIncomingPacket(packet);
-#else
+    // TODO: Surely we can move this logic onto either side of this function (IE into either the
+    //       audio system or the network system)? This seems like a pretty pointless function
+    //       by itself because it just calls the audio system.
     if(((packet.index < 20) && (this->lastReceivedAudioPacket > 235)) ||
             (this->lastReceivedAudioPacket < packet.index))
     {
@@ -49,7 +49,6 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
     {
         logWarn("Audio packet %u received out of order\n", packet.index);
     }
-#endif
 }
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)
@@ -72,7 +71,6 @@ void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packe
                      packet.imageWidth, packet.imageHeight, 0,
                      GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
         glBindTexture(GL_TEXTURE_2D, 0);
-        logTerm("Received %d bytes of video frame\n", packet.encodedDataLength);
         delete[] pixelValues;
     }
     else
