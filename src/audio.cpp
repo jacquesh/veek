@@ -436,7 +436,7 @@ void Audio::AddAudioUser(UserIdentifier userId)
     newUser.decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
     logInfo("Opus decoder created: %d\n", opusError);
 
-    newUser.buffer = new RingBuffer(8192);
+    newUser.buffer = new RingBuffer(48000);
 
     AudioSource userSource = {};
     userSource.buffer = newUser.buffer;
@@ -484,6 +484,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     decodePacket(srcUser.decoder,
                  packet.encodedDataLength, packet.encodedData,
                  tempBuffer);
+    logTerm("Received %d samples from the network\n", tempBuffer.Length);
     srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
     delete[] tempBuffer.Data;
 }
@@ -977,9 +978,9 @@ bool Audio::Setup()
     // get a list of connected devices
     audioState.currentInputDevice = -1;
     audioState.currentOutputDevice = -1;
-    inBuffer = new RingBuffer(4096);
+    inBuffer = new RingBuffer(48000);
 
-    listenBuffer = new RingBuffer(1 << 13);
+    listenBuffer = new RingBuffer(1 << 18);
 
     // Initialize SoundIO
     logInfo("Initializing libsoundio %s\n", soundio_version_string());

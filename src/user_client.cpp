@@ -37,6 +37,8 @@ ClientUserData::~ClientUserData()
 
 void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
 {
+    Audio::ProcessIncomingPacket(packet);
+#if 0
     // TODO: Surely we can move this logic onto either side of this function (IE into either the
     //       audio system or the network system)? This seems like a pretty pointless function
     //       by itself because it just calls the audio system.
@@ -49,6 +51,7 @@ void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packe
     {
         logWarn("Audio packet %u received out of order\n", packet.index);
     }
+#endif
 }
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)
