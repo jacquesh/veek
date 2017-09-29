@@ -164,7 +164,8 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             float val = 0.0f;
             if(audioState.isListeningToInput)
             {
-                listenBuffer->read(1, &val);
+                if(listenBuffer->count() > 0)
+                    listenBuffer->read(1, &val);
             }
 
 #if 0
