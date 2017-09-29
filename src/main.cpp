@@ -85,27 +85,35 @@ void renderGame(GameState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    ImVec2 size = ImVec2((float)cameraWidth, (float)cameraHeight);
-
-    ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
-    ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
-    ImGui::Image((ImTextureID)localUser->videoTexture, size);
-    ImGui::End();
-
-    ImGui::SetNextWindowPos(ImVec2(0,0));
-    ImGuiWindowFlags remoteVideoWindowFlags = ImGuiWindowFlags_NoMove |
-                                              ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                              ImGuiWindowFlags_NoTitleBar;
-    ImGui::Begin("Remote Video", nullptr, size, -1.0f, remoteVideoWindowFlags);
-    for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
+    // Video images
+    if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
     {
-        ClientUserData* user = *userIter;
-        ImGui::BeginGroup();
-        ImGui::Text(user->name);
-        ImGui::Image((ImTextureID)user->videoTexture, size);
-        ImGui::EndGroup();
+        ImVec2 videoImageSize = ImVec2((float)cameraWidth, (float)cameraHeight);
+        ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
+        ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
+        ImGui::Text(localUser->name);
+        ImGui::Image((ImTextureID)localUser->videoTexture, videoImageSize);
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(0,0));
+        ImGui::SetNextWindowSize(ImVec2(screenWidth, screenHeight));
+        ImGuiWindowFlags remoteVideoWindowFlags = ImGuiWindowFlags_NoMove |
+                                                  ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                                  ImGuiWindowFlags_NoResize |
+                                                  ImGuiWindowFlags_NoTitleBar;
+        ImGui::Begin("Remote Video", nullptr, remoteVideoWindowFlags);
+        ImGui::Text("You are in room: %u", Network::CurrentRoom());
+        ImGui::Separator();
+        for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
+        {
+            ClientUserData* user = *userIter;
+            ImGui::BeginGroup();
+            ImGui::Text(user->name);
+            ImGui::Image((ImTextureID)user->videoTexture, videoImageSize);
+            ImGui::EndGroup();
+        }
+        ImGui::End();
     }
-    ImGui::End();
 
     // Options window
     ImVec2 windowLoc(0.0f, 0.0f);
@@ -305,30 +313,6 @@ void renderGame(GameState* game, float deltaTime)
     ImGui::ProgressBar(rms, sizeArg, nullptr);
     ImGui::PopStyleColor();
     ImGui::End();
-
-    if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
-    {
-        UIFlags = ImGuiWindowFlags_NoMove |
-                  ImGuiWindowFlags_NoResize;
-        char userWindowTitle[64];
-        snprintf(userWindowTitle, sizeof(userWindowTitle),
-                 "Users in room: %u", Network::CurrentRoom());
-
-        ImGui::Begin(userWindowTitle, 0, UIFlags);
-        ImGui::SetWindowPos(ImVec2(300, 0));
-        ImGui::SetWindowSize(ImVec2(150, 150));
-        ImGui::Text("+");
-        ImGui::SameLine();
-        ImGui::Text(localUser->name);
-        for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
-        {
-            ClientUserData* user = *userIter;
-            ImGui::Text("-");
-            ImGui::SameLine();
-            ImGui::Text(user->name);
-        }
-        ImGui::End();
-    }
 }
 
 void cleanupGame()
