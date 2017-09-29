@@ -6,7 +6,6 @@
 #include "soundio/soundio.h"
 #include "opus/opus.h"
 
-#include "ringbuffer.h"
 #include "user.h"
 
 #ifndef _USER_CLIENT_H

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -109,7 +110,8 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
     //logTerm("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     SoundIoChannelArea* inArea;
 
-    // TODO: Check the free space in inBuffer
+    // TODO: Check the free space in inBuffer, but in a less draconion manner than with an assert.
+    assert(framesRemaining < inBuffer->free());
     while(framesRemaining > 0)
     {
         int frameCount = framesRemaining;
@@ -129,6 +131,8 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
             inBuffer->write(1, &val);
         }
 
+        // TODO: Should we not break if we get frameCount = 0? Because otherwise we'll just spin
+        //       and framesRemaining won't decrease?
         if(frameCount > 0)
         {
             soundio_instream_end_read(stream);
@@ -341,6 +345,7 @@ void Audio::decodePacket(OpusDecoder* decoder,
 
     if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
+        // TODO: We need different resamplers for each user that we receive from.
         logTerm("Resample a buffer after decoding\n");
         static ResampleStreamContext ctx = {};
         ctx.InputSampleRate = audioState.decodingBuffer.SampleRate;
