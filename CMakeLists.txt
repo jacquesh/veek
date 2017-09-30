@@ -32,15 +32,14 @@ include(FindOpenGL)
 target_link_libraries(veek ${OPENGL_gl_LIBRARY})
 
 find_package(PkgConfig REQUIRED)
-pkg_search_module(GLFW REQUIRED libglfw3)
-#pkg_search_module(ENET REQUIRED libenet)
+pkg_search_module(GLFW REQUIRED glfw3)
+pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
 
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
 find_package(X11)
-find_library(ENET_LIB enet)
-#find_library(GLFW_LIB glfw3)
+#find_library(ENET_LIB enet)
 
 include(ExternalProject)
 ExternalProject_Add(
@@ -57,8 +56,19 @@ ExternalProject_Add(
     UPDATE_COMMAND ""
     )
 set(SOUNDIO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(SOUNDIO_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/soundio)
+set(SOUNDIO_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/include)
 
 add_dependencies(veek libsoundio)
-include_directories(veek ${CMAKE_SOURCE_DIR}/include ${SOUNDIO_INCLUDE} ${GLFW_INCLUDE_DIRS})
-target_link_libraries(veek ${GLFW_STATIC_LIBRARIES} ${SOUNDIO_LIB} ${ENET_LIB} ${OPUS_STATIC_LIBRARIES} ${CMAKE_DL_LIBS} ${CMAKE_THREAD_LIBS_INIT} ${X11_LIBRARIES} ${ALSA_LIBRARIES})
+include_directories(veek ${CMAKE_SOURCE_DIR}/include
+                         ${SOUNDIO_INCLUDE}
+                         ${GLFW_INCLUDE_DIRS}
+                         ${ENET_INCLUDE_DIRS}
+                         ${OPUS_INCLUDE_DIRS})
+target_link_libraries(veek ${SOUNDIO_LIB}
+                           ${GLFW_STATIC_LIBRARIES}
+                           ${ENET_STATIC_LIBRARIES}
+                           ${OPUS_STATIC_LIBRARIES}
+                           ${CMAKE_DL_LIBS}
+                           ${CMAKE_THREAD_LIBS_INIT}
+                           ${X11_LIBRARIES}
+                           ${ALSA_LIBRARIES})
