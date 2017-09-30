@@ -32,7 +32,7 @@ include(FindOpenGL)
 target_link_libraries(veek ${OPENGL_gl_LIBRARY})
 
 find_package(PkgConfig REQUIRED)
-pkg_search_module(GLFW REQUIRED glfw3)
+#pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
 pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
 
@@ -54,16 +54,31 @@ ExternalProject_Add(
     PREFIX libsoundio
     UPDATE_COMMAND ""
     )
-set(SOUNDIO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(SOUNDIO_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
 set(SOUNDIO_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/include)
 
-add_dependencies(veek libsoundio)
+# NOTE: This is only here because TravisCI is running on Ubuntu 14.04 and doesn't have libglfw3-dev
+ExternalProject_Add(
+    glfw
+    GIT_REPOSITORY git@github.com:glfw/glfw.git
+    GIT_TAG 3.2.1
+    CMAKE_ARGS -DGLFW_BUILD_EXAMPLES=OFF
+               -DGLFW_BUILD_TESTS=OFF
+               -DGLFW_BUILD_DOCS=OFF
+               -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/glfw/bin
+    PREFIX glfw
+    UPDATE_COMMAND ""
+    )
+set(GLFW_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}glfw3${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(GLFW_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/include)
+
+add_dependencies(veek libsoundio glfw)
 include_directories(veek ${CMAKE_SOURCE_DIR}/include
-                         ${SOUNDIO_INCLUDE}
+                         ${SOUNDIO_INCLUDE_DIRS}
                          ${GLFW_INCLUDE_DIRS}
                          ${ENET_INCLUDE_DIRS}
                          ${OPUS_INCLUDE_DIRS})
-target_link_libraries(veek ${SOUNDIO_LIB}
+target_link_libraries(veek ${SOUNDIO_STATIC_LIBRARIES}
                            ${GLFW_STATIC_LIBRARIES}
                            ${ENET_STATIC_LIBRARIES}
                            ${OPUS_STATIC_LIBRARIES}
