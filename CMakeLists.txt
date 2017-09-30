@@ -39,7 +39,6 @@ pkg_search_module(OPUS REQUIRED opus)
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
 find_package(X11)
-#find_library(ENET_LIB enet)
 
 include(ExternalProject)
 ExternalProject_Add(
