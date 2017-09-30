@@ -32,7 +32,7 @@ include(FindOpenGL)
 target_link_libraries(veek ${OPENGL_gl_LIBRARY})
 
 find_package(PkgConfig REQUIRED)
-pkg_search_module(GLFW REQUIRED libglfw)
+pkg_search_module(GLFW REQUIRED libglfw3)
 #pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
 
