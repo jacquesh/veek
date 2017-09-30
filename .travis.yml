@@ -1,26 +1,29 @@
-sudo: required
 language: cpp
-compiler:
-    - gcc
-    - clang
-
-addons:
-    apt:
-        packages:
-            - libglfw-dev
-            - libopus-dev
-            - libenet-dev
-            - libasound-dev
 
 matrix:
     include:
       - os: linux
+        compiler: clang
+        addons:
+            apt:
+                packages:
+                    - libglfw-dev
+                    - libopus-dev
+                    - libenet-dev
+                    - libasound-dev
+
+      - os: linux
+        compiler: gcc
         addons:
             apt:
                 sources:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
+                    - libglfw-dev
+                    - libopus-dev
+                    - libenet-dev
+                    - libasound-dev
         env:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
@@ -31,6 +34,10 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-5
+                    - libglfw-dev
+                    - libopus-dev
+                    - libenet-dev
+                    - libasound-dev
         env:
             - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
 
@@ -41,6 +48,10 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-6
+                    - libglfw-dev
+                    - libopus-dev
+                    - libenet-dev
+                    - libasound-dev
         env:
             - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
 
@@ -48,7 +59,6 @@ before_install:
     - eval "${MATRIX_EVAL}"
 
 before_script:
-    - eval "${MATRIX_EVAL}"
     - mkdir build
     - cd build
     - cmake ..
