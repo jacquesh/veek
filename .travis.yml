@@ -7,6 +7,7 @@ addons:
             - libglfw-dev
             - libopus-dev
             - libenet-dev
+            - libasound-dev
 
 before_script:
     - mkdir build
