@@ -56,7 +56,7 @@ ExternalProject_Add(
     PREFIX libsoundio
     UPDATE_COMMAND ""
     )
-set(SOUNDIO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib64/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(SOUNDIO_LIB ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
 set(SOUNDIO_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/soundio)
 
 add_dependencies(veek libsoundio)

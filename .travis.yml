@@ -1,25 +1,54 @@
 sudo: required
 language: cpp
-compiler: gcc
+compiler:
+    - gcc
+    - clang
 
 addons:
     apt:
-        sources:
-            - ubuntu-toolchain-r-test
         packages:
-            - gcc-7
-            - g++-7
             - libglfw-dev
             - libopus-dev
             - libenet-dev
             - libasound-dev
 
+matrix:
+    include:
+      - os: linux
+        addons:
+            apt:
+                sources:
+                    - ubuntu-toolchain-r-test
+                packages:
+                    - g++-4.9
+        env:
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+
+      - os: linux
+        addons:
+            apt:
+                sources:
+                    - ubuntu-toolchain-r-test
+                packages:
+                    - g++-5
+        env:
+            - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
+
+      - os: linux
+        addons:
+            apt:
+                sources:
+                    - ubuntu-toolchain-r-test
+                packages:
+                    - g++-6
+        env:
+            - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+
+before_install:
+    - eval "${MATRIX_EVAL}"
+
 before_script:
-    - ln -s /usr/bin/gcc-7 /usr/local/bin/gcc
-    - ln -s /usr/bin/g++-7 /usr/local/bin/g++
-    - export CC=/usr/bin/gcc-7
-    - export CXX=/usr/bin/g++-7
-    - gcc -v && g++ -v && cmake --version
+    - eval "${MATRIX_EVAL}"
     - mkdir build
     - cd build
     - cmake ..
