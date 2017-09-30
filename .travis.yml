@@ -7,6 +7,7 @@ matrix:
         addons:
             apt:
                 packages:
+                    - xorg-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -19,39 +20,12 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
+                    - xorg-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
         env:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
-
-      - os: linux
-        compiler: gcc
-        addons:
-            apt:
-                sources:
-                    - ubuntu-toolchain-r-test
-                packages:
-                    - g++-5
-                    - libopus-dev
-                    - libenet-dev
-                    - libasound-dev
-        env:
-            - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
-
-      - os: linux
-        compiler: gcc
-        addons:
-            apt:
-                sources:
-                    - ubuntu-toolchain-r-test
-                packages:
-                    - g++-6
-                    - libopus-dev
-                    - libenet-dev
-                    - libasound-dev
-        env:
-            - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
 
 before_install:
     - eval "${MATRIX_EVAL}"
