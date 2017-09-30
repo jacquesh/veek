@@ -69,7 +69,11 @@ ExternalProject_Add(
     PREFIX glfw
     UPDATE_COMMAND ""
     )
-set(GLFW_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}glfw3${CMAKE_STATIC_LIBRARY_SUFFIX})
+find_library(Xrandr_LIB Xrandr)
+find_library(Xcursor_LIB Xcursor)
+find_library(Xxf86vm_LIB Xxf86vm)
+find_library(Xinerama_LIB Xinerama)
+set(GLFW_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}glfw3${CMAKE_STATIC_LIBRARY_SUFFIX} ${Xrandr_LIB} ${Xcursor_LIB} ${Xxf86vm_LIB} ${Xinerama_LIB})
 set(GLFW_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/include)
 
 add_dependencies(veek libsoundio glfw)
@@ -78,6 +82,7 @@ include_directories(veek ${CMAKE_SOURCE_DIR}/include
                          ${GLFW_INCLUDE_DIRS}
                          ${ENET_INCLUDE_DIRS}
                          ${OPUS_INCLUDE_DIRS})
+message("${X11_LIBRARIES}")
 target_link_libraries(veek ${SOUNDIO_STATIC_LIBRARIES}
                            ${GLFW_STATIC_LIBRARIES}
                            ${ENET_STATIC_LIBRARIES}
