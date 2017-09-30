@@ -7,7 +7,6 @@ matrix:
         addons:
             apt:
                 packages:
-                    - libglfw3-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -20,7 +19,6 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
-                    - libglfw3-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -35,7 +33,6 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-5
-                    - libglfw3-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -50,7 +47,6 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-6
-                    - libglfw3-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev

@@ -55,7 +55,7 @@ ExternalProject_Add(
     UPDATE_COMMAND ""
     )
 set(SOUNDIO_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(SOUNDIO_INCLUDE ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/include)
+set(SOUNDIO_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/include)
 
 # NOTE: This is only here because TravisCI is running on Ubuntu 14.04 and doesn't have libglfw3-dev
 ExternalProject_Add(
