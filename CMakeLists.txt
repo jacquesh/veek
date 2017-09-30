@@ -31,7 +31,7 @@ include(FindOpenGL)
 target_link_libraries(veek ${OPENGL_gl_LIBRARY})
 
 find_package(PkgConfig REQUIRED)
-pkg_search_module(GLFW REQUIRED glfw3)
+pkg_search_module(GLFW REQUIRED libglfw)
 
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
