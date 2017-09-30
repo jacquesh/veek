@@ -9,17 +9,17 @@ void Video::Shutdown()
 {
 }
 
-bool enableCamera(int deviceId)
+bool Video::enableCamera(int deviceId)
 {
     return false;
 }
 
-bool checkForNewVideoFrame()
+bool Video::checkForNewVideoFrame()
 {
     return false;
 }
 
-uint8_t* currentVideoFrame()
+uint8_t* Video::currentVideoFrame()
 {
     return nullptr;
 }

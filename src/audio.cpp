@@ -501,7 +501,7 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
 
     inBuffer->read(samplesToWrite, buffer.Data);
     buffer.Length = samplesToWrite;
-    buffer.SampleRate = inDevice->sample_rate_current;
+    buffer.SampleRate = inStream->sample_rate;
 
     if(audioState.generateToneInput)
     {
