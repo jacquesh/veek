@@ -1,6 +1,13 @@
 language: cpp
 compiler: gcc
 
+addons:
+    apt:
+        packages:
+            - libglfw-dev
+            - libopus-dev
+            - libenet-dev
+
 before_script:
     - mkdir build
     - cd build

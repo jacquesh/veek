@@ -30,13 +30,13 @@ message("${CMAKE_CURRENT_BINARY_DIR}")
 include(FindOpenGL)
 target_link_libraries(veek ${OPENGL_gl_LIBRARY})
 
-find_package(glfw 3.2 REQUIRED)
+find_package(glfw3 3.2 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
 find_package(X11)
 find_library(ENET_LIB enet)
 find_library(OPUS_LIB opus)
-find_library(GLFW_LIB glfw)
+find_library(GLFW_LIB glfw3)
 
 include(ExternalProject)
 ExternalProject_Add(
