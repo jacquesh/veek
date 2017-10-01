@@ -1,8 +1,8 @@
 # Project Structure
 build/
-lib/
 dependencies/
 tests/
+thirdparty/
 
 # Log files
 *.log
