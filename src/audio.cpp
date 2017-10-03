@@ -802,13 +802,17 @@ static void devicesChangeCallback(SoundIo* sio)
     audioState.inputDeviceNames = new char*[managedInputDeviceCount];
     audioState.inputDeviceCount = managedInputDeviceCount;
     audioState.currentInputDevice = -1;
+    // TODO: Just store the list of valid device indices.
+    //       As it stands we can still encounter problems if we get a probe error in the 1nd loop
+    //       but not the 2nd because we'll allocate too little memory and overflow the buffer.
+    //       The same applies to output devices.
     int targetInputDeviceIndex = -1;
     int managedInputIndex = 0;
     int needNewInputStream = true;
     for(int i=0; i<inputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_input_device(sio, i);
-        if(!device->is_raw)
+        if(!device->probe_error && !device->is_raw)
         {
             audioState.inputDeviceList[managedInputIndex] = device;
             audioState.inputDeviceNames[managedInputIndex] = device->name;
@@ -905,7 +909,7 @@ static void devicesChangeCallback(SoundIo* sio)
     for(int i=0; i<outputDeviceCount; ++i)
     {
         SoundIoDevice* device = soundio_get_output_device(sio, i);
-        if(!device->is_raw)
+        if(!device->probe_error && !device->is_raw)
         {
             audioState.outputDeviceList[managedOutputIndex] = device;
             audioState.outputDeviceNames[managedOutputIndex] = device->name;
