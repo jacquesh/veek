@@ -11,6 +11,9 @@
 #include "stb_image_write.h"
 #endif
 
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
+
 #ifdef DEBUG_VIDEO_VIDEO_OUTPUT
 #include <time.h>
 #include <stdlib.h> // For srand/rand
@@ -26,6 +29,7 @@ static int cameraDevice = -1;
 
 static int pixelBytes = 0;
 static uint8* pixelValues = 0;
+static uint8* preResizePixelValues = 0;
 
 static videoInput VI;
 
@@ -54,6 +58,11 @@ bool Video::enableCamera(int deviceID)
         logInfo("Disable camera: %s\n", deviceName);
         VI.stopDevice(cameraDevice);
         cameraDevice = -1;
+
+        if(preResizePixelValues)
+        {
+            delete[] preResizePixelValues;
+        }
     }
 
     if((deviceID >= 0) && (deviceID < cameraDeviceCount))
@@ -70,8 +79,15 @@ bool Video::enableCamera(int deviceID)
         bool success = VI.setupDevice(cameraDevice, cameraWidth, cameraHeight);
         if(success)
         {
+            int actualWidth = VI.getWidth(cameraDevice);
+            int actualHeight = VI.getHeight(cameraDevice);
+            if((actualWidth != cameraWidth) || (actualHeight != cameraHeight))
+            {
+                preResizePixelValues = new uint8_t[actualWidth*actualHeight*3];
+            }
+
             logInfo("Begin video capture using %s - Dimensions are %dx%d\n", deviceName,
-                    VI.getWidth(cameraDevice), VI.getHeight(cameraDevice));
+                    actualWidth, actualHeight);
             return true;
         }
         else
@@ -90,7 +106,20 @@ bool Video::checkForNewVideoFrame()
     if(result)
     {
         //logTerm("Recevied video input frame from local camera\n"); // TODO: Wraithy gets none of these
-        VI.getPixels(cameraDevice, pixelValues, true, true);
+        if(preResizePixelValues)
+        {
+            int actualWidth = VI.getWidth(cameraDevice);
+            int actualHeight = VI.getHeight(cameraDevice);
+
+            VI.getPixels(cameraDevice, preResizePixelValues, true, true);
+
+            stbir_resize_uint8(preResizePixelValues, actualWidth, actualHeight, 0,
+                               pixelValues, cameraWidth, cameraHeight, 0, 3);
+        }
+        else
+        {
+            VI.getPixels(cameraDevice, pixelValues, true, true);
+        }
     }
     return result;
 }
