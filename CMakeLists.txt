@@ -39,6 +39,7 @@ find_package(PkgConfig REQUIRED)
 #pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
 pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
+pkg_search_module(PULSE libpulse)
 
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
@@ -50,7 +51,8 @@ ExternalProject_Add(
     GIT_REPOSITORY git@github.com:andrewrk/libsoundio.git
     GIT_TAG 1778b8d10f
     CMAKE_ARGS -DENABLE_JACK=OFF
-               -DENABLE_PULSEAUDIO=OFF
+               -DENABLE_PULSEAUDIO=ON
+               -DENABLE_ALSA=ON
                -DBUILD_TESTS=OFF
                -DBUILD_EXAMPLE_PROGRAMS=OFF
                -DBUILD_DYNAMIC_LIBS=OFF
@@ -95,6 +97,7 @@ target_link_libraries(veek ${OPENGL_gl_LIBRARY}
                            ${CMAKE_DL_LIBS}
                            ${CMAKE_THREAD_LIBS_INIT}
                            ${X11_LIBRARIES}
+                           ${PULSE_LIBRARIES}
                            ${ALSA_LIBRARIES})
 target_compile_definitions(veek PRIVATE SOUNDIO_STATIC_LIBRARY
                                         BUILD_VERSION="${CURRENT_TIME}_UNKNOWNCOMMIT")

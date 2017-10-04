@@ -609,7 +609,7 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     inStream->format = SoundIoFormatFloat32NE;
     inStream->layout = inDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
-    inStream->software_latency = 0.005f;
+    inStream->software_latency = 0.01f;
     // NOTE: Lower latency corresponds to higher CPU usage, at 0.001 or 0s libsoundio eats an entire CPU but at 0.005 its fine
     // TODO: We probably want to check to make sure we don't set this to a value lower than the
     //       minimum latency for the current device
@@ -671,7 +671,7 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     outStream->format = SoundIoFormatFloat32NE;
     outStream->layout = outDevice->layouts[0]; // NOTE: Devices are guaranteed to have at least 1 layout
     // TODO: We might well want to sort this first, to make a slightly more intelligent selection of the layout
-    outStream->software_latency = 0.005f;
+    outStream->software_latency = 0.01f;
     // TODO: We probably want to check to make sure we don't set this to a value lower than the
     //       minimum latency for the current device
 
