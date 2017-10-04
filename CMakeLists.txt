@@ -3,6 +3,10 @@ project(veek)
 
 string(TIMESTAMP CURRENT_TIME "%Y-%m-%d_%H:%M:%S" UTC)
 
+include(FindOpenGL) # For OPENGL_gl_LIBRARY
+include(GNUInstallDirs) # For CMAKE_INSTALL_LIBDIR
+include(ExternalProject) # For ExternalProject_Add
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/build)
@@ -33,7 +37,6 @@ set(SERVER_SRC_FILES ${SRC_DIR}/server.cpp
                      ${SRC_DIR}/logging.cpp
     )
 
-include(FindOpenGL)
 
 find_package(PkgConfig REQUIRED)
 #pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
@@ -45,7 +48,6 @@ find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
 find_package(X11)
 
-include(ExternalProject)
 ExternalProject_Add(
     libsoundio
     GIT_REPOSITORY git@github.com:andrewrk/libsoundio.git
@@ -60,8 +62,9 @@ ExternalProject_Add(
     PREFIX libsoundio
     UPDATE_COMMAND ""
     )
-set(SOUNDIO_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
-set(SOUNDIO_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin/include)
+set(SOUNDIO_BINDIR ${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin)
+set(SOUNDIO_STATIC_LIBRARIES ${SOUNDIO_BINDIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}soundio${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(SOUNDIO_INCLUDE_DIRS ${SOUNDIO_BINDIR}/include)
 
 # NOTE: This is only here because TravisCI is running on Ubuntu 14.04 and doesn't have libglfw3-dev
 ExternalProject_Add(
