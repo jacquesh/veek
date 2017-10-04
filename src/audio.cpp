@@ -87,17 +87,29 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
             device->software_latency_min, device->software_latency_max,
             device->software_latency_current);
 
-    logInfo("  %d layouts supported:\n", device->layout_count);
+    bool monoSupported = false;
+    bool stereoSupported = false;
     for(int layoutIndex=0; layoutIndex<device->layout_count; layoutIndex++)
     {
-        logInfo("    %s\n", device->layouts[layoutIndex].name);
+        if(device->layouts[layoutIndex].channel_count == 1)
+            monoSupported = true;
+        if(device->layouts[layoutIndex].channel_count == 2)
+            stereoSupported = true;
     }
+    const char* monoSupportStr = monoSupported ? "Available" : "Unavailable";
+    const char* stereoSupportStr = stereoSupported ? "Available" : "Unavailable";
+    logInfo("  %d layouts supported. Mono support: %s. Stereo support: %s\n", device->layout_count, monoSupportStr, stereoSupportStr);
 
-    logInfo("  %d formats supported:\n", device->format_count);
+    bool float32Supported = false;
     for(int formatIndex=0; formatIndex<device->format_count; formatIndex++)
     {
-        logInfo("    %s\n", soundio_format_string(device->formats[formatIndex]));
+        if(device->formats[formatIndex] == SoundIoFormatFloat32NE)
+        {
+            float32Supported = true;
+        }
     }
+    const char* floatSupportStr = float32Supported ? "Available" : "Unavailable";
+    logInfo("  %d formats supported. Float32 support: %s\n", device->format_count, floatSupportStr);
 }
 
 static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
