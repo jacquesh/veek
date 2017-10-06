@@ -1,14 +1,14 @@
-#include <stdint.h>
-#include <string.h> // For strerror
-
 #include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <linux/videodev2.h>
+#include <libv4l2.h>
+#include <stdint.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/ioctl.h>
 
-#include <linux/videodev2.h>
+
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include "stb_image_resize.h"
 
 #include "logging.h"
 #include "video.h"
@@ -35,21 +35,63 @@ static int xioctl(int fileDescriptor, int request, void* data)
         int result;
         do
         {
-            result = ioctl(fileDescriptor, request, data);
+            result = v4l2_ioctl(fileDescriptor, request, data);
         } while((result == -1) && (errno == EINTR));
         return result;
 }
 
-bool Video::Setup()
+bool SetupPlatform()
 {
     currentImage = new uint8_t[320*240*3];
+    cameraDeviceCount = 0;
+    const char* deviceName = "/dev/video0";
+
     // TODO: List devices
+    struct stat st;
+    if(stat(deviceName, &st) == -1)
+    {
+        logFail("Error %d: Unable to get status for device %s: %s\n", errno, deviceName, strerror(errno));
+        return true;
+    }
+
+    if(!S_ISCHR(st.st_mode))
+    {
+        logFail("Device %s is not a character special device\n", deviceName);
+    }
+
+    int device = v4l2_open(deviceName, O_RDWR | O_NONBLOCK, 0);
+
+    if(device == -1)
+    {
+        logFail("Error %d: Unable to open device %s: %s\n", errno, deviceName, strerror(errno));
+        return false;
+    }
+
+    v4l2_capability deviceCapabilities = {};
+    if(xioctl(device, VIDIOC_QUERYCAP, &deviceCapabilities) == -1)
+    {
+        logFail("Error %d: %s is not a valid V4L2 device: %s\n", errno, deviceName, strerror(errno));
+        v4l2_close(deviceFile); // TODO: I don't believe we care if this fails? Can it? How?
+        return false;
+    }
+
+    cameraDeviceCount = 1;
+    cameraDeviceNames = new char*[cameraDeviceCount];
+    cameraDeviceNames[0] = new char[sizeof(deviceCapabilities.card)];
+    memcpy(cameraDeviceNames[0], deviceCapabilities.card, sizeof(deviceCapabilities.card));
+
     return true;
 }
 
-void Video::Shutdown()
+void ShutdownPlatform()
 {
     delete[] currentImage;
+
+    for(int i=0; i<cameraDeviceCount; i++)
+    {
+        delete[] cameraDeviceNames[i];
+    }
+    delete[] cameraDeviceNames;
 }
 
 bool Video::enableCamera(int deviceId)
@@ -77,7 +119,7 @@ bool Video::enableCamera(int deviceId)
 
     // TODO: So the arguments here are (path, flags, mode), but there's also a (path, flags)
     //       overload. Can't we just use that?
-    deviceFile = open(deviceName, O_RDWR | O_NONBLOCK, 0);
+    deviceFile = v4l2_open(deviceName, O_RDWR | O_NONBLOCK, 0);
 
     if(deviceFile == -1)
     {
@@ -89,21 +131,21 @@ bool Video::enableCamera(int deviceId)
     if(xioctl(deviceFile, VIDIOC_QUERYCAP, &deviceCapabilities) == -1)
     {
         logFail("Error %d: %s is not a valid V4L2 device: %s\n", errno, deviceName, strerror(errno));
-        close(deviceFile); // TODO: I don't believe we care if this fails? Can it? How?
+        v4l2_close(deviceFile); // TODO: I don't believe we care if this fails? Can it? How?
         return false;
     }
 
     if(!(deviceCapabilities.capabilities & V4L2_CAP_VIDEO_CAPTURE))
     {
         logFail("Device %s does not support video capture\n", deviceName);
-        close(deviceFile);
+        v4l2_close(deviceFile);
         return false;
     }
 
     if(!(deviceCapabilities.capabilities & V4L2_CAP_STREAMING))
     {
         logFail("Device %s does not support streaming IO\n", deviceName);
-        close(deviceFile);
+        v4l2_close(deviceFile);
         return false;
     }
 
@@ -112,20 +154,31 @@ bool Video::enableCamera(int deviceId)
     //       Why/when would it not already be default?
     v4l2_cropcap cropCapabilities = {};
     cropCapabilities.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
     if(xioctl(deviceFile, VIDIOC_CROPCAP, &cropCapabilities) == 0)
     {
         v4l2_crop crop = {};
         crop.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         crop.c = cropCapabilities.defrect;
-        xioctl(deviceFile, VIDIOC_S_CROP, &crop);
+
+        if(xioctl(deviceFile, VIDIOC_S_CROP, &crop) == -1)
+        {
+            logWarn("Error %d: Unable to set device crop region: %s\n", errno, strerror(errno));
+        }
+    }
+    else
+    {
+        logWarn("Error %d: Unable to get crop capabilities: %s\n", errno, strerror(errno));
     }
 
-    // TODO: Set the format?
+    // TODO: So apparently at 640x480 it lets us set RGB24, but then the bytesperline
+    //       is still 2*width (which makes no sense).
+    //       At 320x240 however, it doesn't like RGB24, it just gives YUYV.
     v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = 320;
-    fmt.fmt.pix.height = 240;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
+    fmt.fmt.pix.width = 640;//320;
+    fmt.fmt.pix.height = 480;//240;
+    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24; //V4L2_PIX_FMT_YUYV;
     fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
     if(xioctl(deviceFile, VIDIOC_S_FMT, &fmt) == -1)
     {
@@ -136,7 +189,8 @@ bool Video::enableCamera(int deviceId)
     {
         logWarn("Error %d: Unable to get device format: %s\n", errno, strerror(errno));
     }
-    logInfo("Device format: %dx%d\n", fmt.fmt.pix.width, fmt.fmt.pix.height);
+    logInfo("Device format: %dx%d with %d bytes/line, for a total of %d bytes\n",
+            fmt.fmt.pix.width, fmt.fmt.pix.height, fmt.fmt.pix.bytesperline, fmt.fmt.pix.sizeimage);
     if(fmt.fmt.pix.pixelformat != V4L2_PIX_FMT_RGB24)
     {
         // NOTE: We get 1448695129 = 'YUYV' = V4L2_PIX_FMT_YUYV
@@ -158,17 +212,19 @@ bool Video::enableCamera(int deviceId)
     {
         logFail("Error %d: Failed to request memory buffers on device %s: %s\n",
                 errno, deviceName, strerror(errno));
-        close(deviceFile);
+        v4l2_close(deviceFile);
         return false;
     }
+    logInfo("Allocated %d video device buffers\n", requestBuffers.count);
     // TODO: Check that we got a sensible number of buffers from the device.
 
     bufferCount = requestBuffers.count;
     buffers = new ImageBuffer[requestBuffers.count];
+    memset(buffers, 0, requestBuffers.count*sizeof(ImageBuffer));
     if(!buffers)
     {
         logFail("Unable to allocate image buffers, out of memory\n");
-        close(deviceFile);
+        v4l2_close(deviceFile);
         return false;
     }
 
@@ -185,19 +241,20 @@ bool Video::enableCamera(int deviceId)
             //       Do we really need to check this?
             logFail("Error %d: Unable to query the details of buffer %d: %s\n", errno, i, strerror(errno));
             // TODO: Cleanup the buffers that we succeeded on up until now
-            close(deviceFile);
+            v4l2_close(deviceFile);
             return false;
         }
 
         buffers[i].size = buffer.length;
-        buffers[i].data = mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE,
+        buffers[i].data = v4l2_mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE,
                                MAP_SHARED, deviceFile, buffer.m.offset);
 
+        logInfo("Device buffer %d is at %x\n", i, buffers[i].data);
         if(buffers[i].data == MAP_FAILED)
         {
             logFail("Unable to map device memory to user memory for buffer %d\n", i);
             // TODO: Cleanup
-            close(deviceFile);
+            v4l2_close(deviceFile);
             return false;
         }
     }
@@ -213,7 +270,7 @@ bool Video::enableCamera(int deviceId)
         {
             logFail("Error %d: Unable to queue video buffer %d: %s\n", errno, i, strerror(errno));
             // TODO: Cleanup all the buffers
-            close(deviceFile);
+            v4l2_close(deviceFile);
             return false;
         }
     }
@@ -223,7 +280,7 @@ bool Video::enableCamera(int deviceId)
     {
         logFail("Error %d: Unable to begin streaming video input: %s\n", errno, strerror(errno));
         // TODO: Cleanup all the buffers
-        close(deviceFile);
+        v4l2_close(deviceFile);
         return false;
     }
 
@@ -251,8 +308,28 @@ bool Video::checkForNewVideoFrame()
 
     // TODO: We could maybe do something sneaky here, like re-queue the *previous* buffer,
     //       rather than this one, which gives us a single working/active buffer.
-    logTerm("Received %d bytes from the device! seq=%d\n", buffer.bytesused, buffer.sequence);
-    memcpy(currentImage, buffers[buffer.index].data, 320*240*3);
+    logTerm("Received %d bytes from the device! seq=%d, index=%d\n",
+            buffer.bytesused, buffer.sequence, buffer.index);
+
+    uint8_t* rawImage = (uint8_t*)buffers[buffer.index].data;
+    stbir_resize_uint8(rawImage, 640, 480, 0,
+                       currentImage, 320, 240, 0, 3);
+
+#if 0
+    char outName[256];
+    snprintf(outName, sizeof(outName), "video_frame_%03d.ppm", buffer.sequence);
+    FILE* outFile = fopen(outName, "w')");
+    if(outFile)
+    {
+        fprintf(outFile, "P6\n%d %d 255\n", 640, 480);
+        fwrite(buffers[buffer.index].data, buffer.bytesused, 1, outFile);
+        fclose(outFile);
+    }
+    else
+    {
+        logWarn("Failed to open file %s\n", outName);
+    }
+#endif
 
     if(xioctl(deviceFile, VIDIOC_QBUF, &buffer) == -1)
     {
@@ -265,18 +342,5 @@ bool Video::checkForNewVideoFrame()
 
 uint8_t* Video::currentVideoFrame()
 {
-    return nullptr;
+    return currentImage;
 }
-
-int Video::encodeRGBImage(int inputLength, uint8_t* inputBuffer,
-                          int outputLength, uint8_t* outputBuffer)
-{
-    return 0;
-}
-
-int Video::decodeRGBImage(int inputLength, uint8_t* inputBuffer,
-                          int outputLength, uint8_t* outputBuffer)
-{
-    return 0;
-}
-
