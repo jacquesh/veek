@@ -40,9 +40,14 @@ set(SERVER_SRC_FILES ${SRC_DIR}/server.cpp
 
 find_package(PkgConfig REQUIRED)
 #pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
-pkg_search_module(ENET REQUIRED libenet)
+pkg_search_module(ENET REQUIRED enet)
 pkg_search_module(OPUS REQUIRED opus)
-pkg_search_module(PULSE libpulse)
+pkg_search_module(THEORA REQUIRED theoraenc)
+#pkg_search_module(V4L2 REQUIRED v4l2)
+pkg_search_module(PULSE pulse)
+
+# TODO: For some unknown reason, pkg_search_module misses these two, despite the fact that they're included if I called `pkg-config --libs --static theoraenc`
+list(APPEND THEORA_STATIC_LIBRARIES theoraenc theoradec)
 
 find_package(Threads REQUIRED)
 find_package(ALSA REQUIRED)
@@ -91,17 +96,22 @@ include_directories(veek ${CMAKE_SOURCE_DIR}/include
                          ${SOUNDIO_INCLUDE_DIRS}
                          ${GLFW_INCLUDE_DIRS}
                          ${ENET_INCLUDE_DIRS}
-                         ${OPUS_INCLUDE_DIRS})
+                         ${OPUS_INCLUDE_DIRS}
+                         )
 target_link_libraries(veek ${OPENGL_gl_LIBRARY}
                            ${SOUNDIO_STATIC_LIBRARIES}
                            ${GLFW_STATIC_LIBRARIES}
                            ${ENET_STATIC_LIBRARIES}
                            ${OPUS_STATIC_LIBRARIES}
+                           ${THEORA_STATIC_LIBRARIES}
                            ${CMAKE_DL_LIBS}
                            ${CMAKE_THREAD_LIBS_INIT}
                            ${X11_LIBRARIES}
                            ${PULSE_LIBRARIES}
-                           ${ALSA_LIBRARIES})
+                           ${ALSA_LIBRARIES}
+                           ${V4L2_LIBRARIES}
+                           v4l2
+                           )
 target_compile_definitions(veek PRIVATE SOUNDIO_STATIC_LIBRARY
                                         BUILD_VERSION="${CURRENT_TIME}_UNKNOWNCOMMIT")
 

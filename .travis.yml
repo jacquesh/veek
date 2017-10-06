@@ -12,6 +12,8 @@ matrix:
                     - libenet-dev
                     - libasound-dev
                     - pulseaudio
+                    - libtheora-dev
+                    - libv4l-dev
 
       - os: linux
         compiler: gcc
@@ -26,6 +28,8 @@ matrix:
                     - libenet-dev
                     - libasound-dev
                     - pulseaudio
+                    - libtheora-dev
+                    - libv4l-dev
         env:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
