@@ -14,6 +14,8 @@
 #include "video.h"
 
 // https://linuxtv.org/downloads/v4l-dvb-apis-new/index.html
+// https://github.com/unicap/unicap/blob/master/libunicap/cpi/v4l2cpi/v4l2.c or https://github.com/dyne/FreeJ/tree/master/src for alternative references of libraries using v4l2
+// https://linuxtv.org/downloads/v4l-dvb-apis-new/uapi/v4l/capture.c.html for an example of a capture program.
 
 struct ImageBuffer
 {
