@@ -85,16 +85,16 @@ void renderGame(GameState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
+    ImVec2 videoImageSize = ImVec2((float)cameraWidth, (float)cameraHeight);
+    ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
+    ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
+    ImGui::Text(localUser->name);
+    ImGui::Image((ImTextureID)localUser->videoTexture, videoImageSize);
+    ImGui::End();
+
     // Video images
     if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
     {
-        ImVec2 videoImageSize = ImVec2((float)cameraWidth, (float)cameraHeight);
-        ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
-        ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
-        ImGui::Text(localUser->name);
-        ImGui::Image((ImTextureID)localUser->videoTexture, videoImageSize);
-        ImGui::End();
-
         ImGui::SetNextWindowPos(ImVec2(0,0));
         ImGui::SetNextWindowSize(ImVec2(screenWidth, screenHeight));
         ImGuiWindowFlags remoteVideoWindowFlags = ImGuiWindowFlags_NoMove |
