@@ -40,11 +40,11 @@ set(SERVER_SRC_FILES ${SRC_DIR}/server.cpp
 
 find_package(PkgConfig REQUIRED)
 #pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
-pkg_search_module(ENET REQUIRED enet)
+pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
 pkg_search_module(THEORA REQUIRED theoraenc)
-#pkg_search_module(V4L2 REQUIRED v4l2)
-pkg_search_module(PULSE pulse)
+pkg_search_module(V4L2 REQUIRED libv4l2)
+pkg_search_module(PULSE libpulse)
 
 # TODO: For some unknown reason, pkg_search_module misses these two, despite the fact that they're included if I called `pkg-config --libs --static theoraenc`
 list(APPEND THEORA_STATIC_LIBRARIES theoraenc theoradec)
@@ -110,7 +110,6 @@ target_link_libraries(veek ${OPENGL_gl_LIBRARY}
                            ${PULSE_LIBRARIES}
                            ${ALSA_LIBRARIES}
                            ${V4L2_LIBRARIES}
-                           v4l2
                            )
 target_compile_definitions(veek PRIVATE SOUNDIO_STATIC_LIBRARY
                                         BUILD_VERSION="${CURRENT_TIME}_UNKNOWNCOMMIT")
