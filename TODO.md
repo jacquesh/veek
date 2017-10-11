@@ -49,3 +49,6 @@
 
 ## Misc:
     * Possibly remove the storage of names from the server? I don't think names are needed after initial connection data is distributed to all clients
+
+## Reading:
+* https://www.snellman.net/blog/archive/2016-12-13-ring-buffers/
