@@ -122,8 +122,6 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
     //logTerm("Read callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     SoundIoChannelArea* inArea;
 
-    // TODO: Check the free space in inBuffer, but in a less draconion manner than with an assert.
-    assert(framesRemaining < inBuffer->free());
     while(framesRemaining > 0)
     {
         int frameCount = framesRemaining;
@@ -180,8 +178,8 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             float val = 0.0f;
             if(audioState.isListeningToInput)
             {
-                if(listenBuffer->count() > 0)
-                    listenBuffer->read(1, &val);
+                // NOTE: This will not modify val if there is no data available in listenBuffer.
+                listenBuffer->read(1, &val);
             }
 
 #if 0
@@ -201,12 +199,10 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
 #endif
             for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
             {
-                if(sourceList[sourceIndex].buffer->count() > 0)
-                {
-                    float temp;
-                    sourceList[sourceIndex].buffer->read(1, &temp);
-                    val += temp;
-                }
+                // NOTE: This will not modify temp if there is no data available in listenBuffer.
+                float temp = 0.0f;
+                sourceList[sourceIndex].buffer->read(1, &temp);
+                val += temp;
             }
 
             for(int channel=0; channel<channelCount; ++channel)
@@ -506,12 +502,8 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
     // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
     //       to be a single sample from a single channel, but its important to note that that is what
     //       we're currently doing
-    int samplesToWrite = buffer.Capacity;
-    int samplesAvailable = inBuffer->count();
-    if(samplesAvailable < samplesToWrite)
-        samplesToWrite = samplesAvailable;
+    int samplesToWrite = inBuffer->read(buffer.Capacity, buffer.Data);
 
-    inBuffer->read(samplesToWrite, buffer.Data);
     buffer.Length = samplesToWrite;
     buffer.SampleRate = inStream->sample_rate;
 
