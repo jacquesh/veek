@@ -49,6 +49,7 @@ static ogg_stream_state ogvOutputStream;
 
 #elif !defined(_WIN32) && defined(__unix__)
 #include "video_unix.cpp"
+#endif
 
 static float clamp(float x)
 {
@@ -370,5 +371,3 @@ bool Video::NetworkVideoPacket::serialize(Packet& packet)
 }
 template bool Video::NetworkVideoPacket::serialize(NetworkInPacket& packet);
 template bool Video::NetworkVideoPacket::serialize(NetworkOutPacket& packet);
-
-#endif
