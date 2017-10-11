@@ -8,17 +8,12 @@
 * The audio that gets transmitted across the wire is really soft for some reason.
 * If you disable the audio input and then change audio input device, the flag doesn't toggle but the input gets re-enabled (because it isn't checked when changing devices).
 * Fix the RingBuffer not preventing you from reading a value multiple times if you wrap around because you aren't writing to it. The effect of this problem is that if you listen to the input for a bit and then disable the mic, the listen buffer just loops.
-* Check what happens when you join the server in the middle of a conversation/after a bunch of data has been transfered, because the codecs are stateful so we might have to do some shenanigans to make sure that it can handle that and setup the correct state to continue
 * The decoder docs state that we need to call decode with empty values for every lost packet. We do actually keep track of time but we have yet to use that to check for packet loss
 * Gracefully handle disconnecting from the master-server (try reconnecting and just continue working for the peers)
 * Support network packets of any size (in particular, properly handle large packets)
 
 ## Bugs in current functionality:
 * Cleanup old AudioSources (e.g the sine-wave generated for the "test sound")
-* AndrewvR, Tim, Teunis (maybe Sven) currently all get a boatload of "Output underflow" errors
-
-## Video things:
-* Add video...
 
 ## New functionality:
 * Allow the user to set their PushToTalk key
