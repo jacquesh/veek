@@ -104,12 +104,14 @@ void renderGame(GameState* game, float deltaTime)
         ImGui::Begin("Remote Video", nullptr, remoteVideoWindowFlags);
         ImGui::Text("You are in room: %u", Network::CurrentRoom());
         ImGui::Separator();
+
+        ImVec2 largeImageSize = ImVec2(2.0f*videoImageSize.x, 2.0f*videoImageSize.y);
         for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
         {
             ClientUserData* user = *userIter;
             ImGui::BeginGroup();
             ImGui::Text(user->name);
-            ImGui::Image((ImTextureID)user->videoTexture, videoImageSize);
+            ImGui::Image((ImTextureID)user->videoTexture, largeImageSize);
             ImGui::EndGroup();
         }
         ImGui::End();
