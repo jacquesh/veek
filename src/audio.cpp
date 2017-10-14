@@ -968,7 +968,7 @@ bool Audio::Setup()
     opus_encoder_ctl(encoder, OPUS_SET_COMPLEXITY(6));
     opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
     opus_encoder_ctl(encoder, OPUS_SET_APPLICATION(OPUS_APPLICATION_VOIP));
-    //opus_encoder_ctl(encoder, OPUS_SET_BITRATE(OPUS_BITRATE_MAX));
+    opus_encoder_ctl(encoder, OPUS_SET_BITRATE(24000));
 
     opus_int32 complexity;
     opus_int32 bitrate;
