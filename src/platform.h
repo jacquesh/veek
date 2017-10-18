@@ -6,32 +6,43 @@
 
 // TODO: Docs, what do these functions return?
 
-struct DateTime
+namespace Platform
 {
-    uint16_t Year;
-    uint16_t Month;
-    uint16_t Day;
-    uint16_t Hour;
-    uint16_t Minute;
-    uint16_t Second;
-    uint16_t Millisecond;
-};
+    struct DateTime
+    {
+        uint16_t Year;
+        uint16_t Month;
+        uint16_t Day;
+        uint16_t Hour;
+        uint16_t Minute;
+        uint16_t Second;
+        uint16_t Millisecond;
+    };
 
-struct Mutex;
-Mutex* createMutex();
-void destroyMutex(Mutex* mutex);
-void lockMutex(Mutex* mutex);
-void unlockMutex(Mutex* mutex);
+    struct Thread;
+    typedef int ThreadStartFunction(void*);
 
-void sleepForMilliseconds(uint32_t milliseconds);
+    bool Setup();
+    void Shutdown();
 
-int64_t getClockValue();
-int64_t getClockFrequency();
+    Thread* CreateThread(ThreadStartFunction* entryPoint, void* data);
+    int JoinThread(Thread* thread);
 
-int getCurrentUserName(size_t bufferLen, char* buffer);
+    struct Mutex;
+    Mutex* CreateMutex();
+    void DestroyMutex(Mutex* mutex);
+    void LockMutex(Mutex* mutex);
+    void UnlockMutex(Mutex* mutex);
 
-bool isPushToTalkKeyPushed();
+    void SleepForMilliseconds(uint32_t milliseconds);
 
-DateTime getLocalDateTime();
+    double SecondsSinceStartup();
+
+    int GetCurrentUserName(size_t bufferLen, char* buffer);
+
+    bool IsPushToTalkKeyPushed();
+
+    DateTime GetLocalDateTime();
+}
 
 #endif

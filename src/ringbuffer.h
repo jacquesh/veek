@@ -41,7 +41,7 @@ private:
 
     int readIndex;
     int writeIndex;
-    Mutex* lock;
+    Platform::Mutex* lock;
 
     uint64_t totalWrites;
     uint64_t totalReads;

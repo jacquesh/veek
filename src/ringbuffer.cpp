@@ -16,7 +16,7 @@ RingBuffer::RingBuffer(int size)
     //       value (10e10) and looking at the output wave.
     memset(buffer, 0, sizeof(float)*size);
 
-    lock = createMutex();
+    lock = Platform::CreateMutex();
 
     totalWrites = 0;
     totalReads = 0;
@@ -24,13 +24,13 @@ RingBuffer::RingBuffer(int size)
 
 RingBuffer::~RingBuffer()
 {
-    destroyMutex(lock);
+    Platform::DestroyMutex(lock);
     delete[] buffer;
 }
 
 void RingBuffer::write(int valCount, float* vals)
 {
-    lockMutex(lock);
+    Platform::LockMutex(lock);
     assert(valCount < capacity);
 
     if(valCount > freeInternal())
@@ -71,13 +71,13 @@ void RingBuffer::write(int valCount, float* vals)
         writeIndex -= capacity;
     }
     totalWrites += valCount;
-    unlockMutex(lock);
+    Platform::UnlockMutex(lock);
 }
 
 int RingBuffer::read(int valCount, float* vals)
 {
     assert(valCount < capacity);
-    lockMutex(lock);
+    Platform::LockMutex(lock);
 
     int contiguousAvailableValues = capacity - readIndex;
     int valuesToRead = valCount;
@@ -124,17 +124,17 @@ int RingBuffer::read(int valCount, float* vals)
     }
 
     totalReads += valuesToRead;
-    unlockMutex(lock);
+    Platform::UnlockMutex(lock);
 
     return valuesToRead;
 }
 
 int RingBuffer::count()
 {
-    lockMutex(lock);
+    Platform::LockMutex(lock);
     int localWriteIndex = writeIndex;
     int localReadIndex = readIndex;
-    unlockMutex(lock);
+    Platform::UnlockMutex(lock);
 
     if(localWriteIndex < localReadIndex)
         return (capacity - localReadIndex) + localWriteIndex;
@@ -144,9 +144,9 @@ int RingBuffer::count()
 
 int RingBuffer::free()
 {
-    lockMutex(lock);
+    Platform::LockMutex(lock);
     int result = freeInternal();
-    unlockMutex(lock);
+    Platform::UnlockMutex(lock);
 
     return result;
 }
@@ -168,8 +168,8 @@ int RingBuffer::freeInternal()
 
 void RingBuffer::clear()
 {
-    lockMutex(lock);
+    Platform::LockMutex(lock);
     writeIndex = 0;
     readIndex = 0;
-    unlockMutex(lock);
+    Platform::UnlockMutex(lock);
 }

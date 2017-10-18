@@ -1,87 +1,94 @@
-#include "platform.h"
-
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctime>
 
 #include "common.h"
+#include "platform.h"
 
-struct Mutex
+static double clockSetupTime;
+
+struct Platform::Thread
+{
+    pthread_t handle;
+};
+
+struct Platform::Mutex
 {
     pthread_mutex_t mutex;
 };
 
-Mutex* createMutex()
+Platform::Mutex* Platform::CreateMutex()
 {
     Mutex* result = (Mutex*)malloc(sizeof(Mutex));
     pthread_mutex_init(&result->mutex, NULL);
     return result;
 };
 
-void destroyMutex(Mutex* mutex)
+void Platform::DestroyMutex(Mutex* mutex)
 {
     pthread_mutex_destroy(&mutex->mutex);
     free(mutex);
 }
 
-void lockMutex(Mutex* mutex)
+void Platform::LockMutex(Mutex* mutex)
 {
     pthread_mutex_lock(&mutex->mutex);
 }
 
-void unlockMutex(Mutex* mutex)
+void Platform::UnlockMutex(Mutex* mutex)
 {
     pthread_mutex_unlock(&mutex->mutex);
 }
 
-void sleepForMilliseconds(uint32 milliseconds)
+Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoint, void* data)
+{
+    Thread* result = new Thread();
+    int success = pthread_create(&result->handle, nullptr, entryPoint, data);
+    if(!success)
+    {
+        delete result;
+        return nullptr;
+    }
+    return result;
+}
+
+int Platform::JoinThread(Platform::Thread* thread)
+{
+    void* result;
+    pthread_join(thread->handle, result);
+    return (int)result;
+}
+
+void Platform::SleepForMilliseconds(uint32 milliseconds)
 {
     usleep(1000*milliseconds);
 }
 
-int getCurrentUserName(size_t bufferLen, char* buffer)
+int Platform::GetCurrentUserName(size_t bufferLen, char* buffer)
 {
     int result = getlogin_r(buffer, bufferLen);
     return result;
 }
 
-int64 getClockFrequency()
+static double GetClockSeconds()
 {
-    int64 nsec_count, nsec_per_tick;
-    /*
-     * clock_gettime() returns the number of secs. We translate that to number of nanosecs.
-     * clock_getres() returns number of seconds per tick. We translate that to number of nanosecs per tick.
-     * Number of nanosecs divided by number of nanosecs per tick - will give the number of ticks.
-     */
-     struct timespec ts1, ts2;
+    timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
 
-     if (clock_gettime(CLOCK_MONOTONIC, &ts1) != 0) {
-         return -1;
-     }
-
-     nsec_count = ts1.tv_nsec + ts1.tv_sec * 1000000000;
-
-     if (clock_getres(CLOCK_MONOTONIC, &ts2) != 0) {
-         return -1;
-     }
-
-     nsec_per_tick = ts2.tv_nsec + ts2.tv_sec * 1000000000;
-
-     return (nsec_count / nsec_per_tick);
+    return ((double)ts.tv_sec) + (((double)ts.tv_nsec)/1000000000.0);
+}
+double Platform::SecondsSinceStartup()
+{
+    return GetClockSeconds() - clockSetupTime;
 }
 
-int64 getClockValue()
-{
-  return getClockFrequency();
-}
-
-bool isPushToTalkKeyPushed()
+bool Platform::IsPushToTalkKeyPushed()
 {
     return false;
 }
 
-DateTime getLocalDateTime()
+DateTime Platform::GetLocalDateTime()
 {
     timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
@@ -99,4 +106,20 @@ DateTime getLocalDateTime()
     result.Second = nowSplit.tm_sec;
     result.Millisecond = nowMillis;
     return result;
+}
+
+bool Platform::Setup()
+{
+    timespec startupTs;
+    if(clock_gettime(CLOCK_MONOTONIC, &startupTs) != 0)
+    {
+        return false;
+    }
+
+    clockSetupTime = GetClockSeconds();
+    return true;
+}
+
+void Platform::Shutdown()
+{
 }
