@@ -17,9 +17,15 @@ int main()
     {
         return 1;
     }
+    if(!Platform::Setup())
+    {
+        logFail("Unable to initialize platform subsystem\n");
+        return 1;
+    }
     if(enet_initialize() != 0)
     {
         logFail("Unable to initialize enet!\n");
+        Platform::Shutdown();
         return 1;
     }
     unordered_map<UserIdentifier, ServerUserData*> remoteUsers;
@@ -30,14 +36,12 @@ int main()
     ENetHost* netHost = enet_host_create(&addr, MAX_USERS, 2, 0,0);
     logInfo("Server started on port %d\n", netHost->address.port);
 
-    float updateTime = 1/30.0f;
-    int64 clockFreq = getClockFrequency();
+    double tickDuration = 1/30.0;
+    double nextTickTime = Platform::SecondsSinceStartup();
 
     bool running = true;
     while(running)
     {
-        int64 tickTime = getClockValue();
-
         ENetEvent netEvent;
         int serviceResult = 0;
         while(netHost && ((serviceResult = enet_host_service(netHost, &netEvent, 0)) > 0))
@@ -175,12 +179,12 @@ int main()
             logWarn("ENET service error\n");
         }
 
-        int64 currentTime = getClockValue();
-        float deltaTime = (float)(currentTime - tickTime)/(float)clockFreq;
-        float sleepSeconds = updateTime - deltaTime;
-        if(sleepSeconds > 0)
+        nextTickTime += tickDuration;
+        double currentTime = Platform::SecondsSinceStartup();
+        double sleepSeconds = nextTickTime - currentTime;
+        if(sleepSeconds > 0.0)
         {
-            sleepForMilliseconds((uint32)(sleepSeconds*1000.0f));
+            Platform::SleepForMilliseconds((uint32)(sleepSeconds*1000.0));
         }
     }
     enet_deinitialize();
