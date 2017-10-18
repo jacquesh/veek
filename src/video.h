@@ -21,6 +21,7 @@ namespace Video
     };
 
     bool Setup();
+    void Update();
     void Shutdown();
 
     /**

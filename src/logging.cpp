@@ -33,22 +33,21 @@ void _log(LogLevel level, const char* filePath, int lineNumber, const char* msgF
 
     const char* fileName = getFileNameFromPath(filePath);
 
-    DateTime currentTime = getLocalDateTime();
+    Platform::DateTime currentTime = Platform::GetLocalDateTime();
     char timeBuffer[64];
     snprintf(timeBuffer, sizeof(timeBuffer), "%02u:%02u:%02u.%03u",
              currentTime.Hour, currentTime.Minute, currentTime.Second, currentTime.Millisecond);
-
-    fprintf(stderr, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
-    fprintf(logFile, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
 
     va_list stderrArgs;
     va_list fileArgs;
     va_start(stderrArgs, msgFormat);
     va_copy(fileArgs, stderrArgs);
+    fprintf(stderr, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
     vfprintf(stderr, msgFormat, stderrArgs);
     if(level != LOG_TERM)
     {
         vfprintf(logFile, msgFormat, fileArgs);
+        fprintf(logFile, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
     }
     va_end(fileArgs);
     va_end(stderrArgs);

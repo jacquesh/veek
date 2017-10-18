@@ -16,6 +16,8 @@
 * Cleanup old AudioSources (e.g the sine-wave generated for the "test sound")
 
 ## New functionality:
+* Upgrade to libopus 1.2
+* Re-add the functionality for selecting a microphone activation mode
 * Allow the user to set their PushToTalk key
 * Stop trusting data that we receive over the network (IE might get malicious packets that make us read/write too far and corrupt memory, or allocate too much etc)
 * Bundle packets together, its probably not worth sending lots of tiny packets for every little thing, we'd be better of splitting the network layer out to its own thread so it can send/receive at whatever rate it pleases and transparently pack packets together

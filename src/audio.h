@@ -32,6 +32,13 @@ namespace Audio
         ~AudioBuffer();
     };
 
+    enum class MicActivationMode
+    {
+        Always = 0,
+        PushToTalk,
+        Automatic
+    };
+
     struct NetworkAudioPacket
     {
         UserIdentifier srcUser;
@@ -57,6 +64,9 @@ namespace Audio
     void GenerateToneInput(bool generateTone);
     void ListenToInput(bool listen);
     void PlayTestSound();
+
+    bool IsMicrophoneActive();
+    float GetInputVolume();
 
     /**
      * \return The new state of the microphone, which equals enabled if the function succeeded,

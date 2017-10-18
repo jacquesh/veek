@@ -13,6 +13,7 @@
 #include "logging.h"
 #include "math_utils.h"
 #include "network.h"
+#include "network_client.h"
 #include "platform.h"
 #include "ringbuffer.h"
 #include "unorderedlist.h"
@@ -42,6 +43,11 @@ struct AudioData
 
     Audio::AudioBuffer encodingBuffer; // Used for resampling before encoding, when necessary
     Audio::AudioBuffer decodingBuffer; // Used for resampling after decoding, when necessary
+
+    bool inputEnabled;
+
+    bool inputActive;
+    Audio::MicActivationMode inputActivationMode;
 };
 
 struct UserAudioData
@@ -54,6 +60,8 @@ struct UserAudioData
 };
 
 static AudioData audioState = {};
+
+static Audio::AudioBuffer micBuffer;
 
 static SoundIo* soundio = 0;
 static OpusEncoder* encoder = 0;
@@ -543,6 +551,7 @@ bool Audio::enableMicrophone(bool enabled)
 {
     // TODO: Apparently some backends (e.g JACK) don't support pausing at all
     const char* toggleString = enabled ? "Enable" : "Disable";
+    bool result = enabled;
     if(inStream)
     {
         logInfo("%s audio input\n", toggleString);
@@ -550,15 +559,17 @@ bool Audio::enableMicrophone(bool enabled)
         if(error != SoundIoErrorNone)
         {
             logWarn("Error toggling microhpone: %s\n", soundio_strerror(error));
-            return false; // TODO: libsoundio doesn't let us query the current state of the stream
+            result = false; // TODO: libsoundio doesn't let us query the current state of the stream
         }
-        return enabled;
     }
     else
     {
         logWarn("%s audio input failed: No open input stream\n", toggleString);
-        return false;
+        result = false;
     }
+
+    audioState.inputEnabled = result;
+    return result;
 }
 
 bool Audio::enableSpeakers(bool enabled)
@@ -774,7 +785,6 @@ static void devicesChangeCallback(SoundIo* sio)
     {
         SoundIoDevice* device = soundio_get_input_device(sio, i);
         bool isDefault = (i == defaultInputDevice);
-        printDevice(device, isDefault);
         if(!device->probe_error)
         {
             if(currentInputId && (currentInputDeviceNewIndex == -1))
@@ -787,6 +797,7 @@ static void devicesChangeCallback(SoundIo* sio)
             if(!device->is_raw)
             {
                 managedInputDeviceCount += 1;
+                printDevice(device, isDefault);
             }
         }
         soundio_device_unref(device);
@@ -875,7 +886,6 @@ static void devicesChangeCallback(SoundIo* sio)
     {
         SoundIoDevice* device = soundio_get_output_device(sio, i);
         bool isDefault = (i == defaultOutputDevice);
-        printDevice(device, isDefault);
         if(!device->probe_error)
         {
             if(currentOutputId && (currentOutputDeviceNewIndex == -1))
@@ -888,6 +898,7 @@ static void devicesChangeCallback(SoundIo* sio)
             if(!device->is_raw)
             {
                 managedOutputDeviceCount += 1;
+                printDevice(device, isDefault);
             }
         }
         soundio_device_unref(device);
@@ -1020,6 +1031,7 @@ bool Audio::Setup()
     logInfo("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
+    micBuffer = Audio::AudioBuffer(2400);
     return true;
 }
 
@@ -1028,6 +1040,8 @@ void Audio::SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer)
     int encodedBufferLength = sourceBuffer.Length;
     uint8* encodedBuffer = new uint8[encodedBufferLength];
     memset(encodedBuffer, 0, encodedBufferLength);
+    // TODO: This will absolutely not work for >2 people, we need to only encode each audio
+    //       packet once and then send it multiple times.
     int audioBytes = encodePacket(sourceBuffer, encodedBufferLength, encodedBuffer);
 
     NetworkAudioPacket audioPacket = {};
@@ -1055,6 +1069,39 @@ void Audio::SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer)
 void Audio::Update()
 {
     soundio_flush_events(soundio);
+
+    if(audioState.inputEnabled)
+    {
+        Audio::readAudioInputBuffer(micBuffer);
+        float rms = ComputeRMS(micBuffer);
+        switch(audioState.inputActivationMode)
+        {
+            case MicActivationMode::Always:
+                audioState.inputActive = true;
+                break; // Active is already true
+
+            case MicActivationMode::PushToTalk:
+                audioState.inputActive = Platform::IsPushToTalkKeyPushed();
+                break;
+
+            case MicActivationMode::Automatic:
+                audioState.inputActive = (rms >= 0.1f);
+                break;
+
+            default:
+                logWarn("Unrecognized audio input activation mode: %d\n",
+                        audioState.inputActivationMode);
+        }
+
+        if(audioState.inputActive && Network::IsConnectedToMasterServer())
+        {
+            for(int i=0; i<remoteUsers.size(); i++)
+            {
+                ClientUserData* destinationUser = remoteUsers[i];
+                Audio::SendAudioToUser(destinationUser, micBuffer);
+            }
+        }
+    }
 }
 
 int Audio::InputDeviceCount()
@@ -1120,6 +1167,16 @@ float Audio::ComputeRMS(AudioBuffer& buffer)
         result += (buffer.Data[i]*buffer.Data[i])/buffer.Length;
     }
     return sqrtf(result);
+}
+
+bool Audio::IsMicrophoneActive()
+{
+    return audioState.inputActive;
+}
+
+float Audio::GetInputVolume()
+{
+    return ComputeRMS(micBuffer);
 }
 
 Audio::AudioBuffer::AudioBuffer(int initialCapacity)

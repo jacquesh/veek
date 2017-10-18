@@ -5,7 +5,7 @@ ctime -begin veek_time.ctm
 For /f "tokens=1-4 delims=/ " %%a in ("%DATE%") do (set BuildDate=%%a-%%b-%%c)
 For /f "tokens=1-2 delims=/:/ " %%a in ("%TIME%") do (set BuildTime=%%a-%%b)
 FOR /f %%H IN ('git log -n 1 --oneline') DO set VersionHash=%%H
-set CompileFiles= ..\src\main.cpp ..\src\render.cpp ..\src\audio.cpp ..\src\audio_resample.cpp ..\src\ringbuffer.cpp ..\src\platform.cpp ..\src\logging.cpp ..\src\user.cpp ..\src\user_client.cpp ..\src\network.cpp ..\src\network_client.cpp ..\src\video.cpp ..\src\videoinput.cpp
+set CompileFiles= ..\src\main.cpp ..\src\interface.cpp ..\src\render.cpp ..\src\audio.cpp ..\src\audio_resample.cpp ..\src\ringbuffer.cpp ..\src\platform.cpp ..\src\logging.cpp ..\src\user.cpp ..\src\user_client.cpp ..\src\network.cpp ..\src\network_client.cpp ..\src\video.cpp ..\src\videoinput.cpp
 REM  ..\src\happyhttp.cpp
 set CompileFlags= -nologo -Zi -Gm- -W4 -wd4100 -D_CRT_SECURE_NO_WARNINGS -Od -DNOMINMAX -MTd -EHsc- -DBUILD_VERSION=\"%VersionHash%_%BuildDate%_%BuildTime%\" -DSOUNDIO_STATIC_LIBRARY
 set IncludeDirs= -I..\include -I..\thirdparty\include

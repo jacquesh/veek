@@ -326,6 +326,10 @@ bool Video::Setup()
     return true;
 }
 
+void Video::Update()
+{
+}
+
 void Video::Shutdown()
 {
     logInfo("Deinitialize video subsystem\n");

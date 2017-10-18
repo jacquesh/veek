@@ -14,6 +14,7 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
 set(SRC_FILES ${SRC_DIR}/main.cpp
               ${SRC_DIR}/render.cpp
+              ${SRC_DIR}/interface.cpp
               ${SRC_DIR}/audio.cpp
               ${SRC_DIR}/audio_resample.cpp
               ${SRC_DIR}/ringbuffer.cpp
