@@ -12,11 +12,11 @@
 ClientUserData* localUser;
 std::vector<ClientUserData*> remoteUsers;
 
-static uint32 micBufferLen = 2400; // TODO: Make this a constant in audio.h or something
-
 ClientUserData::ClientUserData()
 {
-    this->videoTexture = Render::createTexture();
+    // TODO: Be a bit more flexible with the supported image sizes
+    this->videoImage = new uint8_t[cameraWidth*cameraHeight*3];
+    this->videoTexture = 0;
 }
 
 ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
@@ -25,13 +25,14 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     this->nameLength = connectionPacket.nameLength;
     memcpy(this->name, connectionPacket.name, connectionPacket.nameLength);
     this->name[connectionPacket.nameLength] = 0;
-    this->videoTexture = Render::createTexture();
+    this->videoImage = new uint8_t[cameraWidth*cameraHeight*3];
+    this->videoTexture = 0;
     logInfo("Connected to user %d with name of length %d: %s\n", ID, nameLength, name);
 }
 
 ClientUserData::~ClientUserData()
 {
-    glDeleteTextures(1, &videoTexture);
+    delete[] videoImage;
 }
 
 
@@ -66,15 +67,11 @@ void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packe
         }
         this->lastReceivedVideoPacket = packet.index;
 
+        assert(packet.imageWidth == cameraWidth);
+        assert(packet.imageHeight == cameraHeight);
         int outputImageBytes = packet.imageWidth * packet.imageHeight * 3;
-        uint8* pixelValues = new uint8[outputImageBytes];
-        Video::decodeRGBImage(packet.encodedDataLength, packet.encodedData, outputImageBytes, pixelValues);
-        glBindTexture(GL_TEXTURE_2D, this->videoTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                     packet.imageWidth, packet.imageHeight, 0,
-                     GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        delete[] pixelValues;
+        Video::decodeRGBImage(packet.encodedDataLength, packet.encodedData,
+                              outputImageBytes, this->videoImage);
     }
     else
     {

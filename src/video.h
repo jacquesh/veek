@@ -6,6 +6,9 @@
 #include "common.h"
 #include "user.h"
 
+const int cameraWidth = 320;
+const int cameraHeight = 240;
+
 namespace Video
 {
     struct NetworkVideoPacket
@@ -15,7 +18,7 @@ namespace Video
         uint16 imageWidth;
         uint16 imageHeight;
         uint16 encodedDataLength;
-        uint8 encodedData[320*240*3]; // TODO: Sizing
+        uint8 encodedData[cameraWidth*cameraHeight*3]; // TODO: Sizing
 
         template<typename Packet> bool serialize(Packet& packet);
     };

@@ -17,8 +17,6 @@
 #include "render.h"
 #include "user_client.h"
 #include "video.h"
-const int cameraWidth = 320;
-const int cameraHeight = 240;
 
 // TODO: Look into replacing the GL3 UI with something slightly more native (but still cross platform)
 //       - http://www.fltk.org/index.php
@@ -77,6 +75,11 @@ void handleVideoInput(InterfaceState& game)
                                                         320*240*3, encPx);
             Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
 #endif
+            if(localUser->videoTexture == 0)
+            {
+                // TODO: These textures never get cleaned up because that'd need to happen from the UI thread
+                localUser->videoTexture = Render::createTexture();
+            }
             glBindTexture(GL_TEXTURE_2D, localUser->videoTexture);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
                          cameraWidth, cameraHeight, 0,
@@ -140,6 +143,17 @@ void renderGame(InterfaceState* game, float deltaTime)
         for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
         {
             ClientUserData* user = *userIter;
+            if(user->videoTexture == 0)
+            {
+                // TODO: These textures never get cleaned up because that'd need to happen from the UI thread
+                user->videoTexture = Render::createTexture();
+            }
+            glBindTexture(GL_TEXTURE_2D, user->videoTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                         cameraWidth, cameraHeight, 0,
+                         GL_RGB, GL_UNSIGNED_BYTE, user->videoImage);
+            glBindTexture(GL_TEXTURE_2D, 0);
+
             ImGui::BeginGroup();
             ImGui::Text(user->name);
             ImGui::Image((ImTextureID)user->videoTexture, largeImageSize);

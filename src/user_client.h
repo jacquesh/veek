@@ -7,15 +7,14 @@
 #include "enet/enet.h"
 
 #include "audio.h"
-#include "common.h"
-#include "render.h"
 #include "user.h"
 #include "video.h"
 
 struct ClientUserData : UserData
 {
     // Video
-    GLuint videoTexture;
+    uint32_t videoTexture;
+    uint8_t* videoImage;
 
     // Network
     uint8 lastSentAudioPacket;

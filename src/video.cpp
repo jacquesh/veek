@@ -30,9 +30,6 @@ static int cameraDevice = -1;
 int cameraDeviceCount;
 char** cameraDeviceNames;
 
-int cameraWidth = 320; // TODO: We probably also want these to be static
-int cameraHeight = 240;
-
 static th_enc_ctx* encoderContext;
 static th_dec_ctx* decoderContext;
 
