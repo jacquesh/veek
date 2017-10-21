@@ -361,24 +361,11 @@ void Audio::decodePacket(OpusDecoder* decoder,
 
     if(targetAudioBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
-        // TODO: We need different resamplers for each user that we receive from.
-        logTerm("Resample a buffer after decoding\n");
-        static ResampleStreamContext ctx = {};
-        ctx.InputSampleRate = audioState.decodingBuffer.SampleRate;
-        ctx.OutputSampleRate = targetAudioBuffer.SampleRate;
-        targetAudioBuffer.Length = 0;
         audioState.decodingBuffer.Length = totalFramesDecoded;
 
-        for(int i=0; i<audioState.decodingBuffer.Length; i++)
-        {
-            resampleStreamInput(ctx, audioState.decodingBuffer.Data[i]);
-            while(!resampleStreamRequiresInput(ctx))
-            {
-                float sample = resampleStreamOutput(ctx);
-                targetAudioBuffer.Data[targetAudioBuffer.Length++] = sample;
-            }
-
-        }
+        // TODO: We need different resamplers for each user that we receive from.
+        static ResampleStreamContext ctx = {};
+        resampleBuffer2Buffer(ctx, audioState.decodingBuffer, targetAudioBuffer);
     }
     else
     {
@@ -397,18 +384,8 @@ int Audio::encodePacket(AudioBuffer& sourceBuffer,
     if(sourceBuffer.SampleRate != NETWORK_SAMPLE_RATE)
     {
         static ResampleStreamContext ctx = {};
-        ctx.InputSampleRate = sourceBuffer.SampleRate;
-        ctx.OutputSampleRate = NETWORK_SAMPLE_RATE;
-        audioState.encodingBuffer.Length = 0;
-        for(int i=0; i<sourceBuffer.Length; i++)
-        {
-            resampleStreamInput(ctx, sourceBuffer.Data[i]);
-            while(!resampleStreamRequiresInput(ctx))
-            {
-                float sample = resampleStreamOutput(ctx);
-                audioState.encodingBuffer.Data[audioState.encodingBuffer.Length++] = sample;
-            }
-        }
+        resampleBuffer2Buffer(ctx, sourceBuffer, audioState.encodingBuffer);
+
         sourceData = audioState.encodingBuffer.Data;
         sourceLengthRemaining = audioState.encodingBuffer.Length;
     }
@@ -526,23 +503,6 @@ void Audio::readAudioInputBuffer(AudioBuffer& buffer)
             double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
             buffer.Data[sampleIndex] = (float)sinVal;
             sampleTime += timestep;
-        }
-    }
-
-    if(audioState.isListeningToInput)
-    {
-        static ResampleStreamContext ctx = {};
-        ctx.InputSampleRate = buffer.SampleRate;
-        ctx.OutputSampleRate = outStream->sample_rate;
-
-        for(int i=0; i<samplesToWrite; i++)
-        {
-            resampleStreamInput(ctx, buffer.Data[i]);
-            while(!resampleStreamRequiresInput(ctx))
-            {
-                float sample = resampleStreamOutput(ctx);
-                listenBuffer->write(1, &sample);
-            }
         }
     }
 }
@@ -1072,7 +1032,7 @@ void Audio::Update()
 
     if(audioState.inputEnabled)
     {
-        Audio::readAudioInputBuffer(micBuffer);
+        readAudioInputBuffer(micBuffer);
         float rms = ComputeRMS(micBuffer);
         switch(audioState.inputActivationMode)
         {
@@ -1091,6 +1051,13 @@ void Audio::Update()
             default:
                 logWarn("Unrecognized audio input activation mode: %d\n",
                         audioState.inputActivationMode);
+        }
+
+        if(audioState.isListeningToInput)
+        {
+            static ResampleStreamContext ctx = {};
+            ctx.OutputSampleRate = outStream->sample_rate;
+            resampleBuffer2Ring(ctx, micBuffer, *listenBuffer);
         }
 
         if(audioState.inputActive && Network::IsConnectedToMasterServer())

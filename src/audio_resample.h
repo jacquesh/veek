@@ -21,13 +21,11 @@ struct ResampleStreamContext
     int PreviousOutputSampleIndex;
 };
 
-int resampleStream(ResampleStreamContext& ctx,
-                   float inputSample, float* outputSamples, int maxOutputSamples);
-
-bool resampleStreamRequiresInput(ResampleStreamContext& ctx);
-void resampleStreamInput(ResampleStreamContext& ctx, float inputSample);
-float resampleStreamOutput(ResampleStreamContext& ctx);
-
-float resampleStreamFrom(ResampleStreamContext& ctx, RingBuffer& buffer);
+void resampleBuffer2Buffer(ResampleStreamContext& ctx,
+                           const Audio::AudioBuffer& input,
+                           Audio::AudioBuffer& output);
+void resampleBuffer2Ring(ResampleStreamContext& ctx,
+                         const Audio::AudioBuffer& input,
+                         RingBuffer& output);
 
 #endif // _AUDIO_RESAMPLE_H
