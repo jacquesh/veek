@@ -225,7 +225,10 @@ void Network::UpdateReceive()
 
 void Network::UpdateSend()
 {
-    enet_host_flush(networkState.netHost);
+    if(networkState.netHost)
+    {
+        enet_host_flush(networkState.netHost);
+    }
 }
 
 bool Network::Setup()
