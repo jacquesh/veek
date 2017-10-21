@@ -139,7 +139,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
     }
 }
 
-void Network::Update()
+void Network::UpdateReceive()
 {
     ENetEvent netEvent;
     int serviceResult = 0;
@@ -221,6 +221,11 @@ void Network::Update()
     {
         logWarn("ENET service error\n");
     }
+}
+
+void Network::UpdateSend()
+{
+    enet_host_flush(networkState.netHost);
 }
 
 bool Network::Setup()

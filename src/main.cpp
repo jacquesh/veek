@@ -67,6 +67,7 @@ int main()
     logInfo("Setup complete, start running...\n");
     while(globals->isRunning)
     {
+        Network::UpdateReceive();
         nextTickTime += tickDuration;
 
         double newTime = Platform::SecondsSinceStartup();
@@ -74,7 +75,7 @@ int main()
 
         Audio::Update();
         Video::Update();
-        Network::Update();
+        Network::UpdateSend();
 
         // Sleep till next scheduled update
         newTime = Platform::SecondsSinceStartup();

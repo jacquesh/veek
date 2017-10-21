@@ -12,7 +12,8 @@ namespace Network
     RoomIdentifier CurrentRoom();
 
     bool Setup();
-    void Update();
+    void UpdateReceive();
+    void UpdateSend();
     void Shutdown();
 
     void ConnectToMasterServer(const char* serverHostname, bool createRoom, RoomIdentifier roomToJoin);
