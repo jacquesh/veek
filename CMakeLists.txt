@@ -56,7 +56,7 @@ find_package(X11)
 
 ExternalProject_Add(
     libsoundio
-    GIT_REPOSITORY git@github.com:andrewrk/libsoundio.git
+    GIT_REPOSITORY https://github.com/andrewrk/libsoundio.git
     GIT_TAG 1778b8d10f
     CMAKE_ARGS -DENABLE_JACK=OFF
                -DENABLE_PULSEAUDIO=ON
@@ -75,7 +75,7 @@ set(SOUNDIO_INCLUDE_DIRS ${SOUNDIO_BINDIR}/include)
 # NOTE: This is only here because TravisCI is running on Ubuntu 14.04 and doesn't have libglfw3-dev
 ExternalProject_Add(
     glfw
-    GIT_REPOSITORY git@github.com:glfw/glfw.git
+    GIT_REPOSITORY https://github.com/glfw/glfw.git
     GIT_TAG 3.2.1
     CMAKE_ARGS -DGLFW_BUILD_EXAMPLES=OFF
                -DGLFW_BUILD_TESTS=OFF
