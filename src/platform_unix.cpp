@@ -1,11 +1,12 @@
 #include <pthread.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
-#include <ctime>
 
 #include "common.h"
 #include "platform.h"
 
+typedef void UnixThreadEntryPoint(void*);
 static double clockSetupTime;
 
 struct Platform::Thread
@@ -44,7 +45,7 @@ void Platform::UnlockMutex(Mutex* mutex)
 Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoint, void* data)
 {
     Thread* result = new Thread();
-    int success = pthread_create(&result->handle, nullptr, entryPoint, data);
+    int success = pthread_create(&result->handle, nullptr, (UnixThreadEntryPoint*)entryPoint, data);
     if(!success)
     {
         delete result;
@@ -55,9 +56,9 @@ Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoi
 
 int Platform::JoinThread(Platform::Thread* thread)
 {
-    void* result;
-    pthread_join(thread->handle, result);
-    return (int)result;
+    pthread_join(thread->handle, nullptr);
+    // TODO: Get a proper return value
+    return 0;
 }
 
 void Platform::SleepForMilliseconds(uint32 milliseconds)
@@ -88,7 +89,7 @@ bool Platform::IsPushToTalkKeyPushed()
     return false;
 }
 
-DateTime Platform::GetLocalDateTime()
+Platform::DateTime Platform::GetLocalDateTime()
 {
     timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
