@@ -56,8 +56,7 @@ int main()
     // Initialize
     double tickRate = 20;
     double tickDuration = 1.0/tickRate;
-    double currentTime = Platform::SecondsSinceStartup();
-    double nextTickTime = currentTime;
+    double nextTickTime = Platform::SecondsSinceStartup();;
 
     GlobalState* globals = new GlobalState();
     globals->isRunning = true;
@@ -68,20 +67,16 @@ int main()
     while(globals->isRunning)
     {
         Network::UpdateReceive();
-        nextTickTime += tickDuration;
-
-        double newTime = Platform::SecondsSinceStartup();
-        currentTime = newTime;
-
         Audio::Update();
         Video::Update();
         Network::UpdateSend();
 
         // Sleep till next scheduled update
-        newTime = Platform::SecondsSinceStartup();
-        if(newTime < nextTickTime)
+        nextTickTime += tickDuration;
+        double currentTime = Platform::SecondsSinceStartup();
+        double sleepSeconds = nextTickTime - currentTime;
+        if(sleepSeconds > 0.0)
         {
-            double sleepSeconds = nextTickTime - newTime;
             uint32 sleepMS = (uint32)(sleepSeconds*1000);
             Platform::SleepForMilliseconds(sleepMS);
         }
