@@ -117,4 +117,5 @@ target_compile_definitions(veek PRIVATE SOUNDIO_STATIC_LIBRARY
 
 add_executable(server ${SERVER_SRC_FILES})
 include_directories(server ${ENET_INCLUDE_DIRS})
-target_link_libraries(server ${ENET_STATIC_LIBRARIES})
+target_link_libraries(server ${ENET_STATIC_LIBRARIES}
+                             ${CMAKE_THREAD_LIBS_INIT})
