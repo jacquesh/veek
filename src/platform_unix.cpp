@@ -6,7 +6,7 @@
 #include "common.h"
 #include "platform.h"
 
-typedef void UnixThreadEntryPoint(void*);
+typedef void* UnixThreadEntryPoint(void*);
 static double clockSetupTime;
 
 struct Platform::Thread
@@ -54,11 +54,10 @@ Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoi
     return result;
 }
 
-int Platform::JoinThread(Platform::Thread* thread)
+void Platform::JoinThread(Platform::Thread* thread)
 {
+    // TODO: Check for errors
     pthread_join(thread->handle, nullptr);
-    // TODO: Get a proper return value
-    return 0;
 }
 
 void Platform::SleepForMilliseconds(uint32 milliseconds)

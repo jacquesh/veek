@@ -60,14 +60,10 @@ Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoi
     return result;
 }
 
-int Platform::JoinThread(Platform::Thread* thread)
+void Platform::JoinThread(Platform::Thread* thread)
 {
     // TODO: Check for errors
     WaitForSingleObject(thread->handle, INFINITE);
-
-    DWORD returnCode;
-    GetExitCodeThread(thread->handle, &returnCode);
-    return returnCode;
 }
 
 void Platform::SleepForMilliseconds(uint32_t milliseconds)

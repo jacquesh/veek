@@ -26,7 +26,7 @@ namespace Platform
     void Shutdown();
 
     Thread* CreateThread(ThreadStartFunction* entryPoint, void* data);
-    int JoinThread(Thread* thread);
+    void JoinThread(Thread* thread);
 
     struct Mutex;
     Mutex* CreateMutex();
