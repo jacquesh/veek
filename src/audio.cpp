@@ -149,8 +149,6 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
             inBuffer->write(1, &val);
         }
 
-        // TODO: Should we not break if we get frameCount = 0? Because otherwise we'll just spin
-        //       and framesRemaining won't decrease?
         if(frameCount > 0)
         {
             soundio_instream_end_read(stream);
@@ -168,7 +166,6 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
     SoundIoChannelArea* outArea;
-    // TODO: Wraithy always gets 0 frameCountMin and then framesRemaining gets 0 and it underflows
 
     while(framesRemaining > 0)
     {
@@ -334,13 +331,6 @@ void Audio::decodePacket(OpusDecoder* decoder,
     while((sourceLengthRemaining >= sizeof(int)) && (targetLengthRemaining >= frameSize))
     {
         int packetLength = *((int*)sourceBuffer); // TODO: Byte order checking/swapping
-        static bool printLen = true;
-        if(printLen)
-        {
-            logInfo("Decode packet with length %d\n", packetLength);
-            printLen = false;
-        }
-
         int correctErrors = 0; // TODO: What value do we actually want here?
         int framesDecoded = opus_decode_float(decoder,
                                               sourceBuffer+4, packetLength,
@@ -398,7 +388,6 @@ int Audio::encodePacket(AudioBuffer& sourceBuffer,
     // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
     while((sourceLengthRemaining >= frameSize) && (targetLengthRemaining >= frameSize))
     {
-        // TODO: Multiple channels, this currently assumes a single channel
         int packetLength = opus_encode_float(encoder,
                                              sourceData, frameSize,
                                              targetData+4, targetLengthRemaining);
@@ -425,7 +414,6 @@ void Audio::AddAudioUser(UserIdentifier userId)
     int32 opusError;
     int32 channels = 1;
     UserAudioData newUser = {};
-    // TODO: Don't create the decoder here, create it when we receive a packet and we know what the sample rate is
     newUser.decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
     logInfo("Opus decoder created: %d\n", opusError);
 
@@ -472,7 +460,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     AudioBuffer tempBuffer = {};
     tempBuffer.Capacity = 2400;
     tempBuffer.Data = new float[tempBuffer.Capacity];
-    tempBuffer.SampleRate = NETWORK_SAMPLE_RATE; // TODO: srcUser.sampleRate
+    tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 
     decodePacket(srcUser.decoder,
                  packet.encodedDataLength, packet.encodedData,

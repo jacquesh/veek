@@ -99,7 +99,9 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
             //       In fact we probably want to have a serialize function for Users specifically,
             //       not just UserIDs, since then we can quit if that fails and it will take into
             //       account the situation in which the ID doesn't correspond to any users that we
-            //       know of
+            //       know of.
+            //       In fact this can happen if we get packets out-of-order when a client disconnects.
+            //       I'm pretty sure we can just ignore a packet from an unknown user?
             assert(sourceUser != nullptr);
 
             sourceUser->processIncomingAudioPacket(audioInPacket);
