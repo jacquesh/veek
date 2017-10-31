@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "soundio/soundio.h"
-#include "opus/opus.h"
 
 #include "user.h"
 
@@ -86,9 +85,6 @@ namespace Audio
     void ProcessIncomingPacket(NetworkAudioPacket& packet);
 
     void SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer);
-
-    int encodePacket(AudioBuffer& sourceBuffer, int targetLength, uint8_t* targetBufferPtr);
-    void decodePacket(OpusDecoder* decoder, int sourceLength, uint8_t* sourceBuffer, AudioBuffer& targetAudioBuffer);
 
     // TODO: Maybe return true/false to indicate if the buffer was large enough?
     // Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
