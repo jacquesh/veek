@@ -214,8 +214,6 @@ void renderGame(InterfaceState* game, float deltaTime)
     }
 
     static bool listening = false;
-    static int selectedRecordingDevice = 0;
-    static int selectedPlaybackDevice = 0;
     if(ImGui::CollapsingHeader("Audio", 0, true, false))
     {
         bool speakersToggled = ImGui::Checkbox("Speakers Enabled", &game->speakersEnabled);
@@ -236,6 +234,7 @@ void renderGame(InterfaceState* game, float deltaTime)
             Audio::GenerateToneInput(game->sendTone);
         }
 
+        int selectedRecordingDevice = Audio::GetAudioInputDevice();
         bool micChanged = ImGui::Combo("Recording Device",
                                        &selectedRecordingDevice,
                                        Audio::InputDeviceNames(),
@@ -252,6 +251,7 @@ void renderGame(InterfaceState* game, float deltaTime)
             Audio::ListenToInput(listening);
         }
 
+        int selectedPlaybackDevice = Audio::GetAudioOutputDevice();
         bool speakerChanged = ImGui::Combo("Playback Device",
                                            &selectedPlaybackDevice,
                                            Audio::OutputDeviceNames(),

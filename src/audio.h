@@ -54,10 +54,12 @@ namespace Audio
 
     int InputDeviceCount();
     const char** InputDeviceNames();
+    int GetAudioInputDevice();
     bool SetAudioInputDevice(int newInputDevice);
 
     int OutputDeviceCount();
     const char** OutputDeviceNames();
+    int GetAudioOutputDevice();
     bool SetAudioOutputDevice(int newOutputDevice);
 
     void GenerateToneInput(bool generateTone);

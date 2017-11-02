@@ -544,6 +544,11 @@ bool Audio::enableSpeakers(bool enabled)
     }
 }
 
+int Audio::GetAudioInputDevice()
+{
+    return audioState.currentInputDevice;
+}
+
 bool Audio::SetAudioInputDevice(int newInputDevice)
 {
     // TODO: We should probably wait for any currently running callbacks to finish
@@ -604,6 +609,11 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     audioState.inputListenResampler.InputSampleRate = inStream->sample_rate;
 
     return true;
+}
+
+int Audio::GetAudioOutputDevice()
+{
+    return audioState.currentOutputDevice;
 }
 
 bool Audio::SetAudioOutputDevice(int newOutputDevice)
