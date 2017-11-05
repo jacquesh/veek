@@ -464,6 +464,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
                 srcUser.lastReceivedPacketIndex+1, packet.index-1);
     }
     srcUser.lastReceivedPacketIndex = packet.index;
+    logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
 #ifdef USE_JB
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
