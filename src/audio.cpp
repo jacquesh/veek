@@ -20,6 +20,9 @@
 #include "user.h"
 #include "user_client.h"
 
+#define USE_JB
+#include "jitterbuffer.h"
+
 struct AudioSource
 {
     RingBuffer* buffer;
@@ -58,6 +61,7 @@ struct UserAudioData
     ResampleStreamContext receiveResampler;
     OpusDecoder* decoder;
     RingBuffer* buffer;
+    JitterBuffer* jitter;
 };
 
 static AudioData audioState = {};
@@ -420,6 +424,7 @@ void Audio::AddAudioUser(UserIdentifier userId)
     logInfo("Opus decoder created: %d\n", opusError);
 
     newUser.buffer = new RingBuffer(48000);
+    newUser.jitter = new JitterBuffer();
 
     AudioSource userSource = {};
     userSource.buffer = newUser.buffer;
@@ -435,6 +440,7 @@ void Audio::RemoveAudioUser(UserIdentifier userId)
         return;
 
     UserAudioData& oldUser = oldUserIter->second;
+    delete oldUser.jitter;
     if(oldUser.decoder)
     {
         opus_decoder_destroy(oldUser.decoder);
@@ -459,6 +465,9 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     }
     srcUser.lastReceivedPacketIndex = packet.index;
 
+#ifdef USE_JB
+    srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
+#else
     AudioBuffer tempBuffer = {};
     tempBuffer.Capacity = 2400;
     tempBuffer.Data = new float[tempBuffer.Capacity];
@@ -470,6 +479,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     logTerm("Received %d samples from the network\n", tempBuffer.Length);
     srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
     delete[] tempBuffer.Data;
+#endif
 }
 
 void Audio::readAudioInputBuffer(AudioBuffer& buffer)
@@ -1066,6 +1076,31 @@ void Audio::Update()
             }
         }
     }
+
+#ifdef USE_JB
+    for(auto& iter : audioUsers)
+    {
+        UserIdentifier uid = iter.first;
+        UserAudioData& srcUser = iter.second;
+
+        uint8_t* dataToDecode = nullptr;
+        uint16_t dataToDecodeLen = srcUser.jitter->Get(dataToDecode);
+        if(dataToDecodeLen == 0)
+            continue;
+
+        AudioBuffer tempBuffer = {};
+        tempBuffer.Capacity = 2400;
+        tempBuffer.Data = new float[tempBuffer.Capacity];
+        tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+        decodePacket(srcUser.decoder, srcUser.receiveResampler,
+                     dataToDecodeLen, dataToDecode,
+                     tempBuffer);
+        logTerm("Received %d samples from the network\n", tempBuffer.Length);
+        srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
+        delete[] tempBuffer.Data;
+    }
+#endif
 }
 
 int Audio::InputDeviceCount()

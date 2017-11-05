@@ -25,6 +25,7 @@ set(SRC_FILES ${SRC_DIR}/main.cpp
               ${SRC_DIR}/network.cpp
               ${SRC_DIR}/network_client.cpp
               ${SRC_DIR}/video.cpp
+              ${SRC_DIR}/jitterbuffer.cpp
     )
 set(IMGUI_SRC_FILES ${CMAKE_SOURCE_DIR}/imgui/imgui.cpp
                     ${CMAKE_SOURCE_DIR}/imgui/imgui_draw.cpp
