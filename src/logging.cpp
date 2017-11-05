@@ -26,10 +26,11 @@ static const char* getFileNameFromPath(const char* filePath)
     return baseName;
 }
 
-void _log(LogLevel level, const char* filePath, int lineNumber, const char* msgFormat, ...)
+void _log(LogLevel level, bool logToTerminal, bool logToFile,
+          const char* filePath, int lineNumber, const char* msgFormat, ...)
 {
-    assert((level >= LOG_TERM) && (level <= LOG_FAIL));
-    const char* logLevelLabels[] = {"TERM", "INFO", "WARN", "FAIL"};
+    assert((level >= LOG_DBUG) && (level <= LOG_FAIL));
+    const char* logLevelLabels[] = {"DBUG", "INFO", "WARN", "FAIL"};
 
     const char* fileName = getFileNameFromPath(filePath);
 
@@ -42,12 +43,17 @@ void _log(LogLevel level, const char* filePath, int lineNumber, const char* msgF
     va_list fileArgs;
     va_start(stderrArgs, msgFormat);
     va_copy(fileArgs, stderrArgs);
-    fprintf(stderr, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
-    vfprintf(stderr, msgFormat, stderrArgs);
-    if(level != LOG_TERM)
+    if(logToTerminal)
     {
+        fprintf(stderr, "%s [%s] %16s:%-3d - ",
+                timeBuffer, logLevelLabels[level], fileName, lineNumber);
+        vfprintf(stderr, msgFormat, stderrArgs);
+    }
+    if(logToFile)
+    {
+        fprintf(logFile, "%s [%s] %16s:%-3d - ",
+                timeBuffer, logLevelLabels[level], fileName, lineNumber);
         vfprintf(logFile, msgFormat, fileArgs);
-        fprintf(logFile, "%s [%s] %16s:%-3d - ", timeBuffer, logLevelLabels[level], fileName, lineNumber);
     }
     va_end(fileArgs);
     va_end(stderrArgs);
