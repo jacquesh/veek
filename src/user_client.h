@@ -17,10 +17,10 @@ struct ClientUserData : UserData
     uint8_t* videoImage;
 
     // Network
-    uint8 lastSentAudioPacket;
-    uint8 lastSentVideoPacket;
-    uint8 lastReceivedAudioPacket;
-    uint8 lastReceivedVideoPacket;
+    uint16 lastSentAudioPacket;
+    uint16 lastSentVideoPacket;
+    uint16 lastReceivedAudioPacket;
+    uint16 lastReceivedVideoPacket;
 
     // Functions
     ClientUserData();

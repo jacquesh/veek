@@ -41,7 +41,7 @@ namespace Audio
     struct NetworkAudioPacket
     {
         UserIdentifier srcUser;
-        uint8 index;
+        uint16 index;
         uint16 encodedDataLength;
         uint8 encodedData[2400]; // TODO: Sizing (currently =2400=micBufferLen from main.cpp)
 

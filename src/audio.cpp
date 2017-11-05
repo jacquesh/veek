@@ -55,7 +55,7 @@ struct AudioData
 
 struct UserAudioData
 {
-    uint8_t lastReceivedPacketIndex;
+    uint16_t lastReceivedPacketIndex;
 
     int32 sampleRate;
     ResampleStreamContext receiveResampler;
@@ -1198,7 +1198,7 @@ template<typename Packet>
 bool Audio::NetworkAudioPacket::serialize(Packet& packet)
 {
     packet.serializeuint8(this->srcUser);
-    packet.serializeuint8(this->index);
+    packet.serializeuint16(this->index);
     packet.serializeuint16(this->encodedDataLength);
     packet.serializebytes(this->encodedData, this->encodedDataLength);
 
