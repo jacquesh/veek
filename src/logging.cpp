@@ -8,7 +8,7 @@
 #include "platform.h"
 
 static const char* logFileName;
-static FILE* logFile;
+static FILE* logFile = nullptr;
 
 static const char* getFileNameFromPath(const char* filePath)
 {
@@ -49,7 +49,7 @@ void _log(LogLevel level, bool logToTerminal, bool logToFile,
                 timeBuffer, logLevelLabels[level], fileName, lineNumber);
         vfprintf(stderr, msgFormat, stderrArgs);
     }
-    if(logToFile)
+    if(logToFile && (logFile != nullptr))
     {
         fprintf(logFile, "%s [%s] %16s:%-3d - ",
                 timeBuffer, logLevelLabels[level], fileName, lineNumber);
