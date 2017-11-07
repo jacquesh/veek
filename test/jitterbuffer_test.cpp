@@ -52,7 +52,7 @@ TEST_CASE("Get returns nothing when the data is all consumed after being filled"
 TEST_CASE("Get returns data in the correct order after it was received in the correct order")
 {
     JitterBuffer jb;
-    uint8_t inVal = 3;
+    uint8_t inVal;
     uint16_t outCount;
     uint8_t* outVal;
 
@@ -81,7 +81,7 @@ TEST_CASE("Get returns data in the correct order after it was received in the co
 TEST_CASE("Get returns data in the correct order after it was received with two items swapped around")
 {
     JitterBuffer jb;
-    uint8_t inVal = 3;
+    uint8_t inVal;
     uint16_t outCount;
     uint8_t* outVal;
 
@@ -110,7 +110,7 @@ TEST_CASE("Get returns data in the correct order after it was received with two 
 TEST_CASE("Get returns data in the correct order after it was received in reverse order")
 {
     JitterBuffer jb;
-    uint8_t inVal = 3;
+    uint8_t inVal;
     uint16_t outCount;
     uint8_t* outVal;
 
@@ -134,4 +134,36 @@ TEST_CASE("Get returns data in the correct order after it was received in revers
     outCount = jb.Get(outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
+}
+
+TEST_CASE("Get returns empty data when a packet is dropped")
+{
+    JitterBuffer jb;
+    uint8_t inVal;
+    uint16_t outCount;
+    uint8_t* outVal;
+
+    inVal = 3;
+    jb.Add(1, 1, &inVal);
+
+    inVal = 5;
+    jb.Add(3, 1, &inVal);
+
+    inVal = 6;
+    jb.Add(4, 1, &inVal);
+
+    outCount = jb.Get(outVal);
+    CHECK(outCount == 1);
+    CHECK(*outVal == 3);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 0);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 5);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 6);
 }
