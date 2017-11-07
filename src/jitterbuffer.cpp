@@ -76,6 +76,7 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
         memcpy(newItem->data, data, dataLength);
         newItem->dataLength = dataLength;
         newItem->packetIndex = packetIndex;
+        nextOutputPacketIndex = packetIndex;
         return;
     }
     else
@@ -133,6 +134,7 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
         memcpy(newItem->data, data, dataLength);
         newItem->dataLength = dataLength;
         newItem->packetIndex = packetIndex;
+        nextOutputPacketIndex = packetIndex;
     }
 
     if(unusedItems == nullptr)
@@ -160,6 +162,14 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
     assert(first != nullptr); // !refilling => first != nullptr
 
     JitterItem* itemToGet = first;
+    uint16_t expectedPacketIndex = nextOutputPacketIndex;
+    nextOutputPacketIndex++;
+
+    if(itemToGet->packetIndex != expectedPacketIndex)
+    {
+        return 0;
+    }
+
     uint16_t result = itemToGet->dataLength;
     data = itemToGet->data;
 

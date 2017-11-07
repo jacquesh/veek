@@ -31,6 +31,7 @@ private:
     JitterItem* last;
 
     bool refilling;
+    uint16_t nextOutputPacketIndex;
 
     JitterItem* GetFreeItem();
 };
