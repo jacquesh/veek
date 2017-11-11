@@ -338,8 +338,8 @@ void videoDevice::NukeDownstream(IBaseFilter *pBF){
 
 void videoDevice::destroyGraph(){
 	HRESULT hr = NULL;
- 	int FuncRetval=0;
- 	int NumFilters=0;
+ 	//int FuncRetval=0; // NOTE: This is initialized but not referenced, so it's been commented out to reduce warnings
+ 	//int NumFilters=0; // NOTE: This is initialized but not referenced, so it's been commented out to reduce warnings
 
 	int i = 0;
 	while (hr == NOERROR)
@@ -687,10 +687,10 @@ bool videoInput::setupDevice(int deviceNumber){
 //
 // ----------------------------------------------------------------------
 
-bool videoInput::setupDevice(int deviceNumber, int connection){
+bool videoInput::setupDevice(int deviceNumber, int connectionToUse){
 	if(deviceNumber >= VI_MAX_CAMERAS || VDList[deviceNumber]->readyToCapture) return false;
 
-	setPhyCon(deviceNumber, connection);
+	setPhyCon(deviceNumber, connectionToUse);
 	if(setup(deviceNumber))return true;
 	return false;
 }
@@ -715,11 +715,11 @@ bool videoInput::setupDevice(int deviceNumber, int w, int h){
 //
 // ----------------------------------------------------------------------
 
-bool videoInput::setupDevice(int deviceNumber, int w, int h, int connection){
+bool videoInput::setupDevice(int deviceNumber, int w, int h, int connectionToUse){
 	if(deviceNumber >= VI_MAX_CAMERAS || VDList[deviceNumber]->readyToCapture) return false;
 
 	setAttemptCaptureSize(deviceNumber,w,h);
-	setPhyCon(deviceNumber, connection);
+	setPhyCon(deviceNumber, connectionToUse);
 	if(setup(deviceNumber))return true;
 	return false;
 }
