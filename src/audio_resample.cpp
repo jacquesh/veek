@@ -106,3 +106,26 @@ void resampleBuffer2Ring(ResampleStreamContext& ctx,
         }
     }
 }
+
+void resampleRing2Ring(ResampleStreamContext& ctx,
+                       RingBuffer& input,
+                       RingBuffer& output)
+{
+    // TODO: Set/check sample rates
+    const int chunkSize = 1024;
+    float inputChunk[chunkSize];
+
+    while(input.count() >= chunkSize)
+    {
+        int inputChunkLength = input.read(chunkSize, inputChunk);
+        for(int i=0; i<inputChunkLength; i++)
+        {
+            resampleStreamInput(ctx, inputChunk[i]);
+            while(!resampleStreamRequiresInput(ctx))
+            {
+                float sample = resampleStreamOutput(ctx);
+                output.write(1, &sample);
+            }
+        }
+    }
+}

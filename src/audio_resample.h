@@ -21,11 +21,18 @@ struct ResampleStreamContext
     int PreviousOutputSampleIndex;
 };
 
+/// Resample the full contents of input into output, overwriting any of output's previous contents.
 void resampleBuffer2Buffer(ResampleStreamContext& ctx,
                            const Audio::AudioBuffer& input,
                            Audio::AudioBuffer& output);
+
+/// Resample the full contents of input into output.
 void resampleBuffer2Ring(ResampleStreamContext& ctx,
                          const Audio::AudioBuffer& input,
                          RingBuffer& output);
 
+/// Resample the full contents of input into output.
+void resampleRing2Ring(ResampleStreamContext& ctx,
+                       RingBuffer& input,
+                       RingBuffer& output);
 #endif // _AUDIO_RESAMPLE_H
