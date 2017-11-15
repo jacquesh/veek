@@ -89,6 +89,10 @@ static RingBuffer* listenBuffer;
 
 static std::unordered_map<UserIdentifier, UserAudioData> audioUsers;
 
+// NOTE: We assume all audio is mono.
+//       Input devices are opened as mono and output devices have the same sample copied to all
+//       channels, so they may as well be mono.
+
 static void printDevice(SoundIoDevice* device, bool isDefault)
 {
     const char* rawStr = device->is_raw ? "(RAW) " : "";
@@ -132,8 +136,6 @@ static void printDevice(SoundIoDevice* device, bool isDefault)
 
 static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frameCountMax)
 {
-    // NOTE: We assume all audio input is MONO, which should always we the case if we didn't
-    //       get an error during initialization since we specifically ask for MONO
     // TODO: If we take (frameCountMin+frameCountMax)/2 then we seem to get called WAY too often
     //       and get random values, should probably check the error and overflow callbacks
     int framesRemaining = frameCountMax;//frameCountMin + (frameCountMax-frameCountMin)/2;
@@ -152,7 +154,7 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
 
         for(int frame=0; frame<frameCount; ++frame)
         {
-            // NOTE: We assume here that our input stream is MONO
+            // NOTE: We assume here that our input stream is mono.
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
@@ -323,47 +325,15 @@ void Audio::PlayTestSound()
         {
             sinVal += ((5-i)/(5.0f))*sinf(((1 << i)*frequency)*twopi*sampleTime);
         }
-        //sampleSource.buffer->write(1, &sinVal);
         tempbuffer[sampleIndex] = 0.1f*sinVal;
         sampleTime += timestep;
     }
 
-    int32 opusError;
-    int32 channels = 1;
-    UserAudioData newUser = {};
-    OpusDecoder* decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
-    if(opusError != OPUS_OK)
-    {
-        logWarn("Failed to create Opus decoder: %d\n", opusError);
-    }
-
-    AudioBuffer sampleBuffer = {};
-    sampleBuffer.Capacity = sampleSoundSampleCount;
-    sampleBuffer.Length = sampleBuffer.Capacity;
-    sampleBuffer.SampleRate = outStream->sample_rate;
-    sampleBuffer.Data = tempbuffer;
-    AudioBuffer outputBuffer = {};
-    outputBuffer.Capacity = sampleSoundSampleCount;
-    outputBuffer.Length = 0;
-    outputBuffer.SampleRate = outStream->sample_rate;
-    outputBuffer.Data = new float[sampleSoundSampleCount];
-
-    ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = NETWORK_SAMPLE_RATE;
-    ctx.OutputSampleRate = NETWORK_SAMPLE_RATE;
-
-    int encSize = 1 << 16;
-    uint8_t* encodedData = new uint8_t[encSize];
-    int encodedLength = encodePacket(sampleBuffer, encSize, encodedData);
-    decodePacket(decoder, ctx, encodedLength, encodedData, outputBuffer);
-    delete[] encodedData;
-
-    sampleSource.buffer->write(outputBuffer.Length, outputBuffer.Data);
+    sampleSource.buffer->write(sampleSoundSampleCount, tempbuffer);
     sourceList.insert(sampleSource);
     // TODO: This needs to be removed from the list of sources when it's finished playing
 
-    delete[] outputBuffer.Data;
-    opus_decoder_destroy(decoder);
+    delete[] tempbuffer;
 }
 
 void Audio::AddAudioUser(UserIdentifier userId)
