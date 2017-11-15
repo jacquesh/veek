@@ -23,6 +23,9 @@
 #define USE_JB
 #include "jitterbuffer.h"
 
+static const int AUDIO_PACKET_DURATION_MS = 10;
+static const int AUDIO_PACKET_FRAME_SIZE = (AUDIO_PACKET_DURATION_MS * Audio::NETWORK_SAMPLE_RATE)/1000;
+
 struct AudioSource
 {
     RingBuffer* buffer;
@@ -67,6 +70,7 @@ struct UserAudioData
 static AudioData audioState = {};
 
 static ResampleStreamContext sendResampler;
+static RingBuffer* presendBuffer;
 static Audio::AudioBuffer micBuffer;
 
 static SoundIo* soundio = 0;
@@ -249,97 +253,45 @@ static void outErrorCallback(SoundIoOutStream* stream, int error)
     logWarn("Output error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
-static void decodePacket(OpusDecoder* decoder, ResampleStreamContext& ctx,
-                         int sourceLength, uint8_t* sourceBufferPtr,
-                         Audio::AudioBuffer& targetAudioBuffer)
+static void decodeSingleFrame(OpusDecoder* decoder, ResampleStreamContext& ctx,
+                              int sourceLength, uint8_t* sourceBufferPtr,
+                              Audio::AudioBuffer& targetAudioBuffer)
 {
-    int frameSize = 240;
-    uint8_t* sourceBuffer = sourceBufferPtr;
-    float* targetBuffer = targetAudioBuffer.Data;
-    int sourceLengthRemaining = sourceLength;
-    int targetLengthRemaining = targetAudioBuffer.Capacity;
-    int totalFramesDecoded = 0;
+    assert(targetAudioBuffer.Capacity >= AUDIO_PACKET_FRAME_SIZE);
+    assert(targetAudioBuffer.SampleRate == Audio::NETWORK_SAMPLE_RATE);
 
-    if(targetAudioBuffer.SampleRate != Audio::NETWORK_SAMPLE_RATE)
+    int packetLength = sourceLength;
+    int correctErrors = 0; // TODO: What value do we actually want here?
+    int framesDecoded = opus_decode_float(decoder,
+                                          sourceBufferPtr, packetLength,
+                                          targetAudioBuffer.Data, targetAudioBuffer.Capacity,
+                                          correctErrors);
+    targetAudioBuffer.Length = framesDecoded;
+
+    if(framesDecoded < 0)
     {
-        targetBuffer = audioState.decodingBuffer.Data;
-        targetLengthRemaining = audioState.decodingBuffer.Capacity;
+        logWarn("Error decoding audio data. Error %d\n", framesDecoded);
     }
-
-    while((sourceLengthRemaining >= sizeof(int)) && (targetLengthRemaining >= frameSize))
+    else if(framesDecoded > 0 && sourceBufferPtr == nullptr)
     {
-        int packetLength = *((int*)sourceBuffer); // TODO: Byte order checking/swapping
-        int correctErrors = 0; // TODO: What value do we actually want here?
-        int framesDecoded = opus_decode_float(decoder,
-                                              sourceBuffer+4, packetLength,
-                                              targetBuffer, targetLengthRemaining,
-                                              correctErrors);
-        if(framesDecoded < 0)
-        {
-            logWarn("Error decoding audio data. Error %d\n", framesDecoded);
-            break;
-        }
-
-        sourceLengthRemaining -= packetLength+4;
-        sourceBuffer += packetLength+4;
-        targetLengthRemaining -= framesDecoded;
-        targetBuffer += framesDecoded;
-        totalFramesDecoded += framesDecoded;
-    }
-
-    if(targetAudioBuffer.SampleRate != Audio::NETWORK_SAMPLE_RATE)
-    {
-        audioState.decodingBuffer.Length = totalFramesDecoded;
-        resampleBuffer2Buffer(ctx, audioState.decodingBuffer, targetAudioBuffer);
-    }
-    else
-    {
-        targetAudioBuffer.Length = totalFramesDecoded;
+        logWarn("We got %d frames from PLC!\n", framesDecoded);
     }
 }
 
-static int encodePacket(Audio::AudioBuffer& sourceBuffer,
-                        int targetLength, uint8_t* targetBufferPtr)
+static int encodeSingleFrame(Audio::AudioBuffer& sourceBuffer, int targetLength, uint8_t* targetBufferPtr)
 {
-    uint8_t* targetData = targetBufferPtr;
-    int targetLengthRemaining = targetLength;
+    assert(sourceBuffer.SampleRate == Audio::NETWORK_SAMPLE_RATE);
+    assert(sourceBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
 
-    float* sourceData = sourceBuffer.Data;
-    int sourceLengthRemaining = sourceBuffer.Length;
-    if(sourceBuffer.SampleRate != Audio::NETWORK_SAMPLE_RATE)
+    int outputLength = opus_encode_float(encoder,
+                                         sourceBuffer.Data, AUDIO_PACKET_FRAME_SIZE,
+                                         targetBufferPtr, targetLength);
+    if(outputLength < 0)
     {
-        resampleBuffer2Buffer(sendResampler, sourceBuffer, audioState.encodingBuffer);
-
-        sourceData = audioState.encodingBuffer.Data;
-        sourceLengthRemaining = audioState.encodingBuffer.Length;
+        logWarn("Error encoding audio. Error code %d\n", outputLength);
+        return 0;
     }
-
-    // TODO: Opus can only create packets from a given set of sample counts, we should probably
-    //       try support other packet sizes (is larger better? can it be dynamic? are we always
-    //       going to have a sample rate of 48k? etc)
-    int frameSize = 240;
-
-    // TODO: What is an appropriate minimum targetLengthRemaining relative to framesize?
-    while((sourceLengthRemaining >= frameSize) && (targetLengthRemaining >= frameSize))
-    {
-        int packetLength = opus_encode_float(encoder,
-                                             sourceData, frameSize,
-                                             targetData+4, targetLengthRemaining);
-        *((int*)targetData) = packetLength; // TODO: Byte order checking/swapping
-        if(packetLength < 0)
-        {
-            logWarn("Error encoding audio. Error code %d\n", packetLength);
-            break;
-        }
-
-        sourceLengthRemaining -= frameSize;
-        sourceData += frameSize;
-        targetLengthRemaining -= packetLength+4;
-        targetData += packetLength+4;
-    }
-
-    int bytesWritten = targetLength - targetLengthRemaining;
-    return bytesWritten;
+    return outputLength;
 }
 
 void Audio::ListenToInput(bool listening)
@@ -474,38 +426,15 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     tempBuffer.Data = new float[tempBuffer.Capacity];
     tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 
-    decodePacket(srcUser.decoder, srcUser.receiveResampler,
-                 packet.encodedDataLength, packet.encodedData,
-                 tempBuffer);
+    decodeSingleFrame(srcUser.decoder, srcUser.receiveResampler,
+                      packet.encodedDataLength, packet.encodedData,
+                      tempBuffer);
+
+    // TODO: Resample from tempbuffer into srcUser.buffer for the local device SampleRate?
     logTerm("Received %d samples from the network\n", tempBuffer.Length);
     srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
     delete[] tempBuffer.Data;
 #endif
-}
-
-void Audio::readAudioInputBuffer(AudioBuffer& buffer)
-{
-    // NOTE: We don't need to take the number of channels into account here if we consider a "sample"
-    //       to be a single sample from a single channel, but its important to note that that is what
-    //       we're currently doing
-    int samplesToWrite = inBuffer->read(buffer.Capacity, buffer.Data);
-
-    buffer.Length = samplesToWrite;
-    buffer.SampleRate = inStream->sample_rate;
-
-    if(audioState.generateToneInput)
-    {
-        double twopi = 2.0*3.1415927;
-        double frequency = 261.6; // Middle C
-        double timestep = 1.0/buffer.SampleRate;
-        static double sampleTime = 0.0;
-        for(int sampleIndex=0; sampleIndex<buffer.Length; sampleIndex++)
-        {
-            double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
-            buffer.Data[sampleIndex] = (float)sinVal;
-            sampleTime += timestep;
-        }
-    }
 }
 
 bool Audio::enableMicrophone(bool enabled)
@@ -1001,39 +930,100 @@ bool Audio::Setup()
     logInfo("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
-    micBuffer = Audio::AudioBuffer(2400);
+    micBuffer = Audio::AudioBuffer(AUDIO_PACKET_FRAME_SIZE);
+    micBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+    presendBuffer = new RingBuffer(NETWORK_SAMPLE_RATE);
     return true;
 }
 
-void Audio::SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer)
+static Audio::NetworkAudioPacket* CreateOutputPacket(Audio::AudioBuffer& sourceBuffer)
 {
-    int encodedBufferLength = sourceBuffer.Length;
-    uint8* encodedBuffer = new uint8[encodedBufferLength];
-    memset(encodedBuffer, 0, encodedBufferLength);
-    // TODO: This will absolutely not work for >2 people, we need to only encode each audio
-    //       packet once and then send it multiple times.
-    int audioBytes = encodePacket(sourceBuffer, encodedBufferLength, encodedBuffer);
+    assert(sourceBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
+    assert(sourceBuffer.SampleRate == Audio::NETWORK_SAMPLE_RATE);
 
-    NetworkAudioPacket audioPacket = {};
-    audioPacket.srcUser = localUser->ID;
-    audioPacket.index = user->lastSentAudioPacket++;
-    audioPacket.encodedDataLength = audioBytes;
-    memcpy(audioPacket.encodedData, encodedBuffer, audioBytes);
+    Audio::NetworkAudioPacket* audioPacket = new Audio::NetworkAudioPacket();
+    audioPacket->srcUser = localUser->ID;
 
-    delete[] encodedBuffer;
+    int audioBytes = encodeSingleFrame(sourceBuffer, AUDIO_PACKET_FRAME_SIZE, audioPacket->encodedData);
+    audioPacket->encodedDataLength = audioBytes;
+
+    return audioPacket;
+}
+
+void Audio::SendAudioToUser(ClientUserData* user, NetworkAudioPacket* audioPacket)
+{
+    audioPacket->index = user->lastSentAudioPacket++;
 
     NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
-    audioPacket.serialize(outPacket);
-
-    NetworkInPacket inPacketTest = {};
-    inPacketTest.contents = outPacket.contents;
-    inPacketTest.length = outPacket.length;
-    uint8_t packetType;
-    inPacketTest.serializeuint8(packetType);
-    NetworkAudioPacket audioInPacket;
-    audioInPacket.serialize(inPacketTest);
+    audioPacket->serialize(outPacket);
 
     outPacket.send(user->netPeer, 0, false);
+}
+
+static void ProduceASingleAudioOutputPacket()
+{
+    micBuffer.Length = presendBuffer->read(AUDIO_PACKET_FRAME_SIZE, micBuffer.Data);
+    assert(micBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
+
+    if(audioState.generateToneInput)
+    {
+        double twopi = 2.0*3.1415927;
+        double frequency = 261.6; // Middle C
+        double timestep = 1.0/micBuffer.SampleRate;
+        static double sampleTime = 0.0;
+        for(int sampleIndex=0; sampleIndex<micBuffer.Capacity; sampleIndex++)
+        {
+            double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
+            micBuffer.Data[sampleIndex] = (float)sinVal;
+            sampleTime += timestep;
+        }
+    }
+
+    float rms = ComputeRMS(micBuffer);
+    switch(audioState.inputActivationMode)
+    {
+        case Audio::MicActivationMode::Always:
+            audioState.inputActive = true;
+            break; // Active is already true
+
+        case Audio::MicActivationMode::PushToTalk:
+            audioState.inputActive = Platform::IsPushToTalkKeyPushed();
+            break;
+
+        case Audio::MicActivationMode::Automatic:
+            audioState.inputActive = (rms >= 0.1f);
+            break;
+
+        default:
+            logWarn("Unrecognized audio input activation mode: %d\n",
+                    audioState.inputActivationMode);
+    }
+
+    bool anEntirePacketIsAvailable = (micBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
+    if(anEntirePacketIsAvailable)
+    {
+        if(audioState.isListeningToInput)
+        {
+            resampleBuffer2Ring(audioState.inputListenResampler, micBuffer, *listenBuffer);
+        }
+
+        if(audioState.inputActive && Network::IsConnectedToMasterServer())
+        {
+            Audio::NetworkAudioPacket* audioPacket = CreateOutputPacket(micBuffer);
+            for(int i=0; i<remoteUsers.size(); i++)
+            {
+                ClientUserData* destinationUser = remoteUsers[i];
+                Audio::SendAudioToUser(destinationUser, audioPacket);
+            }
+            delete audioPacket;
+        }
+
+        micBuffer.Length = 0;
+    }
+    else
+    {
+        logTerm("Insufficient data for sending an entire packet\n");
+    }
 }
 
 void Audio::Update()
@@ -1042,39 +1032,18 @@ void Audio::Update()
 
     if(audioState.inputEnabled)
     {
-        readAudioInputBuffer(micBuffer);
-        float rms = ComputeRMS(micBuffer);
-        switch(audioState.inputActivationMode)
+        ResampleStreamContext backupCtx = sendResampler;
+        // TODO: Rename the resampler to something that makes more sense.
+        // TODO: Remove these sample rate updates
+        sendResampler.InputSampleRate = inStream->sample_rate;
+        sendResampler.OutputSampleRate = NETWORK_SAMPLE_RATE;
+        resampleRing2Ring(sendResampler, *inBuffer, *presendBuffer);
+
+        int outputCount = 0;
+        while(presendBuffer->count() >= AUDIO_PACKET_FRAME_SIZE)
         {
-            case MicActivationMode::Always:
-                audioState.inputActive = true;
-                break; // Active is already true
-
-            case MicActivationMode::PushToTalk:
-                audioState.inputActive = Platform::IsPushToTalkKeyPushed();
-                break;
-
-            case MicActivationMode::Automatic:
-                audioState.inputActive = (rms >= 0.1f);
-                break;
-
-            default:
-                logWarn("Unrecognized audio input activation mode: %d\n",
-                        audioState.inputActivationMode);
-        }
-
-        if(audioState.isListeningToInput)
-        {
-            resampleBuffer2Ring(audioState.inputListenResampler, micBuffer, *listenBuffer);
-        }
-
-        if(audioState.inputActive && Network::IsConnectedToMasterServer())
-        {
-            for(int i=0; i<remoteUsers.size(); i++)
-            {
-                ClientUserData* destinationUser = remoteUsers[i];
-                Audio::SendAudioToUser(destinationUser, micBuffer);
-            }
+            ProduceASingleAudioOutputPacket();
+            outputCount++;
         }
     }
 
@@ -1094,9 +1063,11 @@ void Audio::Update()
         tempBuffer.Data = new float[tempBuffer.Capacity];
         tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 
-        decodePacket(srcUser.decoder, srcUser.receiveResampler,
-                     dataToDecodeLen, dataToDecode,
-                     tempBuffer);
+        decodeSingleFrame(srcUser.decoder, srcUser.receiveResampler,
+                          dataToDecodeLen, dataToDecode,
+                          tempBuffer);
+
+        // TODO: Resample from tempbuffer into srcUser.buffer for the local device SampleRate?
         logTerm("Received %d samples from the network\n", tempBuffer.Length);
         srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
         delete[] tempBuffer.Data;

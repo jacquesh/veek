@@ -86,11 +86,7 @@ namespace Audio
 
     void ProcessIncomingPacket(NetworkAudioPacket& packet);
 
-    void SendAudioToUser(ClientUserData* user, AudioBuffer& sourceBuffer);
-
-    // TODO: Maybe return true/false to indicate if the buffer was large enough?
-    // Returns the number of samples written to the buffer (samples != indices, see TODO/NOTE)
-    void readAudioInputBuffer(AudioBuffer& buffer);
+    void SendAudioToUser(ClientUserData* user, NetworkAudioPacket* audioPacket);
 
     // Returns the root-mean-square amplitude of the samples in buffer.
     float ComputeRMS(AudioBuffer& buffer);
