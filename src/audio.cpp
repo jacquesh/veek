@@ -23,7 +23,7 @@
 #define USE_JB
 #include "jitterbuffer.h"
 
-static const int AUDIO_PACKET_DURATION_MS = 10;
+static const int AUDIO_PACKET_DURATION_MS = 20;
 static const int AUDIO_PACKET_FRAME_SIZE = (AUDIO_PACKET_DURATION_MS * Audio::NETWORK_SAMPLE_RATE)/1000;
 
 struct AudioSource
@@ -850,6 +850,7 @@ bool Audio::Setup()
     opus_encoder_ctl(encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
     opus_encoder_ctl(encoder, OPUS_SET_APPLICATION(OPUS_APPLICATION_VOIP));
     opus_encoder_ctl(encoder, OPUS_SET_BITRATE(24000));
+    opus_encoder_ctl(encoder, OPUS_SET_PACKET_LOSS_PERC(5));
 
     opus_int32 complexity;
     opus_int32 bitrate;
@@ -1029,7 +1030,7 @@ void Audio::Update()
             continue;
 
         AudioBuffer tempBuffer = {};
-        tempBuffer.Capacity = 2400;
+        tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
         tempBuffer.Data = new float[tempBuffer.Capacity];
         tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 

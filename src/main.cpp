@@ -54,7 +54,7 @@ int main()
     }
 
     // Initialize
-    double tickRate = 20;
+    double tickRate = 50;
     double tickDuration = 1.0/tickRate;
     double nextTickTime = Platform::SecondsSinceStartup();;
 
