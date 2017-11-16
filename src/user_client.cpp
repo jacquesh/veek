@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "audio.h"
 #include "common.h"
 #include "logging.h"
 #include "network.h"
@@ -33,26 +32,6 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
 ClientUserData::~ClientUserData()
 {
     delete[] videoImage;
-}
-
-
-void ClientUserData::processIncomingAudioPacket(Audio::NetworkAudioPacket& packet)
-{
-    Audio::ProcessIncomingPacket(packet);
-#if 0
-    // TODO: Surely we can move this logic onto either side of this function (IE into either the
-    //       audio system or the network system)? This seems like a pretty pointless function
-    //       by itself because it just calls the audio system.
-    if(((packet.index < 20) && (this->lastReceivedAudioPacket > 235)) ||
-            (this->lastReceivedAudioPacket < packet.index))
-    {
-        Audio::ProcessIncomingPacket(packet);
-    }
-    else
-    {
-        logWarn("Audio packet %u received out of order\n", packet.index);
-    }
-#endif
 }
 
 void ClientUserData::processIncomingVideoPacket(Video::NetworkVideoPacket& packet)

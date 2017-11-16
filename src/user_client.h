@@ -6,7 +6,6 @@
 #include "opus/opus.h"
 #include "enet/enet.h"
 
-#include "audio.h"
 #include "user.h"
 #include "video.h"
 
@@ -27,7 +26,6 @@ struct ClientUserData : UserData
     explicit ClientUserData(NetworkUserConnectPacket& connectionPacket);
     virtual ~ClientUserData();
 
-    void processIncomingAudioPacket(Audio::NetworkAudioPacket& packet);
     void processIncomingVideoPacket(Video::NetworkVideoPacket& packet);
 };
 

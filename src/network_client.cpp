@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "audio.h"
 #include "logging.h"
 #include "network.h"
 #include "network_client.h"
@@ -80,31 +81,11 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
             Audio::NetworkAudioPacket audioInPacket;
             if(!audioInPacket.serialize(incomingPacket))
             {
-                logTerm("Failed to deserialize packet\n");
+                logTerm("Failed to deserialize audio packet\n");
                 break;
             }
 
-            ClientUserData* sourceUser = nullptr;
-            for(auto userIter=remoteUsers.begin();
-                     userIter!=remoteUsers.end();
-                     userIter++)
-            {
-                if(audioInPacket.srcUser == (*userIter)->ID)
-                {
-                    sourceUser = *userIter;
-                    break;
-                }
-            }
-            // TODO: Do something safer/more elegant here, else we can crash from malicious packets
-            //       In fact we probably want to have a serialize function for Users specifically,
-            //       not just UserIDs, since then we can quit if that fails and it will take into
-            //       account the situation in which the ID doesn't correspond to any users that we
-            //       know of.
-            //       In fact this can happen if we get packets out-of-order when a client disconnects.
-            //       I'm pretty sure we can just ignore a packet from an unknown user?
-            assert(sourceUser != nullptr);
-
-            sourceUser->processIncomingAudioPacket(audioInPacket);
+            Audio::ProcessIncomingPacket(audioInPacket);
         } break;
 
         case NET_MSGTYPE_VIDEO:
