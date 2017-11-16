@@ -21,13 +21,15 @@ JitterItem::~JitterItem()
 
 JitterBuffer::JitterBuffer()
 {
-    int itemCount = 3;
-    allItems = new JitterItem[itemCount];
+    capacity = 6;
+    allItems = new JitterItem[capacity];
     unusedItems = allItems;
+    unusedItemCount = capacity;
+    unusedItemRefillThreshold = capacity/2;
     first = nullptr;
     last = nullptr;
 
-    for(int i=0; i<itemCount-1; i++)
+    for(int i=0; i<capacity-1; i++)
     {
         allItems[i].next = &allItems[i+1];
     }
@@ -51,8 +53,10 @@ JitterItem* JitterBuffer::GetFreeItem()
     }
     else
     {
+        assert(unusedItemCount > 0);
         result = unusedItems;
         unusedItems = unusedItems->next;
+        unusedItemCount--;
     }
     return result;
 }
@@ -66,9 +70,7 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
         assert(last == nullptr);
         assert(unusedItems != nullptr);
 
-        JitterItem* newItem = unusedItems;
-        unusedItems = unusedItems->next;
-
+        JitterItem* newItem = GetFreeItem();
         first = newItem;
         last = newItem;
         newItem->next = nullptr;
@@ -137,7 +139,7 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
         nextOutputPacketIndex = packetIndex;
     }
 
-    if(unusedItems == nullptr)
+    if(unusedItemCount <= unusedItemRefillThreshold)
     {
         refilling = false;
     }
@@ -186,6 +188,8 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
 
     itemToGet->next = unusedItems;
     unusedItems = itemToGet;
+    unusedItemCount++;
+    assert(unusedItemCount <= capacity);
 
     return result;
 }

@@ -5,7 +5,7 @@
 
 // TODO: Note that these tests assume a hard-coded jitterbuffer size of 3
 
-TEST_CASE("Get returns nothing until the buffer has been filled")
+TEST_CASE("Get returns nothing until the buffer has been populated")
 {
     JitterBuffer jb;
     uint8_t inVal = 3;
@@ -20,7 +20,7 @@ TEST_CASE("Get returns nothing until the buffer has been filled")
     REQUIRE(jb.Get(outVal) == 0);
 }
 
-TEST_CASE("Get returns data after the buffer has been filled")
+TEST_CASE("Get returns data after the buffer has been populated")
 {
     JitterBuffer jb;
     uint8_t inVal = 3;
@@ -33,7 +33,7 @@ TEST_CASE("Get returns data after the buffer has been filled")
     REQUIRE(jb.Get(outVal) == 1);
 }
 
-TEST_CASE("Get returns nothing when the data is all consumed after being filled")
+TEST_CASE("Get returns nothing when the data is all consumed after being populated")
 {
     JitterBuffer jb;
     uint8_t inVal = 3;
@@ -166,4 +166,28 @@ TEST_CASE("Get returns empty data when a packet is dropped")
     outCount = jb.Get(outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 6);
+}
+
+TEST_CASE("Get returns the expected packet after an extra packet is received after refill completes")
+{
+    JitterBuffer jb;
+    uint8_t inVal;
+    uint16_t outCount;
+    uint8_t* outVal;
+
+    inVal = 3;
+    jb.Add(1, 1, &inVal);
+
+    inVal = 4;
+    jb.Add(2, 1, &inVal);
+
+    inVal = 5;
+    jb.Add(3, 1, &inVal);
+
+    inVal = 6;
+    jb.Add(4, 1, &inVal);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 3);
 }

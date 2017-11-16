@@ -25,6 +25,10 @@ public:
     uint16_t Get(uint8_t*& data);
 
 private:
+    int capacity;
+    int unusedItemCount;
+    int unusedItemRefillThreshold;
+
     JitterItem* allItems;
     JitterItem* unusedItems; // Singly-linked list of items, only item->next is valid.
     JitterItem* first;
