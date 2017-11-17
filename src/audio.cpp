@@ -255,7 +255,7 @@ static void outErrorCallback(SoundIoOutStream* stream, int error)
     logWarn("Output error on stream from %s: %s\n", stream->device->name, soundio_strerror(error));
 }
 
-static void decodeSingleFrame(OpusDecoder* decoder, ResampleStreamContext& ctx,
+static void decodeSingleFrame(OpusDecoder* decoder,
                               int sourceLength, uint8_t* sourceBufferPtr,
                               Audio::AudioBuffer& targetAudioBuffer)
 {
@@ -396,7 +396,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     tempBuffer.Data = new float[tempBuffer.Capacity];
     tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 
-    decodeSingleFrame(srcUser.decoder, srcUser.receiveResampler,
+    decodeSingleFrame(srcUser.decoder,
                       packet.encodedDataLength, packet.encodedData,
                       tempBuffer);
 
@@ -1034,13 +1034,13 @@ void Audio::Update()
         tempBuffer.Data = new float[tempBuffer.Capacity];
         tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
 
-        decodeSingleFrame(srcUser.decoder, srcUser.receiveResampler,
+        decodeSingleFrame(srcUser.decoder,
                           dataToDecodeLen, dataToDecode,
                           tempBuffer);
 
-        // TODO: Resample from tempbuffer into srcUser.buffer for the local device SampleRate?
         logTerm("Received %d samples from the network\n", tempBuffer.Length);
-        srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
+        srcUser.receiveResampler.OutputSampleRate = outStream->sample_rate;
+        resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }
 #endif
