@@ -385,7 +385,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
                 srcUser.lastReceivedPacketIndex+1, packet.index-1);
     }
     srcUser.lastReceivedPacketIndex = packet.index;
-    logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
+    logInfo("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
 }
@@ -999,6 +999,8 @@ void Audio::Update()
             ProduceASingleAudioOutputPacket();
             outputCount++;
         }
+        logTerm("Produced %d output packets this tick (%d samples remaining in presend)\n",
+                outputCount, presendBuffer->count());
     }
 
     for(auto& iter : audioUsers)

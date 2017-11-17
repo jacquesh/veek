@@ -1,81 +1,112 @@
 #include "catch.hpp"
 
+#include "audio.h"
 #include "audio_resample.h"
+
+using namespace Audio;
+
+// TODO: Dirty hack so we don't need to compile audio.cpp (which has its own dependencies)
+Audio::AudioBuffer::AudioBuffer(int initialCapacity)
+{
+    Data = new float[initialCapacity];
+    Capacity = initialCapacity;
+    Length = 0;
+}
+
+Audio::AudioBuffer::~AudioBuffer()
+{
+    if(Data)
+    {
+        delete[] Data;
+    }
+}
 
 TEST_CASE("Upsample first input matches output")
 {
     ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = 10;
-    ctx.OutputSampleRate = 15;
+    AudioBuffer inBuffer(1);
+    AudioBuffer outBuffer(2);
 
-    float inputVal = 3.14f;
-    float outSamples[8];
-    int outSampleCount = resampleStream(ctx, inputVal, outSamples, 8);
+    inBuffer.Data[0] = 3.14f;
+    inBuffer.Length = 1;
+    inBuffer.SampleRate = 10;
+    outBuffer.SampleRate = 15;
 
-    REQUIRE(outSampleCount == 1);
-    REQUIRE(outSamples[0] == inputVal);
+    resampleBuffer2Buffer(ctx, inBuffer, outBuffer);
+
+    REQUIRE(outBuffer.Length == 1);
+    REQUIRE(outBuffer.Data[0] == inBuffer.Data[0]);
 }
 
-TEST_CASE("Upsample second input gives some output")
+TEST_CASE("Upsample from two samples, gives the correct number of output samples")
 {
     ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = 10;
-    ctx.OutputSampleRate = 15;
+    AudioBuffer inBuffer(2);
+    AudioBuffer outBuffer(5);
 
-    float inputVals[2] = {1.0f, 2.0f};
+    inBuffer.Data[0] = 1.0f;
+    inBuffer.Data[1] = 2.0f;
+    inBuffer.Length = 2;
+    inBuffer.SampleRate = 10;
+    outBuffer.SampleRate = 15;
 
-    float outSamples[8];
-    int outSampleCount = resampleStream(ctx, inputVals[0], outSamples, 8);
-    outSampleCount = resampleStream(ctx, inputVals[1], outSamples, 8);
+    resampleBuffer2Buffer(ctx, inBuffer, outBuffer);
 
-    REQUIRE(outSampleCount == 1);
+    // NOTE: 2 is the correct number, we'll only be part-way to the 3rd output sample
+    REQUIRE(outBuffer.Length == 2);
 }
 
 TEST_CASE("Downsample first input matches output")
 {
     ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = 15;
-    ctx.OutputSampleRate = 10;
+    AudioBuffer inBuffer(1);
+    AudioBuffer outBuffer(2);
 
-    float inputVal = 3.14f;
-    float outSamples[8];
-    int outSampleCount = resampleStream(ctx, inputVal, outSamples, 8);
+    inBuffer.Data[0] = 3.14f;
+    inBuffer.Length = 1;
+    inBuffer.SampleRate = 15;
+    outBuffer.SampleRate = 10;
 
-    REQUIRE(outSampleCount == 1);
-    REQUIRE(outSamples[0] == inputVal);
+    resampleBuffer2Buffer(ctx, inBuffer, outBuffer);
+
+    REQUIRE(outBuffer.Length == 1);
+    REQUIRE(outBuffer.Data[0] == inBuffer.Data[0]);
 }
 
-TEST_CASE("Downsample second input gives no output")
+TEST_CASE("Downsample from two samples, gives the correct number of output samples")
 {
     ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = 15;
-    ctx.OutputSampleRate = 10;
+    AudioBuffer inBuffer(2);
+    AudioBuffer outBuffer(5);
 
-    float inputVals[2] = {1.0f, 2.0f};
+    inBuffer.Data[0] = 1.0f;
+    inBuffer.Data[1] = 2.0f;
+    inBuffer.Length = 2;
+    inBuffer.SampleRate = 15;
+    outBuffer.SampleRate = 10;
 
-    float outSamples[8];
-    int outSampleCount = resampleStream(ctx, inputVals[0], outSamples, 8);
-    outSampleCount = resampleStream(ctx, inputVals[1], outSamples, 8);
+    resampleBuffer2Buffer(ctx, inBuffer, outBuffer);
 
-    REQUIRE(outSampleCount == 0);
+    REQUIRE(outBuffer.Length == 1);
 }
 
-TEST_CASE("Resampling to the current sample rate returns output 1-for-1")
+TEST_CASE("Resampling to the current sample rate returns the input as-is")
 {
     ResampleStreamContext ctx = {};
-    ctx.InputSampleRate = 48000;
-    ctx.OutputSampleRate = 48000;
+    AudioBuffer inBuffer(3);
+    AudioBuffer outBuffer(3);
 
-    float inputVals[3] = {1.0f, 2.0f, 3.0f};
-    int outSampleCount;
-    float outSamples[2];
+    inBuffer.Data[0] = 1.0f;
+    inBuffer.Data[1] = 2.0f;
+    inBuffer.Data[2] = 3.0f;
+    inBuffer.Length = 3;
+    inBuffer.SampleRate = 48000;
+    outBuffer.SampleRate = 48000;
 
-    outSampleCount = resampleStream(ctx, inputVals[0], outSamples, 2);
-    REQUIRE(outSampleCount == 1);
+    resampleBuffer2Buffer(ctx, inBuffer, outBuffer);
 
-    outSampleCount = resampleStream(ctx, inputVals[1], outSamples, 2);
-    REQUIRE(outSampleCount == 1);
-
-    outSampleCount = resampleStream(ctx, inputVals[2], outSamples, 2);
-    REQUIRE(outSampleCount == 1);
+    REQUIRE(outBuffer.Length == inBuffer.Length);
+    REQUIRE(outBuffer.Data[0] == inBuffer.Data[0]);
+    REQUIRE(outBuffer.Data[1] == inBuffer.Data[1]);
+    REQUIRE(outBuffer.Data[2] == inBuffer.Data[2]);
 }
