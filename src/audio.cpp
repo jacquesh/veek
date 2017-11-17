@@ -10,6 +10,7 @@
 #include "audio.h"
 #include "audio_resample.h"
 #include "common.h"
+#include "jitterbuffer.h"
 #include "logging.h"
 #include "math_utils.h"
 #include "network.h"
@@ -20,8 +21,6 @@
 #include "user.h"
 #include "user_client.h"
 
-#define USE_JB
-#include "jitterbuffer.h"
 
 static const int AUDIO_PACKET_DURATION_MS = 20;
 static const int AUDIO_PACKET_FRAME_SIZE = (AUDIO_PACKET_DURATION_MS * Audio::NETWORK_SAMPLE_RATE)/1000;
@@ -388,23 +387,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     srcUser.lastReceivedPacketIndex = packet.index;
     logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
-#ifdef USE_JB
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
-#else
-    AudioBuffer tempBuffer = {};
-    tempBuffer.Capacity = 2400;
-    tempBuffer.Data = new float[tempBuffer.Capacity];
-    tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
-
-    decodeSingleFrame(srcUser.decoder,
-                      packet.encodedDataLength, packet.encodedData,
-                      tempBuffer);
-
-    // TODO: Resample from tempbuffer into srcUser.buffer for the local device SampleRate?
-    logTerm("Received %d samples from the network\n", tempBuffer.Length);
-    srcUser.buffer->write(tempBuffer.Length, tempBuffer.Data);
-    delete[] tempBuffer.Data;
-#endif
 }
 
 bool Audio::enableMicrophone(bool enabled)
@@ -1018,7 +1001,6 @@ void Audio::Update()
         }
     }
 
-#ifdef USE_JB
     for(auto& iter : audioUsers)
     {
         UserIdentifier uid = iter.first;
@@ -1026,9 +1008,6 @@ void Audio::Update()
 
         uint8_t* dataToDecode = nullptr;
         uint16_t dataToDecodeLen = srcUser.jitter->Get(dataToDecode);
-        if(dataToDecodeLen == 0)
-            continue;
-
         AudioBuffer tempBuffer = {};
         tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
         tempBuffer.Data = new float[tempBuffer.Capacity];
@@ -1043,7 +1022,6 @@ void Audio::Update()
         resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }
-#endif
 }
 
 int Audio::InputDeviceCount()
