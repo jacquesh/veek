@@ -62,6 +62,8 @@ namespace Audio
     int GetAudioOutputDevice();
     bool SetAudioOutputDevice(int newOutputDevice);
 
+    float GetPacketLoss();
+
     void GenerateToneInput(bool generateTone);
     void ListenToInput(bool listen);
     void PlayTestSound();

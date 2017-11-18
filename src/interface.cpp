@@ -305,6 +305,7 @@ void renderGame(InterfaceState* game, float deltaTime)
         {
             float netTotalIn = TotalNetworkIncomingBytes()/1024.0f;
             float netTotalOut = TotalNetworkOutgoingBytes()/1024.0f;
+            ImGui::Text("Audio packet loss: %.2f%", Audio::GetPacketLoss()*100.0f);
             ImGui::Text("Total Incoming: %.1fKB", netTotalIn);
             ImGui::Text("Total Outgoing: %.1fKB", netTotalOut);
             if(ImGui::Button("Disconnect", ImVec2(80,20)))

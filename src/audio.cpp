@@ -69,6 +69,9 @@ struct UserAudioData
     OpusDecoder* decoder;
     RingBuffer* buffer;
     JitterBuffer* jitter;
+
+    uint64_t totalExpectedPackets;
+    uint64_t lostPackets;
 };
 
 static AudioData audioState = {};
@@ -991,6 +994,24 @@ static void ProduceASingleAudioOutputPacket()
     }
 }
 
+float Audio::GetPacketLoss()
+{
+    uint64_t total = 0;
+    uint64_t lost = 0;
+    for(auto& iter : audioUsers)
+    {
+        UserAudioData& user = iter.second;
+        total += user.totalExpectedPackets;
+        lost += user.lostPackets;
+    }
+
+    if(total == 0)
+    {
+        return 0.0f;
+    }
+    return lost * 1.0f/total;
+}
+
 void Audio::Update()
 {
     soundio_flush_events(soundio);
@@ -1022,6 +1043,17 @@ void Audio::Update()
         tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
         tempBuffer.Data = new float[tempBuffer.Capacity];
         tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+        if(srcUser.totalExpectedPackets >= 100)
+        {
+            srcUser.totalExpectedPackets /= 2;
+            srcUser.lostPackets /= 2;
+        }
+        srcUser.totalExpectedPackets++;
+        if(dataToDecodeLen == 0)
+        {
+            srcUser.lostPackets++;
+        }
 
         decodeSingleFrame(srcUser.decoder,
                           dataToDecodeLen, dataToDecode,
