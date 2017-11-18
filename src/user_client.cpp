@@ -26,6 +26,10 @@ ClientUserData::ClientUserData(NetworkUserConnectPacket& connectionPacket)
     this->name[connectionPacket.nameLength] = 0;
     this->videoImage = new uint8_t[cameraWidth*cameraHeight*3];
     this->videoTexture = 0;
+    this->lastSentAudioPacket = 0;
+    this->lastSentVideoPacket = 0;
+    this->lastReceivedAudioPacket = 0;
+    this->lastReceivedVideoPacket = 0;
     logInfo("Connected to user %d with name of length %d: %s\n", ID, nameLength, name);
 }
 
