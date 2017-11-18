@@ -380,7 +380,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     if(srcUserIter == audioUsers.end())
     {
         logWarn("Received an audio packet from unknown user ID %d\n", packet.srcUser);
-       return;
+        return;
     }
 
     UserAudioData& srcUser = srcUserIter->second;
@@ -390,7 +390,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
                 srcUser.lastReceivedPacketIndex+1, packet.index-1);
     }
     srcUser.lastReceivedPacketIndex = packet.index;
-    logInfo("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
+    logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
 }
@@ -987,7 +987,7 @@ static void ProduceASingleAudioOutputPacket()
     }
     else
     {
-        logTerm("Insufficient data for sending an entire packet\n");
+        logInfo("Insufficient data for sending an entire packet: %d of %d\n", micBuffer.Length, AUDIO_PACKET_FRAME_SIZE);
     }
 }
 
@@ -1007,7 +1007,7 @@ void Audio::Update()
             ProduceASingleAudioOutputPacket();
             outputCount++;
         }
-        logTerm("Produced %d output packets this tick (%d samples remaining in presend)\n",
+        logFile("Produced %d output packets this tick (%d samples remaining in presend)\n",
                 outputCount, presendBuffer->count());
     }
 
@@ -1027,7 +1027,7 @@ void Audio::Update()
                           dataToDecodeLen, dataToDecode,
                           tempBuffer);
 
-        logTerm("Received %d samples from the network\n", tempBuffer.Length);
+        logFile("Received %d samples from the network\n", tempBuffer.Length);
         resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }

@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "jitterbuffer.h"
+#include "logging.h"
 
 static const int MAX_DATA_LENGTH = 1024*1024;
 
@@ -159,6 +160,7 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
     }
     if(refilling)
     {
+        logFile("Return empty while we refill\n");
         return 0;
     }
     assert(first != nullptr); // !refilling => first != nullptr
@@ -169,11 +171,14 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
 
     if(itemToGet->packetIndex != expectedPacketIndex)
     {
+        logFile("Incorrect expected outpacket index: Expected %d, got %d\n",
+                expectedPacketIndex, itemToGet->packetIndex);
         return 0;
     }
 
     uint16_t result = itemToGet->dataLength;
     data = itemToGet->data;
+    logFile("Return packet with index %d\n", itemToGet->packetIndex);
 
     if(first == last)
     {
