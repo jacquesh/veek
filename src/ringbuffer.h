@@ -8,7 +8,7 @@
 class RingBuffer
 {
 public:
-    RingBuffer(int size);
+    RingBuffer(int sampleRate, int size);
     ~RingBuffer();
 
     // Write an array of values into the buffer
@@ -35,6 +35,8 @@ public:
     // Empty the ringbuffer
     void clear();
 
+
+    int sampleRate;
 private:
     int capacity;
     float* buffer;
@@ -46,7 +48,7 @@ private:
     uint64_t totalWrites;
     uint64_t totalReads;
 
-    // NOTE: This function is not thread-safe
+    // NOTE: These functions are not thread-safe
     int freeInternal();
 };
 

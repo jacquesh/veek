@@ -5,7 +5,7 @@
 TEST_CASE("A single value gets read after being written")
 {
     float xIn = 3.14f;
-    RingBuffer buffer = RingBuffer(2);
+    RingBuffer buffer = RingBuffer(1, 2);
     buffer.write(1, &xIn);
 
     float xOut;
@@ -17,7 +17,7 @@ TEST_CASE("A single value gets read after being written")
 TEST_CASE("Multiple values are correctly read after being written")
 {
     float xIn[3] = {3.14f, 2.71f, -1.0f};
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
 
     buffer.write(3, &xIn[0]);
 
@@ -32,7 +32,7 @@ TEST_CASE("Multiple values are correctly read after being written")
 TEST_CASE("A buffer with capacity n can store n-1 items")
 {
     float xIn[3] = {3.14f, 2.71f, -1.0f};
-    RingBuffer buffer = RingBuffer(4);
+    RingBuffer buffer = RingBuffer(1, 4);
 
     buffer.write(3, &xIn[0]);
 
@@ -47,7 +47,7 @@ TEST_CASE("A buffer with capacity n can store n-1 items")
 TEST_CASE("The latest values are read when we write more than the full capacity")
 {
     float xIn[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    RingBuffer buffer = RingBuffer(3);
+    RingBuffer buffer = RingBuffer(1, 3);
 
     buffer.write(2, &xIn[0]);
     buffer.write(2, &xIn[2]);
@@ -63,7 +63,7 @@ TEST_CASE("The latest values are read when we write more than the full capacity"
 TEST_CASE("Return fewer than the requested number of values when there is not enough data available (with a non-wrapping read)")
 {
     float xIn[2] = {1.0f, 2.0f};
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
 
     buffer.write(2, &xIn[0]);
 
@@ -79,7 +79,7 @@ TEST_CASE("Return fewer than the requested number of values when there is not en
 TEST_CASE("Return fewer than the requested number of values when there is not enough data available (with a wrapping read)")
 {
     float xIn[4] = {1.0f, 2.0f, 3.0f, 4.0f};
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
 
     float xOut[4] = {};
     buffer.write(4, &xIn[0]);
@@ -97,7 +97,7 @@ TEST_CASE("Return fewer than the requested number of values when there is not en
 
 TEST_CASE("Read returns 0 values on a new buffer")
 {
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
 
     float xOut[2] = {};
     int valuesRead = buffer.read(2, &xOut[0]);
@@ -108,7 +108,7 @@ TEST_CASE("Read returns 0 values on a new buffer")
 TEST_CASE("Read returns 0 values on an empty buffer that has been written to and read from")
 {
     float xIn[2] = {1.0f, 2.0f};
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
     buffer.write(2, &xIn[0]);
 
     float xOut[2] = {};
@@ -120,7 +120,7 @@ TEST_CASE("Read returns 0 values on an empty buffer that has been written to and
 
 TEST_CASE("Read advances the read pointer correctly")
 {
-    RingBuffer buffer = RingBuffer(5);
+    RingBuffer buffer = RingBuffer(1, 5);
 
     float xIn[4] = {1.0f, 2.0f, 3.0f, 4.0f};
     buffer.write(4, &xIn[0]);

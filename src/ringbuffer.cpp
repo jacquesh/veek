@@ -5,8 +5,8 @@
 #include "logging.h"
 #include "ringbuffer.h"
 
-RingBuffer::RingBuffer(int size)
-    : capacity(size), readIndex(0), writeIndex(0)
+RingBuffer::RingBuffer(int startingSampleRate, int size)
+    : capacity(size), readIndex(0), writeIndex(0), sampleRate(startingSampleRate)
 {
     buffer = new float[size];
 

@@ -25,6 +25,11 @@
 static const int AUDIO_PACKET_DURATION_MS = 20;
 static const int AUDIO_PACKET_FRAME_SIZE = (AUDIO_PACKET_DURATION_MS * Audio::NETWORK_SAMPLE_RATE)/1000;
 
+// NOTE: The actual buffer size doesn't really matter as long as we can fit enough data
+//       into the buffer at once. At 48KHz, (1 << 18) is ~5s of mono data, enough for us
+//       to notice if we're somehow reliant on the size of the buffer.
+static int RING_BUFFER_SIZE = 1 << 18;
+
 struct AudioSource
 {
     RingBuffer* buffer;
@@ -310,7 +315,7 @@ void Audio::PlayTestSound()
     // Create the test sound based on the sample rate that we got
     uint32 sampleSoundSampleCount = 1 << 16;
     AudioSource sampleSource = {};
-    sampleSource.buffer = new RingBuffer(sampleSoundSampleCount);
+    sampleSource.buffer = new RingBuffer(outStream->sample_rate, sampleSoundSampleCount);
 
     float* tempbuffer = new float[sampleSoundSampleCount];
     float twopi = 2.0f*3.1415927f;
@@ -344,7 +349,7 @@ void Audio::AddAudioUser(UserIdentifier userId)
     newUser.decoder = opus_decoder_create(NETWORK_SAMPLE_RATE, channels, &opusError);
     logInfo("Opus decoder created: %d\n", opusError);
 
-    newUser.buffer = new RingBuffer(48000);
+    newUser.buffer = new RingBuffer(outStream->sample_rate, RING_BUFFER_SIZE);
     newUser.jitter = new JitterBuffer();
 
     AudioSource userSource = {};
@@ -499,7 +504,7 @@ bool Audio::SetAudioInputDevice(int newInputDevice)
     logInfo("  Layout: %s\n", inStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(inStream->format));
 
-    audioState.inputListenResampler.InputSampleRate = inStream->sample_rate;
+    inBuffer->sampleRate = inStream->sample_rate;
 
     return true;
 }
@@ -565,7 +570,12 @@ bool Audio::SetAudioOutputDevice(int newOutputDevice)
     logInfo("  Layout: %s\n", outStream->layout.name);
     logInfo("  Format: %s\n", soundio_format_string(outStream->format));
 
-    audioState.inputListenResampler.OutputSampleRate = outStream->sample_rate;
+    listenBuffer->sampleRate = outStream->sample_rate;
+    for(auto& iter : audioUsers)
+    {
+        UserAudioData& user = iter.second;
+        user.buffer->sampleRate = outStream->sample_rate;
+    }
 
     return true;
 }
@@ -851,9 +861,13 @@ bool Audio::Setup()
     // get a list of connected devices
     audioState.currentInputDevice = -1;
     audioState.currentOutputDevice = -1;
-    inBuffer = new RingBuffer(48000);
 
-    listenBuffer = new RingBuffer(1 << 18);
+    inBuffer = new RingBuffer(NETWORK_SAMPLE_RATE, RING_BUFFER_SIZE);
+    listenBuffer = new RingBuffer(1, RING_BUFFER_SIZE);
+
+    micBuffer = Audio::AudioBuffer(AUDIO_PACKET_FRAME_SIZE);
+    micBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+    presendBuffer = new RingBuffer(NETWORK_SAMPLE_RATE, RING_BUFFER_SIZE);
 
     logInfo("Initializing libsoundio %s\n", soundio_version_string());
     soundio = soundio_create();
@@ -884,9 +898,6 @@ bool Audio::Setup()
     logInfo("SoundIO event queue flushed\n");
     // TODO: Check the supported input/output formats
 
-    micBuffer = Audio::AudioBuffer(AUDIO_PACKET_FRAME_SIZE);
-    micBuffer.SampleRate = NETWORK_SAMPLE_RATE;
-    presendBuffer = new RingBuffer(NETWORK_SAMPLE_RATE);
     return true;
 }
 
@@ -986,11 +997,8 @@ void Audio::Update()
 
     if(audioState.inputEnabled)
     {
-        ResampleStreamContext backupCtx = sendResampler;
         // TODO: Rename the resampler to something that makes more sense.
         // TODO: Remove these sample rate updates
-        sendResampler.InputSampleRate = inStream->sample_rate;
-        sendResampler.OutputSampleRate = NETWORK_SAMPLE_RATE;
         resampleRing2Ring(sendResampler, *inBuffer, *presendBuffer);
 
         int outputCount = 0;
@@ -1020,7 +1028,6 @@ void Audio::Update()
                           tempBuffer);
 
         logTerm("Received %d samples from the network\n", tempBuffer.Length);
-        srcUser.receiveResampler.OutputSampleRate = outStream->sample_rate;
         resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }

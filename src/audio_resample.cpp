@@ -95,6 +95,7 @@ void resampleBuffer2Ring(ResampleStreamContext& ctx,
                          RingBuffer& output)
 {
     ctx.InputSampleRate = input.SampleRate;
+    ctx.OutputSampleRate = output.sampleRate;
 
     for(int i=0; i<input.Length; i++)
     {
@@ -111,9 +112,11 @@ void resampleRing2Ring(ResampleStreamContext& ctx,
                        RingBuffer& input,
                        RingBuffer& output)
 {
-    // TODO: Set/check sample rates
     const int chunkSize = 1024;
     float inputChunk[chunkSize];
+
+    ctx.InputSampleRate = input.sampleRate;
+    ctx.OutputSampleRate = output.sampleRate;
 
     while(input.count() >= chunkSize)
     {
