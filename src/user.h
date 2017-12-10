@@ -9,7 +9,14 @@
 struct UserData; // TODO: We forward-declare this here so we can use it for constructors of packets, probably not ideal
 
 typedef uint8_t UserIdentifier;
-typedef uint8_t RoomIdentifier;
+
+const int MAX_ROOM_ID_LENGTH = 32;
+struct RoomIdentifier
+{
+    char name[MAX_ROOM_ID_LENGTH];
+
+    bool equals(RoomIdentifier& other);
+};
 
 // Client -> Server
 // Sent as a first message when/after connecting to the server

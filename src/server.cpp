@@ -1,5 +1,5 @@
-#include <vector>
 #include <unordered_map>
+#include <random>
 
 #include "enet/enet.h"
 
@@ -9,7 +9,27 @@
 #include "logging.h"
 #include "platform.h"
 
+#include "wordlist_adjectives.cpp"
+#include "wordlist_nouns.cpp"
+
 using namespace std;
+
+RoomIdentifier GetRandomRoomId()
+{
+    static random_device randDevice;
+    static default_random_engine rng(randDevice());
+    static uniform_int_distribution<int> nounDistrib(0, nounCount);
+    static uniform_int_distribution<int> adjectiveDistrib(0, adjectiveCount);
+
+    const char* adj1 = allAdjectives[adjectiveDistrib(rng)];
+    const char* adj2 = allAdjectives[adjectiveDistrib(rng)];
+    const char* noun = allNouns[nounDistrib(rng)];
+
+    RoomIdentifier result = {};
+    snprintf(result.name, sizeof(result), "%s%s%s", adj1, adj2, noun);
+
+    return result;
+}
 
 int main()
 {
@@ -94,9 +114,8 @@ int main()
                         RoomIdentifier roomToJoin;
                         if(setupPacket.createRoom)
                         {
-                            static uint8_t nextRoomId = 1;
-                            roomToJoin = nextRoomId++;
-                            logTerm("Create room %d\n", roomToJoin);
+                            roomToJoin = GetRandomRoomId();
+                            logTerm("Create room %s\n", roomToJoin);
                         }
                         else
                         {
@@ -112,7 +131,7 @@ int main()
                         for(auto iter : remoteUsers)
                         {
                             ServerUserData* userData = iter.second;
-                            if(userData->room != roomToJoin)
+                            if(!userData->room.equals(roomToJoin))
                                 continue;
 
                             remoteUserCount++;
@@ -131,7 +150,7 @@ int main()
                         for(auto iter : remoteUsers)
                         {
                             ServerUserData* userData = iter.second;
-                            if(userData->room != roomToJoin)
+                            if(!userData->room.equals(roomToJoin))
                                 continue;
 
                             NetworkOutPacket connOutPacket = createNetworkOutPacket(NET_MSGTYPE_USER_CONNECT);
@@ -140,8 +159,8 @@ int main()
                         }
 
                         remoteUsers[newUser->ID] = newUser;
-                        logInfo("Initialization received for %s in room %d\n",
-                                newUser->name, newUser->room);
+                        logInfo("Initialization received for %s in room %s\n",
+                                newUser->name, newUser->room.name);
                     } break;
                 }
                 enet_packet_destroy(netEvent.packet);

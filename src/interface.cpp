@@ -26,7 +26,7 @@
 const int HOSTNAME_MAX_LENGTH = 26;
 static char serverHostname[HOSTNAME_MAX_LENGTH];
 
-static char roomToJoinBuffer[4];
+static char roomToJoinBuffer[MAX_ROOM_ID_LENGTH];
 
 extern int screenWidth;
 extern int screenHeight;
@@ -136,7 +136,7 @@ void renderGame(InterfaceState* game, float deltaTime)
                                                   ImGuiWindowFlags_NoResize |
                                                   ImGuiWindowFlags_NoTitleBar;
         ImGui::Begin("Remote Video", nullptr, remoteVideoWindowFlags);
-        ImGui::Text("You are in room: %u", Network::CurrentRoom());
+        ImGui::Text("You are in room: %s", Network::CurrentRoom());
         ImGui::Separator();
 
         ImVec2 largeImageSize = ImVec2(2.0f*videoImageSize.x, 2.0f*videoImageSize.y);
@@ -277,10 +277,9 @@ void renderGame(InterfaceState* game, float deltaTime)
             ImGui::SameLine();
             ImGui::InputText("##serverHostname", serverHostname, HOSTNAME_MAX_LENGTH);
 
-            int roomIdFlags = ImGuiInputTextFlags_CharsDecimal;
             ImGui::Text("Room ID:");
             ImGui::SameLine();
-            ImGui::InputText("##roomId", roomToJoinBuffer, sizeof(roomToJoinBuffer), roomIdFlags);
+            ImGui::InputText("##roomId", roomToJoinBuffer, sizeof(roomToJoinBuffer));
 
             ImGui::Text("Create room:");
             ImGui::SameLine();
@@ -291,7 +290,8 @@ void renderGame(InterfaceState* game, float deltaTime)
             {
                 localUser->nameLength = (int)strlen(localUser->name);
 
-                RoomIdentifier roomId = (RoomIdentifier)atoi(roomToJoinBuffer);
+                RoomIdentifier roomId = {};
+                strncpy(roomId.name, roomToJoinBuffer, MAX_ROOM_ID_LENGTH);
                 Network::ConnectToMasterServer(&serverHostname[0], createRoom, roomId);
             }
         } break;
