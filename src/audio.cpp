@@ -56,6 +56,7 @@ struct AudioData
 
     bool inputEnabled;
 
+    float  currentBufferVolume;
     bool inputActive;
     Audio::MicActivationMode inputActivationMode;
 };
@@ -948,6 +949,7 @@ static void ProduceASingleAudioOutputPacket()
     }
 
     float rms = ComputeRMS(micBuffer);
+    audioState.currentBufferVolume = rms;
     switch(audioState.inputActivationMode)
     {
         case Audio::MicActivationMode::Always:
@@ -1137,7 +1139,7 @@ bool Audio::IsMicrophoneActive()
 
 float Audio::GetInputVolume()
 {
-    return ComputeRMS(micBuffer);
+    return audioState.currentBufferVolume;
 }
 
 Audio::AudioBuffer::AudioBuffer(int initialCapacity)
