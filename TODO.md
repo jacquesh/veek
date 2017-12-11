@@ -2,6 +2,8 @@
 ## v0.1
 * Audio transfer that records/plays without artefacts, independant of input or output sample rate
 
+* Sometimes when things get a bit weird, if we close the window the interface thread stops but the processing thread does not.
+* You don't get any audio coming through if you connect with your mic disabled. I'm pretty sure this is just because the jitter buffer gets confused about what the next expected packet index is.
 
 # More specifically
 ## Pre-video things:
@@ -54,3 +56,4 @@
 
 ## Reading:
 * https://www.snellman.net/blog/archive/2016-12-13-ring-buffers/
+* The reason I don't want to do a mobile version: https://medium.com/talko-team-talk-share-do/can-you-hear-me-now-d43dbb7b83e8
