@@ -2,6 +2,7 @@
 
 #include "catch.hpp"
 #include "jitterbuffer.h"
+#include "logging.h"
 
 // TODO: Note that these tests assume a hard-coded jitterbuffer size of 3
 
@@ -190,4 +191,32 @@ TEST_CASE("Get returns the expected packet after an extra packet is received aft
     outCount = jb.Get(outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
+}
+
+TEST_CASE("Packet index overflow is handled smoothly")
+{
+    JitterBuffer jb;
+    uint8_t inVal;
+    uint16_t outCount;
+    uint8_t* outVal;
+    uint16_t currentIndex = (1 << 16) - 2;
+
+    inVal = 2;
+    jb.Add(currentIndex++, 1, &inVal);
+    inVal = 3;
+    jb.Add(currentIndex++, 1, &inVal);
+    inVal = 4;
+    jb.Add(currentIndex++, 1, &inVal);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 2);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 3);
+
+    outCount = jb.Get(outVal);
+    REQUIRE(outCount == 1);
+    REQUIRE(*outVal == 4);
 }
