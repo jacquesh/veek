@@ -1,7 +1,5 @@
 @echo off
 
-ctime -begin veek_time.ctm
-
 For /f "tokens=1-4 delims=/ " %%a in ("%DATE%") do (set BuildDate=%%a-%%b-%%c)
 For /f "tokens=1-2 delims=/:/ " %%a in ("%TIME%") do (set BuildTime=%%a-%%b)
 FOR /f %%H IN ('git log -n 1 --oneline') DO set VersionHash=%%H
@@ -22,5 +20,3 @@ set LinkFlags=-LIBPATH:..\thirdparty\lib\win64 %LinkLibs% -INCREMENTAL:NO -OUT:m
 pushd build
 cl %CompileFlags% %CompileFiles% %IncludeDirs% -link %LinkFlags%
 popd
-
-ctime -end veek_time.ctm %ERRORLEVEL%
