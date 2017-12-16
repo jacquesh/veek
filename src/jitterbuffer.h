@@ -19,9 +19,12 @@ struct JitterItem
 class JitterBuffer
 {
 public:
+    // TODO: (Proper) docs
     JitterBuffer();
     ~JitterBuffer();
     void Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data);
+
+    // Returns the length of the output buffer
     uint16_t Get(uint8_t*& data);
 
 private:
