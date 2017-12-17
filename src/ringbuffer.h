@@ -13,6 +13,7 @@ public:
 
     // Write an array of values into the buffer
     void write(int valCount, float* vals);
+    void write(float value);
 
     // Read an array of values out of the buffer, writing them into the given vals array
     //
@@ -22,6 +23,7 @@ public:
     // will be written into vals[0] to vals[n-1].
     // vals[n] to vals[valCount-1] will not be modified.
     int read(int valCount, float* vals);
+    int read(float* value);
 
     // Returns the number of items that are available for reading in the buffer
     int count();
@@ -44,9 +46,6 @@ private:
     int readIndex;
     int writeIndex;
     Platform::Mutex* lock;
-
-    uint64_t totalWrites;
-    uint64_t totalReads;
 
     // NOTE: These functions are not thread-safe
     int freeInternal();

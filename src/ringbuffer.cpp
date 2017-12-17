@@ -17,9 +17,6 @@ RingBuffer::RingBuffer(int startingSampleRate, int size)
     memset(buffer, 0, sizeof(float)*size);
 
     lock = Platform::CreateMutex();
-
-    totalWrites = 0;
-    totalReads = 0;
 }
 
 RingBuffer::~RingBuffer()
@@ -30,103 +27,69 @@ RingBuffer::~RingBuffer()
 
 void RingBuffer::write(int valCount, float* vals)
 {
-    Platform::LockMutex(lock);
-    assert(valCount < capacity);
-
-    if(valCount > freeInternal())
+    for(int i=0; i<valCount; i++)
     {
-        int readIndexIncrement = valCount - freeInternal();
-        readIndex += readIndexIncrement;
+        write(vals[i]);
+    }
+}
+
+void RingBuffer::write(float value)
+{
+    Platform::LockMutex(lock);
+
+    if(freeInternal() == 0)
+    {
+        readIndex++;
         if(readIndex >= capacity)
         {
             readIndex -= capacity;
         }
     }
 
-    int contiguousFreeSpace = capacity - writeIndex;
-    if(contiguousFreeSpace > valCount)
-    {
-        for(int i=0; i<valCount; ++i)
-        {
-            buffer[writeIndex+i] = vals[i];
-        }
-    }
-    else
-    {
-        for(int i=0; i<contiguousFreeSpace; ++i)
-        {
-            buffer[writeIndex+i] = vals[i];
-        }
+    buffer[writeIndex] = value;
 
-        int wrappedValCount = valCount - contiguousFreeSpace;
-        for(int i=0; i<wrappedValCount; ++i)
-        {
-            buffer[i] = vals[contiguousFreeSpace+i];
-        }
-    }
-
-    writeIndex += valCount;
+    writeIndex++;
     if(writeIndex >= capacity)
     {
         writeIndex -= capacity;
     }
-    totalWrites += valCount;
     Platform::UnlockMutex(lock);
 }
 
-int RingBuffer::read(int valCount, float* vals)
+int RingBuffer::read(int valCount, float* values)
 {
-    assert(valCount < capacity);
+    int valsRead = 0;
+    for(int i=0; i<valCount; i++)
+    {
+        float x = 0.0f;
+        int readCount = read(&x);
+        if(readCount == 0)
+            break;
+
+        valsRead++;
+        values[i] = x;
+    }
+    return valsRead;
+}
+
+int RingBuffer::read(float* value)
+{
     Platform::LockMutex(lock);
-
-    int contiguousAvailableValues = capacity - readIndex;
-    int valuesToRead = valCount;
-    if(contiguousAvailableValues > valCount)
+    if(writeIndex == readIndex)
     {
-        if((writeIndex >= readIndex) && (writeIndex < readIndex+valCount))
-        {
-            valuesToRead = writeIndex - readIndex;
-        }
-
-        for(int i=0; i<valuesToRead; i++)
-        {
-            vals[i] = buffer[readIndex+i];
-        }
-
-        readIndex += valuesToRead;
-    }
-    else
-    {
-        // NOTE: This condition is sufficient because it is always true that (writeIndex < capacity)
-        if(writeIndex >= readIndex)
-        {
-            valuesToRead = writeIndex - readIndex;
-            contiguousAvailableValues = valuesToRead;
-        }
-
-        for(int i=0; i<contiguousAvailableValues; ++i)
-        {
-            vals[i] = buffer[readIndex+i];
-        }
-
-        int wrappedValCount = valuesToRead - contiguousAvailableValues;
-        if((wrappedValCount > 0) && (writeIndex < wrappedValCount))
-        {
-            wrappedValCount = writeIndex;
-            valuesToRead = contiguousAvailableValues + wrappedValCount;
-        }
-        for(int i=0; i<wrappedValCount; ++i)
-        {
-            vals[contiguousAvailableValues+i] = buffer[i];
-        }
-
-        readIndex = wrappedValCount;
+        return 0;
     }
 
-    totalReads += valuesToRead;
+    *value = buffer[readIndex];
+    readIndex++;
+    if(readIndex >= capacity)
+    {
+        readIndex -= capacity;
+    }
+
     Platform::UnlockMutex(lock);
 
-    return valuesToRead;
+    return 1;
 }
 
 int RingBuffer::count()
