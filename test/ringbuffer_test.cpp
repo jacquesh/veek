@@ -95,6 +95,35 @@ TEST_CASE("Return fewer than the requested number of values when there is not en
     REQUIRE(xOut[3] == 0.0f);
 }
 
+TEST_CASE("Return no values when there isn't enough data available (reading 1 at a time)")
+{
+    float xIn[3] = {1.0f, 2.0f, 3.0f};
+    RingBuffer buffer = RingBuffer(1, 4);
+
+    buffer.write(3, xIn);
+
+    float xOut;
+    int valuesRead;
+
+    valuesRead = buffer.read(1, &xOut);
+    REQUIRE(valuesRead == 1);
+    REQUIRE(xOut == 1.0f);
+
+    valuesRead = buffer.read(1, &xOut);
+    REQUIRE(valuesRead == 1);
+    REQUIRE(xOut == 2.0f);
+
+    valuesRead = buffer.read(1, &xOut);
+    REQUIRE(valuesRead == 1);
+    REQUIRE(xOut == 3.0f);
+
+    valuesRead = buffer.read(1, &xOut);
+    REQUIRE(valuesRead == 0);
+    valuesRead = buffer.read(1, &xOut);
+    REQUIRE(valuesRead == 0);
+    REQUIRE(xOut == 3.0f);
+}
+
 TEST_CASE("Read returns 0 values on a new buffer")
 {
     RingBuffer buffer = RingBuffer(1, 5);
