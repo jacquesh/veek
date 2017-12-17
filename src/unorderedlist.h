@@ -80,7 +80,7 @@ public:
         m_count = 0;
     }
 
-    T operator [](int index)
+    T& operator [](int index)
     {
 #ifndef NDEBUG
         if((index < 0) || (index >= m_count))
