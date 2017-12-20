@@ -115,7 +115,7 @@ int main()
                         if(setupPacket.createRoom)
                         {
                             roomToJoin = GetRandomRoomId();
-                            logTerm("Create room %s\n", roomToJoin);
+                            logTerm("Create room %s\n", roomToJoin.name);
                         }
                         else
                         {
