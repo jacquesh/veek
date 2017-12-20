@@ -77,6 +77,7 @@ int RingBuffer::read(float* value)
     Platform::LockMutex(lock);
     if(writeIndex == readIndex)
     {
+        Platform::UnlockMutex(lock);
         return 0;
     }
 
