@@ -33,6 +33,7 @@ static int RING_BUFFER_SIZE = 1 << 18;
 struct AudioSource
 {
     RingBuffer* buffer;
+    bool deleteWhenEmpty;
 };
 
 struct AudioData
@@ -317,16 +318,18 @@ void Audio::GenerateToneInput(bool generateTone)
 void Audio::PlayTestSound()
 {
     // Create the test sound based on the sample rate that we got
-    uint32 sampleSoundSampleCount = 1 << 16;
+    int sampleSoundSampleRate = outStream->sample_rate;
+    int sampleSoundSampleCount = sampleSoundSampleRate;
     AudioSource sampleSource = {};
-    sampleSource.buffer = new RingBuffer(outStream->sample_rate, sampleSoundSampleCount);
+    sampleSource.buffer = new RingBuffer(sampleSoundSampleRate, sampleSoundSampleCount);
+    sampleSource.deleteWhenEmpty = true;
 
     float* tempbuffer = new float[sampleSoundSampleCount];
     float twopi = 2.0f*3.1415927f;
     float frequency = 261.6f; // Middle C
     float timestep = 1.0f/(float)outStream->sample_rate;
     float sampleTime = 0.0f;
-    for(uint32 sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
+    for(int sampleIndex=0; sampleIndex<sampleSoundSampleCount-1; sampleIndex++)
     {
         float sinVal = 0.0f;
         for(int i=0; i<4; i++)
@@ -337,7 +340,7 @@ void Audio::PlayTestSound()
         sampleTime += timestep;
     }
 
-    sampleSource.buffer->write(sampleSoundSampleCount, tempbuffer);
+    sampleSource.buffer->write(sampleSoundSampleCount-1, tempbuffer);
     sourceList.insert(sampleSource);
     // TODO: This needs to be removed from the list of sources when it's finished playing
 
@@ -1065,6 +1068,20 @@ void Audio::Update()
         resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }
+
+    // NOTE: This technically could run while we're reading audio data from sourceList in the
+    //       output callback, but that probably isn't a problem because it'd just mean that
+    //       we skip one callback's worth of audio for a handful of sources.
+    for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
+    {
+        AudioSource& src = sourceList[sourceIndex];
+        if(src.deleteWhenEmpty && (src.buffer->count() == 0))
+        {
+            delete src.buffer;
+            sourceList.removeAt(sourceIndex);
+            sourceIndex--;
+        }
+    }
 }
 
 int Audio::InputDeviceCount()
@@ -1090,7 +1107,6 @@ const char** Audio::OutputDeviceNames()
 void Audio::Shutdown()
 {
     logInfo("Deinitialize audio subsystem\n");
-    // TODO: Wraithy crashes inside this function
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
     // TODO: Clean up the sourceList and its elements (in particular the ringbuffers should
@@ -1117,9 +1133,13 @@ void Audio::Shutdown()
     {
         soundio_device_unref(audioState.outputDeviceList[i]);
     }
-
-    opus_encoder_destroy(encoder);
     soundio_destroy(soundio);
+    opus_encoder_destroy(encoder);
+
+    for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
+    {
+        delete sourceList[sourceIndex].buffer;
+    }
 }
 
 float Audio::ComputeRMS(AudioBuffer& buffer)
