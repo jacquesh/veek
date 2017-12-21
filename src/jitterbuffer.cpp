@@ -100,7 +100,7 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
             return;
         }
 
-        if(packetIndex >= currentItem->packetIndex+1)
+        if(packetIndex >= (uint16_t)(currentItem->packetIndex+1))
         {
             // Insert the new packet after currentItem
             JitterItem* newItem = GetFreeItem();
