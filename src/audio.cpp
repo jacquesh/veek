@@ -64,8 +64,6 @@ struct AudioData
 
 struct UserAudioData
 {
-    uint16_t lastReceivedPacketIndex;
-
     int32 sampleRate;
     ResampleStreamContext receiveResampler;
     OpusDecoder* decoder;
@@ -391,12 +389,6 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     }
 
     UserAudioData& srcUser = srcUserIter->second;
-    if(srcUser.lastReceivedPacketIndex + 1 != packet.index)
-    {
-        logWarn("Dropped audio packets %d to %d (inclusive)\n",
-                srcUser.lastReceivedPacketIndex+1, packet.index-1);
-    }
-    srcUser.lastReceivedPacketIndex = packet.index;
     logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
@@ -1064,7 +1056,7 @@ void Audio::Update()
                           dataToDecodeLen, dataToDecode,
                           tempBuffer);
 
-        logFile("Received %d samples from the network\n", tempBuffer.Length);
+        logFile("Received %d samples from the jitter buffer\n", tempBuffer.Length);
         resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
         delete[] tempBuffer.Data;
     }

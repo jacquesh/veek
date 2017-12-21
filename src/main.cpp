@@ -56,7 +56,7 @@ int main()
     // Initialize
     double tickRate = 50;
     double tickDuration = 1.0/tickRate;
-    double nextTickTime = Platform::SecondsSinceStartup();;
+    double nextTickTime = Platform::SecondsSinceStartup();
 
     GlobalState* globals = new GlobalState();
     globals->isRunning = true;

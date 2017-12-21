@@ -151,13 +151,6 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
 //       on this jitterbuffer again, any call can potentially invalidate your data.
 uint16_t JitterBuffer::Get(uint8_t*& data)
 {
-    int dataCount = 0;
-    JitterItem* countItem = first;
-    while(countItem != nullptr)
-    {
-        dataCount++;
-        countItem = countItem->next;
-    }
     if(refilling)
     {
         logFile("Return empty while we refill\n");
