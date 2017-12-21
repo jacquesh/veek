@@ -82,14 +82,15 @@ int main()
         }
     }
 
+    logInfo("Stop running, begin shutdown\n");
     Platform::JoinThread(uiThread);
 
-    logInfo("Stop running, begin shutdown\n");
     Network::Shutdown();
     Video::Shutdown();
     Audio::Shutdown();
     Platform::Shutdown();
 
+    logInfo("Shutdown complete\n");
     deinitLogging();
     return 0;
 }

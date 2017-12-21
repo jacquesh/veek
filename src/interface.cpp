@@ -431,6 +431,7 @@ int interfaceEntryPoint(void* data)
             Platform::SleepForMilliseconds(sleepMS);
         }
     }
+    logInfo("Begin interface shutdown\n");
 
     cleanupGame();
 
@@ -441,6 +442,7 @@ int interfaceEntryPoint(void* data)
     glfwDestroyWindow(window);
     glfwTerminate();
 
+    logInfo("Interface shutdown complete\n");
     return 0;
 }
 

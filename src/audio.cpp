@@ -917,6 +917,7 @@ static Audio::NetworkAudioPacket* CreateOutputPacket(Audio::AudioBuffer& sourceB
 void Audio::SendAudioToUser(ClientUserData* user, NetworkAudioPacket* audioPacket)
 {
     audioPacket->index = user->lastSentAudioPacket++;
+    logFile("Send audio packet %d to user %d\n", audioPacket->index, user->ID);
 
     NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
     audioPacket->serialize(outPacket);
