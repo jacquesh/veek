@@ -2,6 +2,7 @@
 #include "theora/theoradec.h"
 
 #include "network.h"
+#include "network_client.h"
 #include "video.h"
 
 // https://www.reddit.com/r/programming/comments/4rljty/got_fed_up_with_skype_wrote_my_own_toy_video_chat?st=iql0rqn9&sh=7602e95d
@@ -325,6 +326,45 @@ bool Video::Setup()
 
 void Video::Update()
 {
+    // TODO: This is just a quick hack to check for and send video updates at less than 50Hz
+    static int executionCounter = 0;
+    executionCounter++;
+    if(executionCounter == 3)
+    {
+        executionCounter = 0;
+
+        if(cameraDevice <= -1)
+            return;
+
+        if(checkForNewVideoFrame())
+        {
+            uint8* currentPixelValues = currentVideoFrame();
+            if(Network::IsConnectedToMasterServer())
+            {
+                static uint8* encodedPixels = new uint8[320*240*3];
+                int videoBytes = encodeRGBImage(320*240*3, currentPixelValues,
+                                                320*240*3, encodedPixels);
+                //logTerm("Encoded %d video bytes\n", videoBytes);
+                //delete[] encodedPixels;
+                NetworkVideoPacket videoPacket = {};
+                videoPacket.imageWidth = 320;
+                videoPacket.imageHeight = 240;
+                videoPacket.encodedDataLength = videoBytes;
+                memcpy(videoPacket.encodedData, encodedPixels, videoBytes);
+
+                for(int i=0; i<remoteUsers.size(); i++)
+                {
+                    ClientUserData* destinationUser = remoteUsers[i];
+                    videoPacket.srcUser = localUser->ID;
+                    videoPacket.index = destinationUser->lastSentVideoPacket++;
+
+                    NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_VIDEO);
+                    videoPacket.serialize(outPacket);
+                    outPacket.send(destinationUser->netPeer, 0, false);
+                }
+            }
+        }
+    }
 }
 
 void Video::Shutdown()

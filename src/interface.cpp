@@ -11,11 +11,9 @@
 #include "audio.h"
 #include "globals.h"
 #include "logging.h"
-#include "network.h"
 #include "network_client.h"
 #include "platform.h"
 #include "render.h"
-#include "user_client.h"
 #include "video.h"
 
 // TODO: Look into replacing the GL3 UI with something slightly more native (but still cross platform)
@@ -62,55 +60,17 @@ void handleVideoInput(InterfaceState& game)
 {
     if(game.cameraEnabled)
     {
-        // TODO: If we can switch to using a callback for video (as with audio) then we can
-        //       remove our dependency on calling "checkForNewVideoFrame" and shift the network
-        //       stuff down into the "Send network output data" section
-        if(Video::checkForNewVideoFrame())
+        uint8* pixelValues = Video::currentVideoFrame();
+        if(localUser->videoTexture == 0)
         {
-            uint8* pixelValues = Video::currentVideoFrame();
-#if 0
-            static uint8* encPx = new uint8[320*240*3];
-            static uint8* decPx = new uint8[320*240*3];
-            int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
-                                                        320*240*3, encPx);
-            Video::decodeRGBImage(320*240*3, encPx, 320*240*3, decPx);
-#endif
-            if(localUser->videoTexture == 0)
-            {
-                // TODO: These textures never get cleaned up because that'd need to happen from the UI thread
-                localUser->videoTexture = Render::createTexture();
-            }
-            glBindTexture(GL_TEXTURE_2D, localUser->videoTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                         cameraWidth, cameraHeight, 0,
-                         GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            if(Network::IsConnectedToMasterServer())
-            {
-                static uint8* encodedPixels = new uint8[320*240*3];
-                int videoBytes = Video::encodeRGBImage(320*240*3, pixelValues,
-                                                320*240*3, encodedPixels);
-                //logTerm("Encoded %d video bytes\n", videoBytes);
-                //delete[] encodedPixels;
-                Video::NetworkVideoPacket videoPacket = {};
-                videoPacket.imageWidth = 320;
-                videoPacket.imageHeight = 240;
-                videoPacket.encodedDataLength = videoBytes;
-                memcpy(videoPacket.encodedData, encodedPixels, videoBytes);
-
-                for(int i=0; i<remoteUsers.size(); i++)
-                {
-                    ClientUserData* destinationUser = remoteUsers[i];
-                    videoPacket.srcUser = localUser->ID;
-                    videoPacket.index = destinationUser->lastSentVideoPacket++;
-
-                    NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_VIDEO);
-                    videoPacket.serialize(outPacket);
-                    outPacket.send(destinationUser->netPeer, 0, false);
-                }
-            }
+            // TODO: These textures never get cleaned up because that'd need to happen from the UI thread
+            localUser->videoTexture = Render::createTexture();
         }
+        glBindTexture(GL_TEXTURE_2D, localUser->videoTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
+                     cameraWidth, cameraHeight, 0,
+                     GL_RGB, GL_UNSIGNED_BYTE, pixelValues);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 }
 
