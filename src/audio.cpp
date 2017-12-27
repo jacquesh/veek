@@ -178,9 +178,7 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
 
 static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int frameCountMax)
 {
-    // TODO: 0.025 is twice per frame, we should probably link that in to where we actually specify
-    //       the tickrate
-    int samplesPerFrame = (int)(0.025f*stream->sample_rate);
+    int samplesPerFrame = (AUDIO_PACKET_DURATION_MS*stream->sample_rate)/1000;
     int framesRemaining = clamp(samplesPerFrame, frameCountMin, frameCountMax);
     //logTerm("Write callback! %d - %d => %d\n", frameCountMin, frameCountMax, framesRemaining);
     int channelCount = stream->layout.channel_count;
@@ -1017,7 +1015,6 @@ void Audio::Update()
     if(audioState.inputEnabled)
     {
         // TODO: Rename the resampler to something that makes more sense.
-        // TODO: Remove these sample rate updates
         resampleRing2Ring(sendResampler, *inBuffer, *presendBuffer);
 
         int outputCount = 0;
