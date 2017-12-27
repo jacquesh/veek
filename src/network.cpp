@@ -115,6 +115,10 @@ void NetworkOutPacket::send(ENetPeer* peer, uint8 channelID, bool isReliable)
     {
         enetPacket->flags |= ENET_PACKET_FLAG_RELIABLE;
     }
+    else
+    {
+        enetPacket->flags |= ENET_PACKET_FLAG_UNSEQUENCED | ENET_PACKET_FLAG_UNRELIABLE_FRAGMENT;
+    }
 
     totalBytesOut += currentPosition;
     enetPacket->dataLength = currentPosition;
