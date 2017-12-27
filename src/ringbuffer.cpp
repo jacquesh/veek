@@ -25,14 +25,6 @@ RingBuffer::~RingBuffer()
     delete[] buffer;
 }
 
-void RingBuffer::write(int valCount, float* vals)
-{
-    for(int i=0; i<valCount; i++)
-    {
-        write(vals[i]);
-    }
-}
-
 void RingBuffer::write(float value)
 {
     Platform::LockMutex(lock);
@@ -54,22 +46,6 @@ void RingBuffer::write(float value)
         writeIndex -= capacity;
     }
     Platform::UnlockMutex(lock);
-}
-
-int RingBuffer::read(int valCount, float* values)
-{
-    int valsRead = 0;
-    for(int i=0; i<valCount; i++)
-    {
-        float x = 0.0f;
-        int readCount = read(&x);
-        if(readCount == 0)
-            break;
-
-        valsRead++;
-        values[i] = x;
-    }
-    return valsRead;
 }
 
 int RingBuffer::read(float* value)

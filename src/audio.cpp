@@ -165,7 +165,7 @@ static void inReadCallback(SoundIoInStream* stream, int frameCountMin, int frame
             float val = *((float*)(inArea[0].ptr));
             inArea[0].ptr += inArea[0].step;
 
-            inBuffer->write(1, &val);
+            inBuffer->write(val);
         }
 
         if(frameCount > 0)
@@ -201,7 +201,7 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             if(audioState.isListeningToInput)
             {
                 // NOTE: This will not modify val if there is no data available in listenBuffer.
-                listenBuffer->read(1, &val);
+                listenBuffer->read(&val);
             }
 
 #if 0
@@ -223,7 +223,7 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             {
                 // NOTE: This will not modify temp if there is no data available in listenBuffer.
                 float temp = 0.0f;
-                sourceList[sourceIndex].buffer->read(1, &temp);
+                int sampleCount = sourceList[sourceIndex].buffer->read(&temp);
                 val += temp;
             }
 
@@ -320,7 +320,6 @@ void Audio::PlayTestSound()
     sampleSource.buffer = new RingBuffer(sampleSoundSampleRate, sampleSoundSampleCount);
     sampleSource.deleteWhenEmpty = true;
 
-    float* tempbuffer = new float[sampleSoundSampleCount];
     float twopi = 2.0f*3.1415927f;
     float frequency = 261.6f; // Middle C
     float timestep = 1.0f/(float)outStream->sample_rate;
@@ -332,15 +331,14 @@ void Audio::PlayTestSound()
         {
             sinVal += ((5-i)/(5.0f))*sinf(((1 << i)*frequency)*twopi*sampleTime);
         }
-        tempbuffer[sampleIndex] = 0.1f*sinVal;
+
+        sinVal *= 0.1f;
+        sampleSource.buffer->write(sinVal);
         sampleTime += timestep;
     }
 
-    sampleSource.buffer->write(sampleSoundSampleCount-1, tempbuffer);
     sourceList.insert(sampleSource);
     // TODO: This needs to be removed from the list of sources when it's finished playing
-
-    delete[] tempbuffer;
 }
 
 void Audio::AddAudioUser(UserIdentifier userId)
@@ -925,7 +923,11 @@ void Audio::SendAudioToUser(ClientUserData* user, NetworkAudioPacket* audioPacke
 
 static void ProduceASingleAudioOutputPacket()
 {
-    micBuffer.Length = presendBuffer->read(AUDIO_PACKET_FRAME_SIZE, micBuffer.Data);
+    micBuffer.Length = 0;
+    for(int i=0; i<AUDIO_PACKET_FRAME_SIZE; i++)
+    {
+        micBuffer.Length += presendBuffer->read(&micBuffer.Data[micBuffer.Length]);
+    }
     assert(micBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
 
     if(audioState.generateToneInput)

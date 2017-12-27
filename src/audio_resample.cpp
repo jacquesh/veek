@@ -103,7 +103,7 @@ void resampleBuffer2Ring(ResampleStreamContext& ctx,
         while(!resampleStreamRequiresInput(ctx))
         {
             float sample = resampleStreamOutput(ctx);
-            output.write(1, &sample);
+            output.write(sample);
         }
     }
 }
@@ -112,23 +112,17 @@ void resampleRing2Ring(ResampleStreamContext& ctx,
                        RingBuffer& input,
                        RingBuffer& output)
 {
-    const int chunkSize = 1024;
-    float inputChunk[chunkSize];
-
     ctx.InputSampleRate = input.sampleRate;
     ctx.OutputSampleRate = output.sampleRate;
 
-    while(input.count() >= chunkSize)
+    float inputSample;
+    while(input.read(&inputSample) > 0)
     {
-        int inputChunkLength = input.read(chunkSize, inputChunk);
-        for(int i=0; i<inputChunkLength; i++)
+        resampleStreamInput(ctx, inputSample);
+        while(!resampleStreamRequiresInput(ctx))
         {
-            resampleStreamInput(ctx, inputChunk[i]);
-            while(!resampleStreamRequiresInput(ctx))
-            {
-                float sample = resampleStreamOutput(ctx);
-                output.write(1, &sample);
-            }
+            float sample = resampleStreamOutput(ctx);
+            output.write(sample);
         }
     }
 }

@@ -11,18 +11,15 @@ public:
     RingBuffer(int sampleRate, int size);
     ~RingBuffer();
 
-    // Write an array of values into the buffer
-    void write(int valCount, float* vals);
+    // Write a value into the buffer
+    // NOTE: If the buffer is full, the oldest value will be removed to make space for the new one.
     void write(float value);
 
     // Read an array of values out of the buffer, writing them into the given vals array
     //
     // Returns the number of values that were written.
-    // If there are valCount values available, then valCount will be returned.
-    // Otherwise if there are n<valCount values available, n will be returned and the values
-    // will be written into vals[0] to vals[n-1].
-    // vals[n] to vals[valCount-1] will not be modified.
-    int read(int valCount, float* vals);
+    // If there is a value available, then 1 will be returned and *value will be the resulting value.
+    // Otherwise, 0 will be returned and the contents of value will not be modified.
     int read(float* value);
 
     // Returns the number of items that are available for reading in the buffer
