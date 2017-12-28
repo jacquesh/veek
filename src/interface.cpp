@@ -79,13 +79,6 @@ void renderGame(InterfaceState* game, float deltaTime)
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
-    ImVec2 videoImageSize = ImVec2((float)cameraWidth, (float)cameraHeight);
-    ImGuiWindowFlags localVideoWindowFlags = ImGuiWindowFlags_NoResize;
-    ImGui::Begin("Local Video", nullptr, localVideoWindowFlags);
-    ImGui::Text(localUser->name);
-    ImGui::Image((ImTextureID)localUser->videoTexture, videoImageSize);
-    ImGui::End();
-
     // Video images
     if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
     {
@@ -99,7 +92,7 @@ void renderGame(InterfaceState* game, float deltaTime)
         ImGui::Text("You are in room: %s", Network::CurrentRoom());
         ImGui::Separator();
 
-        ImVec2 largeImageSize = ImVec2(2.0f*videoImageSize.x, 2.0f*videoImageSize.y);
+        ImVec2 largeImageSize = ImVec2(2.0f*cameraWidth, 2.0f*cameraHeight);
         for(auto userIter=remoteUsers.begin(); userIter!=remoteUsers.end(); userIter++)
         {
             ClientUserData* user = *userIter;
@@ -123,11 +116,11 @@ void renderGame(InterfaceState* game, float deltaTime)
     }
 
     // Options window
-    ImVec2 windowLoc(0.0f, 0.0f);
-    ImVec2 windowSize(500.0f, 400.0f);
+    ImVec2 windowSize(430.0f, (float)screenHeight - 100.0f);
+    ImVec2 windowLoc((float)screenWidth-windowSize.x, 0.0f);
     int UIFlags = ImGuiWindowFlags_NoMove |
                   ImGuiWindowFlags_NoResize;
-    ImGui::Begin("Options", 0, UIFlags);
+    ImGui::Begin("Options (double-click here to toggle this window)", 0, UIFlags);
     ImGui::SetWindowPos(windowLoc);
     ImGui::SetWindowSize(windowSize);
 
@@ -170,6 +163,15 @@ void renderGame(InterfaceState* game, float deltaTime)
             {
                 game->cameraEnabled = Video::enableCamera(selectedCameraDevice);
             }
+        }
+
+        if(game->cameraEnabled)
+        {
+            float videoAspectRatio = (float)cameraWidth/(float)cameraHeight;
+            ImVec2 videoImageSize;
+            videoImageSize.x = (float)windowSize.x;
+            videoImageSize.y = videoImageSize.x / videoAspectRatio;
+            ImGui::Image((ImTextureID)localUser->videoTexture, videoImageSize);
         }
     }
 
@@ -360,8 +362,8 @@ int interfaceEntryPoint(void* data)
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     */
 
-    int initialWindowWidth = 640;
-    int initialWindowHeight = 480;
+    int initialWindowWidth = 800;
+    int initialWindowHeight = 600;
     GLFWwindow* window = glfwCreateWindow(initialWindowWidth, initialWindowHeight,
                                           "Veek", 0, 0);
     if(!window)
@@ -386,6 +388,7 @@ int interfaceEntryPoint(void* data)
         glfwTerminate();
         return 1;
     }
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     Render::updateWindowSize(initialWindowWidth, initialWindowHeight);
     ImGui_ImplGlfwGL3_Init(window, false);
     ImGuiIO& imguiIO = ImGui::GetIO();
