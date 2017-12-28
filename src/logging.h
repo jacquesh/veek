@@ -27,6 +27,8 @@ void _log(LogLevel level, bool logToTerminal, bool logToFile,
 
 #ifdef NDEBUG
 #define logTerm(MSG, ...);
+#define logFile(MSG, ...);
+
 #define logInfo(MSG, ...);
 #define logWarn(MSG, ...);
 #define logFail(MSG, ...);
