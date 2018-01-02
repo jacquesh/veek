@@ -26,6 +26,7 @@ public:
 
     // Returns the length of the output buffer
     uint16_t Get(uint8_t*& data);
+    uint16_t Get(uint16_t packetToGet, uint8_t*& data);
 
 private:
     int capacity;

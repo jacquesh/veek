@@ -146,6 +146,12 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
     }
 }
 
+uint16_t JitterBuffer::Get(uint16_t packetToGet, uint8_t*& data)
+{
+    nextOutputPacketIndex = packetToGet;
+    return Get(data);
+}
+
 // NOTE: Please don't modify or delete the contents of data in the calling function.
 // NOTE: You must finish using the contents of the output data pointer before calling any methods
 //       on this jitterbuffer again, any call can potentially invalidate your data.
