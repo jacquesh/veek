@@ -30,12 +30,6 @@ static const int AUDIO_PACKET_FRAME_SIZE = (AUDIO_PACKET_DURATION_MS * Audio::NE
 //       to notice if we're somehow reliant on the size of the buffer.
 static int RING_BUFFER_SIZE = 1 << 18;
 
-struct AudioSource
-{
-    RingBuffer* buffer;
-    bool deleteWhenEmpty;
-};
-
 struct AudioData
 {
     int inputDeviceCount;
@@ -90,7 +84,7 @@ static RingBuffer* inBuffer = 0;
 static SoundIoDevice* outDevice = 0;
 static SoundIoOutStream* outStream = 0;
 
-static UnorderedList<AudioSource> sourceList(10); // TODO: Pick a correct max value here, 8 users + test sound + listening? I dunno
+static UnorderedList<RingBuffer*> sourceList(10);
 
 static RingBuffer* listenBuffer;
 
@@ -204,26 +198,19 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
                 listenBuffer->read(&val);
             }
 
-#if 0
             for(auto userKV : audioUsers)
             {
-                if(userKV.second.buffer->count() != 0)
-                {
-                    logTerm("Callback samples for user %d: %d\n", userKV.first, userKV.second.buffer->count());
-                }
-                if(userKV.second.buffer->count() > 0)
-                {
-                    float temp;
-                    userKV.second.buffer->read(1, &temp);
-                    val += temp;
-                }
+                UserAudioData& user = userKV.second;
+
+                float temp;
+                user.buffer->read(&temp);
+                val += temp;
             }
-#endif
             for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
             {
                 // NOTE: This will not modify temp if there is no data available in listenBuffer.
                 float temp = 0.0f;
-                int sampleCount = sourceList[sourceIndex].buffer->read(&temp);
+                int sampleCount = sourceList[sourceIndex]->read(&temp);
                 val += temp;
             }
 
@@ -316,9 +303,7 @@ void Audio::PlayTestSound()
     // Create the test sound based on the sample rate that we got
     int sampleSoundSampleRate = outStream->sample_rate;
     int sampleSoundSampleCount = sampleSoundSampleRate;
-    AudioSource sampleSource = {};
-    sampleSource.buffer = new RingBuffer(sampleSoundSampleRate, sampleSoundSampleCount);
-    sampleSource.deleteWhenEmpty = true;
+    RingBuffer* sampleSource = new RingBuffer(sampleSoundSampleRate, sampleSoundSampleCount);
 
     float twopi = 2.0f*3.1415927f;
     float frequency = 261.6f; // Middle C
@@ -333,12 +318,11 @@ void Audio::PlayTestSound()
         }
 
         sinVal *= 0.1f;
-        sampleSource.buffer->write(sinVal);
+        sampleSource->write(sinVal);
         sampleTime += timestep;
     }
 
     sourceList.insert(sampleSource);
-    // TODO: This needs to be removed from the list of sources when it's finished playing
 }
 
 void Audio::AddAudioUser(UserIdentifier userId)
@@ -352,10 +336,6 @@ void Audio::AddAudioUser(UserIdentifier userId)
 
     newUser.buffer = new RingBuffer(outStream->sample_rate, RING_BUFFER_SIZE);
     newUser.jitter = new JitterBuffer();
-
-    AudioSource userSource = {};
-    userSource.buffer = newUser.buffer;
-    sourceList.insert(userSource);
 
     audioUsers[userId] = newUser;
 }
@@ -1031,13 +1011,10 @@ void Audio::Update()
 
     for(auto& iter : audioUsers)
     {
-        UserIdentifier uid = iter.first;
         UserAudioData& srcUser = iter.second;
 
         while(srcUser.buffer->count() <= 2*AUDIO_PACKET_FRAME_SIZE)
         {
-            readCount++;
-            jbGetCounter++;
             uint8_t* dataToDecode = nullptr;
             uint16_t dataToDecodeLen = srcUser.jitter->Get(&dataToDecode);
             AudioBuffer tempBuffer = {};
@@ -1106,10 +1083,10 @@ void Audio::Update()
     //       we skip one callback's worth of audio for a handful of sources.
     for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
     {
-        AudioSource& src = sourceList[sourceIndex];
-        if(src.deleteWhenEmpty && (src.buffer->count() == 0))
+        RingBuffer* src = sourceList[sourceIndex];
+        if(src->count() == 0)
         {
-            delete src.buffer;
+            delete src;
             sourceList.removeAt(sourceIndex);
             sourceIndex--;
         }
@@ -1141,8 +1118,6 @@ void Audio::Shutdown()
     logInfo("Deinitialize audio subsystem\n");
     // TODO: Should we check that the mutexes are free at the moment? IE that any callbacks that
     //       may have been in progress when we stopped running, have finished
-    // TODO: Clean up the sourceList and its elements (in particular the ringbuffers should
-    //       probably be freed here)
 
     if(inStream)
     {
@@ -1168,10 +1143,7 @@ void Audio::Shutdown()
     soundio_destroy(soundio);
     opus_encoder_destroy(encoder);
 
-    for(int sourceIndex=0; sourceIndex<sourceList.size(); sourceIndex++)
-    {
-        delete sourceList[sourceIndex].buffer;
-    }
+    sourceList.pointerClear();
 }
 
 float Audio::ComputeRMS(AudioBuffer& buffer)
