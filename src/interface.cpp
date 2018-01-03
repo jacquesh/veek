@@ -83,7 +83,7 @@ void renderGame(InterfaceState* game, float deltaTime)
     if(Network::CurrentConnectionState() == NET_CONNSTATE_CONNECTED)
     {
         ImGui::SetNextWindowPos(ImVec2(0,0));
-        ImGui::SetNextWindowSize(ImVec2(screenWidth, screenHeight));
+        ImGui::SetNextWindowSize(ImVec2((float)screenWidth, (float)screenHeight));
         ImGuiWindowFlags remoteVideoWindowFlags = ImGuiWindowFlags_NoMove |
                                                   ImGuiWindowFlags_NoBringToFrontOnFocus |
                                                   ImGuiWindowFlags_NoResize |

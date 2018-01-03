@@ -210,7 +210,7 @@ static void outWriteCallback(SoundIoOutStream* stream, int frameCountMin, int fr
             {
                 // NOTE: This will not modify temp if there is no data available in listenBuffer.
                 float temp = 0.0f;
-                int sampleCount = sourceList[sourceIndex]->read(&temp);
+                sourceList[sourceIndex]->read(&temp);
                 val += temp;
             }
 
@@ -1040,7 +1040,6 @@ void Audio::Update()
             int bufferItemOffset = srcUser.jitter->ItemCount() - srcUser.jitter->DesiredItemCount();
             if(bufferItemOffset > 1) // We have more items than we would like, speed up
             {
-                logWarn("Speed up!\n");
                 ResampleStreamContext speedResampler = srcUser.receiveResampler;
                 double slowDown = -0.15;
                 AudioBuffer longBuffer = {};
@@ -1055,7 +1054,6 @@ void Audio::Update()
             }
             else if(bufferItemOffset < -1) // We have fewer items than we would like, slow down
             {
-                logWarn("Slow down!\n");
                 ResampleStreamContext speedResampler = srcUser.receiveResampler;
                 double slowDown = 0.15;
                 AudioBuffer longBuffer = {};
@@ -1074,8 +1072,6 @@ void Audio::Update()
             }
             delete[] tempBuffer.Data;
         }
-
-
     }
 
     // NOTE: This technically could run while we're reading audio data from sourceList in the

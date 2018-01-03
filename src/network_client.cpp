@@ -290,7 +290,6 @@ void Network::ConnectToMasterServer(const char* serverHostname,
 
 ClientUserData* Network::ConnectToPeer(NetworkUserConnectPacket& userPacket)
 {
-
     ClientUserData* newUser = new ClientUserData(userPacket);
     // TODO: Move this into constructor (I don't really want to have to pass in a host)
     newUser->netPeer = enet_host_connect(networkState.netHost, &userPacket.address, 1, 0);
