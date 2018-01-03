@@ -52,21 +52,10 @@ int JitterBuffer::DesiredItemCount()
 
 JitterItem* JitterBuffer::GetFreeItem()
 {
-    JitterItem* result = nullptr;
-    if(unusedItems == nullptr)
-    {
-        // We have no unused items, so we take the item from the front of the queue.
-        // NOTE: If we hit this case then first is necessarily not null, so we don't check.
-        result = first;
-        first = first->next;
-    }
-    else
-    {
-        assert(unusedItemCount > 0);
-        result = unusedItems;
-        unusedItems = unusedItems->next;
-        unusedItemCount--;
-    }
+    assert(unusedItemCount > 0);
+    JitterItem* result = unusedItems;
+    unusedItems = unusedItems->next;
+    unusedItemCount--;
     return result;
 }
 
@@ -183,7 +172,6 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
 
     uint16_t result = itemToGet->dataLength;
     data = itemToGet->data;
-    logFile("Return packet with index %d\n", itemToGet->packetIndex);
 
     if(first == last)
     {
