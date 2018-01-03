@@ -169,7 +169,7 @@ int main()
             case ENET_EVENT_TYPE_DISCONNECT:
             {
                 logInfo("Disconnect from %x:%u\n", netEvent.peer->address.host, netEvent.peer->address.port);
-                UserIdentifier oldUserId = (UserIdentifier)(((intptr_t)netEvent.peer->data) & 0xFF);
+                UserIdentifier oldUserId = (UserIdentifier)(((intptr_t)netEvent.peer->data) & 0xFFFF);
                 if(oldUserId == 0)
                     break;
 

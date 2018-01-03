@@ -8,7 +8,7 @@
 
 struct UserData; // TODO: We forward-declare this here so we can use it for constructors of packets, probably not ideal
 
-typedef uint8_t UserIdentifier;
+typedef uint16_t UserIdentifier;
 
 const int MAX_ROOM_ID_LENGTH = 32;
 struct RoomIdentifier

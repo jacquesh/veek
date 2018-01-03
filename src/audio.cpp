@@ -1181,7 +1181,7 @@ Audio::AudioBuffer::~AudioBuffer()
 template<typename Packet>
 bool Audio::NetworkAudioPacket::serialize(Packet& packet)
 {
-    packet.serializeuint8(this->srcUser);
+    packet.serializeuint16(this->srcUser);
     packet.serializeuint16(this->index);
     packet.serializeuint16(this->encodedDataLength);
     packet.serializebytes(this->encodedData, this->encodedDataLength);

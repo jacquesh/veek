@@ -401,7 +401,7 @@ void Video::Shutdown()
 template<typename Packet>
 bool Video::NetworkVideoPacket::serialize(Packet& packet)
 {
-    packet.serializeuint8(this->srcUser);
+    packet.serializeuint16(this->srcUser);
     packet.serializeuint8(this->index);
     packet.serializeuint16(this->imageWidth);
     packet.serializeuint16(this->imageHeight);

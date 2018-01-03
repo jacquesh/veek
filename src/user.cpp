@@ -15,7 +15,7 @@ bool RoomIdentifier::equals(RoomIdentifier& other)
 template<typename Packet>
 bool NetworkUserSetupPacket::serialize(Packet& packet)
 {
-    packet.serializeuint8(this->userID);
+    packet.serializeuint16(this->userID);
     packet.serializeuint8(this->nameLength);
     packet.serializestring(this->name, MAX_USER_NAME_LENGTH);
     packet.serializebool(this->createRoom);
@@ -38,7 +38,7 @@ void NetworkUserConnectPacket::populate(UserData& user)
 template<typename Packet>
 bool NetworkUserConnectPacket::serialize(Packet& packet)
 {
-    packet.serializeuint8(this->userID);
+    packet.serializeuint16(this->userID);
     packet.serializeuint32(this->address.host);
     packet.serializeuint16(this->address.port);
 

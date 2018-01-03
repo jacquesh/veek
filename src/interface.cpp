@@ -52,7 +52,7 @@ void initGame(InterfaceState* game)
 
     srand((unsigned int)time(NULL));
     localUser = new ClientUserData();
-    localUser->ID = (uint8_t)(1 + (rand() & 0xFE));
+    localUser->ID = (uint16_t)(1 + (rand() & 0xFFFE));
     Platform::GetCurrentUserName(MAX_USER_NAME_LENGTH, localUser->name);
 }
 
