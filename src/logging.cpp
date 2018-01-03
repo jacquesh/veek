@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "happyhttp.h"
-
 #include "assert.h"
 #include "logging.h"
 #include "platform.h"
@@ -80,39 +78,4 @@ void deinitLogging()
     fflush(stderr);
     fflush(logFile);
     fclose(logFile);
-
-    // Upload log file to server
-    /*
-    logFile = fopen(logFileName, "rb");
-    if(logFile)
-    {
-        fseek(logFile, 0, SEEK_END);
-        size_t logLength = ftell(logFile);
-        rewind(logFile);
-        int maxFileLength = 500*1024;
-        if(logLength > maxFileLength)
-            logLength = maxFileLength;
-
-        unsigned char* logData = new unsigned char[logLength];
-        size_t dataRead = 0;
-        while(dataRead < logLength)
-        {
-            size_t newData = fread((void*)(logData+dataRead), 1, logLength-dataRead, logFile);
-            dataRead += newData;
-        }
-        fclose(logFile);
-
-        char username[257];
-        getCurrentUserName(257,username);
-        const char* headers[] =
-        {
-            "username", username,
-            0
-        };
-        happyhttp::Connection conn("veek.ddns.net", 80);
-        conn.request("POST", "/", headers, logData, logLength);
-
-        delete[] logData;
-    }
-    */
 }
