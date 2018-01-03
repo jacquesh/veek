@@ -1039,7 +1039,7 @@ void Audio::Update()
             readCount++;
             jbGetCounter++;
             uint8_t* dataToDecode = nullptr;
-            uint16_t dataToDecodeLen = srcUser.jitter->Get(dataToDecode);
+            uint16_t dataToDecodeLen = srcUser.jitter->Get(&dataToDecode);
             AudioBuffer tempBuffer = {};
             tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
             tempBuffer.Data = new float[tempBuffer.Capacity];

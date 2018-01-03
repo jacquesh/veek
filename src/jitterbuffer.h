@@ -27,8 +27,11 @@ public:
     void Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data);
 
     // Returns the length of the output buffer
-    uint16_t Get(uint8_t*& data);
-    uint16_t Get(uint16_t packetToGet, uint8_t*& data);
+    // NOTE: Please don't modify or delete the contents of data in the calling function.
+    //       You must finish using the contents of the data pointer before calling any methods
+    //       on this jitterbuffer again, any call change the contents of the returned pointer.
+    uint16_t Get(uint8_t** data);
+    uint16_t Get(uint16_t packetToGet, uint8_t** data);
 
     // Return the number of items currently available within the buffer.
     int ItemCount();

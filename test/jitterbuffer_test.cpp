@@ -9,11 +9,11 @@ TEST_CASE("Get returns nothing until data has been added")
     uint8_t inVal = 3;
     uint8_t* outVal;
 
-    REQUIRE(jb.Get(outVal) == 0);
+    REQUIRE(jb.Get(&outVal) == 0);
 
     jb.Add(1, 1, &inVal);
     jb.Add(2, 1, &inVal);
-    REQUIRE(jb.Get(outVal) == 1);
+    REQUIRE(jb.Get(&outVal) == 1);
     REQUIRE(*outVal == 3);
 }
 
@@ -25,7 +25,7 @@ TEST_CASE("Get returns data after some has been added")
 
     jb.Add(1, 1, &inVal);
 
-    REQUIRE(jb.Get(outVal) == 1);
+    REQUIRE(jb.Get(&outVal) == 1);
 }
 
 TEST_CASE("Get returns nothing when the data is all consumed after being added")
@@ -38,10 +38,10 @@ TEST_CASE("Get returns nothing when the data is all consumed after being added")
     jb.Add(2, 1, &inVal);
     jb.Add(3, 1, &inVal);
 
-    CHECK(jb.Get(outVal) == 1);
-    CHECK(jb.Get(outVal) == 1);
-    CHECK(jb.Get(outVal) == 1);
-    REQUIRE(jb.Get(outVal) == 0);
+    CHECK(jb.Get(&outVal) == 1);
+    CHECK(jb.Get(&outVal) == 1);
+    CHECK(jb.Get(&outVal) == 1);
+    REQUIRE(jb.Get(&outVal) == 0);
 }
 
 TEST_CASE("Get returns data in the correct order after it was received in the correct order")
@@ -60,15 +60,15 @@ TEST_CASE("Get returns data in the correct order after it was received in the co
     inVal = 5;
     jb.Add(3, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 4);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
 }
@@ -89,15 +89,15 @@ TEST_CASE("Get returns data in the correct order after it was received with two 
     inVal = 4;
     jb.Add(2, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 4);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
 }
@@ -118,15 +118,15 @@ TEST_CASE("Get returns data in the correct order after it was received in revers
     inVal = 3;
     jb.Add(1, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 4);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
 }
@@ -144,14 +144,14 @@ TEST_CASE("Get returns empty data where the packet would be when a packet is dro
     inVal = 5;
     jb.Add(3, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 0);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
 }
@@ -166,7 +166,7 @@ TEST_CASE("Packet index overflow is handled smoothly")
     uint16_t currentIndex = startIndex;
     // NOTE: This call will return with no data because there is no data, but it sets the correct
     //       expected packet index.
-    outCount = jb.Get(startIndex-1, outVal);
+    outCount = jb.Get(startIndex-1, &outVal);
 
     inVal = 2;
     jb.Add(currentIndex++, 1, &inVal);
@@ -175,15 +175,15 @@ TEST_CASE("Packet index overflow is handled smoothly")
     inVal = 4;
     jb.Add(currentIndex++, 1, &inVal);
 
-    outCount = jb.Get(startIndex, outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 2);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 4);
 }
@@ -210,31 +210,31 @@ TEST_CASE("The new packet is dropped when the buffer is full and a new packet is
 
     uint8_t* outVal;
     uint16_t outCount;
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 1);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 2);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 3);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 4);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 5);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 6);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 0);
 }
 
@@ -248,11 +248,11 @@ TEST_CASE("When adding a packet more than once, the second packet is ignored")
 
     uint8_t* outVal;
     uint16_t outCount;
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     REQUIRE(*outVal == 1);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 0);
 }
 
@@ -265,10 +265,10 @@ TEST_CASE("When the first packet to be added to an empty buffer is dropped, it c
 
     uint8_t* outVal;
     uint16_t outCount;
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 0);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     REQUIRE(*outVal == 5);
 }
@@ -284,21 +284,21 @@ TEST_CASE("When a packet is added after it was requested (without an empty buffe
 
     uint8_t* outVal;
     uint16_t outCount;
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     REQUIRE(*outVal == 10);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 0);
 
     inVal = 11;
     jb.Add(2, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     REQUIRE(*outVal == 12);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 0);
 }
 
@@ -307,7 +307,7 @@ TEST_CASE("When a packet is added after it was requested (with an empty buffer),
     JitterBuffer jb;
     uint8_t* outVal;
     uint16_t outCount;
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 0);
 
     uint8_t inVal;
@@ -316,7 +316,7 @@ TEST_CASE("When a packet is added after it was requested (with an empty buffer),
     inVal = 12;
     jb.Add(2, 1, &inVal);
 
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 12);
 }
@@ -339,38 +339,38 @@ TEST_CASE("When a client stops sending for some time, only the packets that arri
 
     // Normal functioning (works)
     AddSingleByteToJitterBuffer(jb, 4, 14);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 11);
 
     AddSingleByteToJitterBuffer(jb, 5, 15);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 12);
 
     AddSingleByteToJitterBuffer(jb, 6, 16);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     REQUIRE(outCount == 1);
     REQUIRE(*outVal == 13);
 
     // Normal functioning (without packets coming in)
     // Skip insert of packet 7
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 14);
 
     // Skip insert of packet 8
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 15);
 
     // Skip insert of packet 9
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 16);
 
     // Skip insert of packet 10
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 0);
     // We expected to get packet 7
 
@@ -384,32 +384,32 @@ TEST_CASE("When a client stops sending for some time, only the packets that arri
 
     // Normal functioning (packets coming in)
     AddSingleByteToJitterBuffer(jb, 13, 23);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 18);
 
     AddSingleByteToJitterBuffer(jb, 14, 24);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 19);
 
     AddSingleByteToJitterBuffer(jb, 15, 25);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 20);
 
     AddSingleByteToJitterBuffer(jb, 16, 26);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 21);
 
     AddSingleByteToJitterBuffer(jb, 17, 27);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 22);
 
     AddSingleByteToJitterBuffer(jb, 18, 28);
-    outCount = jb.Get(outVal);
+    outCount = jb.Get(&outVal);
     CHECK(outCount == 1);
     CHECK(*outVal == 23);
 }
