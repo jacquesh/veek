@@ -28,6 +28,9 @@ public:
     uint16_t Get(uint8_t*& data);
     uint16_t Get(uint16_t packetToGet, uint8_t*& data);
 
+    int ItemCount();
+    int DesiredItemCount();
+
 private:
     int capacity;
     int unusedItemCount;
@@ -38,7 +41,6 @@ private:
     JitterItem* first;
     JitterItem* last;
 
-    bool refilling;
     uint16_t nextOutputPacketIndex;
 
     JitterItem* GetFreeItem();

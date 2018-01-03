@@ -1034,31 +1034,71 @@ void Audio::Update()
         UserIdentifier uid = iter.first;
         UserAudioData& srcUser = iter.second;
 
-        uint8_t* dataToDecode = nullptr;
-        uint16_t dataToDecodeLen = srcUser.jitter->Get(dataToDecode);
-        AudioBuffer tempBuffer = {};
-        tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
-        tempBuffer.Data = new float[tempBuffer.Capacity];
-        tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
-
-        if(srcUser.totalExpectedPackets >= 100)
+        while(srcUser.buffer->count() <= 2*AUDIO_PACKET_FRAME_SIZE)
         {
-            srcUser.totalExpectedPackets /= 2;
-            srcUser.lostPackets /= 2;
-        }
-        srcUser.totalExpectedPackets++;
-        if(dataToDecodeLen == 0)
-        {
-            srcUser.lostPackets++;
+            readCount++;
+            jbGetCounter++;
+            uint8_t* dataToDecode = nullptr;
+            uint16_t dataToDecodeLen = srcUser.jitter->Get(dataToDecode);
+            AudioBuffer tempBuffer = {};
+            tempBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE;
+            tempBuffer.Data = new float[tempBuffer.Capacity];
+            tempBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+            if(srcUser.totalExpectedPackets >= 100)
+            {
+                srcUser.totalExpectedPackets /= 2;
+                srcUser.lostPackets /= 2;
+            }
+            srcUser.totalExpectedPackets++;
+            if(dataToDecodeLen == 0)
+            {
+                srcUser.lostPackets++;
+            }
+
+            decodeSingleFrame(srcUser.decoder,
+                              dataToDecodeLen, dataToDecode,
+                              tempBuffer);
+
+            int bufferItemOffset = srcUser.jitter->ItemCount() - srcUser.jitter->DesiredItemCount();
+            if(bufferItemOffset > 1) // We have more items than we would like, speed up
+            {
+                logWarn("Speed up!\n");
+                ResampleStreamContext speedResampler = srcUser.receiveResampler;
+                double slowDown = -0.15;
+                AudioBuffer longBuffer = {};
+                longBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE*5;
+                longBuffer.Data = new float[longBuffer.Capacity];
+                longBuffer.SampleRate = (int)(NETWORK_SAMPLE_RATE*(1+slowDown));
+                resampleBuffer2Buffer(speedResampler, tempBuffer, longBuffer);
+                longBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+                resampleBuffer2Ring(srcUser.receiveResampler, longBuffer, *srcUser.buffer);
+                delete[] longBuffer.Data;
+            }
+            else if(bufferItemOffset < -1) // We have fewer items than we would like, slow down
+            {
+                logWarn("Slow down!\n");
+                ResampleStreamContext speedResampler = srcUser.receiveResampler;
+                double slowDown = 0.15;
+                AudioBuffer longBuffer = {};
+                longBuffer.Capacity = AUDIO_PACKET_FRAME_SIZE*5;
+                longBuffer.Data = new float[longBuffer.Capacity];
+                longBuffer.SampleRate = (int)(NETWORK_SAMPLE_RATE*(1+slowDown));
+                resampleBuffer2Buffer(speedResampler, tempBuffer, longBuffer);
+                longBuffer.SampleRate = NETWORK_SAMPLE_RATE;
+
+                resampleBuffer2Ring(srcUser.receiveResampler, longBuffer, *srcUser.buffer);
+                delete[] longBuffer.Data;
+            }
+            else // Just play it as-is
+            {
+                resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
+            }
+            delete[] tempBuffer.Data;
         }
 
-        decodeSingleFrame(srcUser.decoder,
-                          dataToDecodeLen, dataToDecode,
-                          tempBuffer);
 
-        logFile("Received %d samples from the jitter buffer\n", tempBuffer.Length);
-        resampleBuffer2Ring(srcUser.receiveResampler, tempBuffer, *srcUser.buffer);
-        delete[] tempBuffer.Data;
     }
 
     // NOTE: This technically could run while we're reading audio data from sourceList in the

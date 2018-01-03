@@ -26,20 +26,28 @@ JitterBuffer::JitterBuffer()
     allItems = new JitterItem[capacity];
     unusedItems = allItems;
     unusedItemCount = capacity;
-    unusedItemRefillThreshold = capacity/2;
     first = nullptr;
     last = nullptr;
+    nextOutputPacketIndex = 1;
 
     for(int i=0; i<capacity-1; i++)
     {
         allItems[i].next = &allItems[i+1];
     }
-    refilling = true;
 }
 
 JitterBuffer::~JitterBuffer()
 {
     delete[] allItems;
+}
+
+int JitterBuffer::ItemCount()
+{
+    return capacity - unusedItemCount;
+}
+int JitterBuffer::DesiredItemCount()
+{
+    return capacity/2;
 }
 
 JitterItem* JitterBuffer::GetFreeItem()
@@ -65,30 +73,29 @@ JitterItem* JitterBuffer::GetFreeItem()
 void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
 {
     assert(dataLength <= MAX_DATA_LENGTH);
-
-    if(first == nullptr)
+    if(unusedItems == nullptr)
     {
-        assert(last == nullptr);
-        assert(unusedItems != nullptr);
-
-        JitterItem* newItem = GetFreeItem();
-        first = newItem;
-        last = newItem;
-        newItem->next = nullptr;
-        newItem->prev = nullptr;
-        memcpy(newItem->data, data, dataLength);
-        newItem->dataLength = dataLength;
-        newItem->packetIndex = packetIndex;
-        nextOutputPacketIndex = packetIndex;
+        logWarn("Dropped packet %d when adding to a full jitterbuffer\n", packetIndex);
         return;
     }
-    else
+
+    // NOTE: If the packet we're inserting is older than the oldest packet in the buffer, and there
+    //       are no empty spaces in the buffer, then we've received it too late and we may as well
+    //       ignore it.
+    if((unusedItems == nullptr) && (packetIndex+1 <= first->packetIndex))
     {
-        if((packetIndex+1 <= first->packetIndex) && (unusedItems == nullptr))
-        {
-            // Ignore it, its too late
-            return;
-        }
+        // Ignore it, its too late
+        return;
+    }
+
+    // NOTE: If the packet we're inserting is older than the packet that we expect to return next,
+    //       then we've received it too late and we should simply drop it.
+    // NOTE: The extra check to see if the difference is small is so that index overflow is handled
+    //       correctly. Without it we'd drop the last <capacity> packets before overflow and we
+    //       don't need to drop any packets the first time when the output index is small anyways.
+    if((packetIndex < nextOutputPacketIndex) && (nextOutputPacketIndex - packetIndex <= (1u << 15)))
+    {
+        return;
     }
 
     JitterItem* currentItem = last;
@@ -131,18 +138,19 @@ void JitterBuffer::Add(uint16_t packetIndex, uint16_t dataLength, uint8_t* data)
         JitterItem* newItem = GetFreeItem();
         newItem->prev = nullptr;
         newItem->next = first;
-        first->prev = newItem;
+        if(first == nullptr)
+        {
+            last = newItem;
+        }
+        else
+        {
+            first->prev = newItem;
+        }
         first = newItem;
 
         memcpy(newItem->data, data, dataLength);
         newItem->dataLength = dataLength;
         newItem->packetIndex = packetIndex;
-        nextOutputPacketIndex = packetIndex;
-    }
-
-    if(unusedItemCount <= unusedItemRefillThreshold)
-    {
-        refilling = false;
     }
 }
 
@@ -157,16 +165,14 @@ uint16_t JitterBuffer::Get(uint16_t packetToGet, uint8_t*& data)
 //       on this jitterbuffer again, any call can potentially invalidate your data.
 uint16_t JitterBuffer::Get(uint8_t*& data)
 {
-    if(refilling)
-    {
-        logFile("Return empty while we refill\n");
-        return 0;
-    }
-    assert(first != nullptr); // !refilling => first != nullptr
-
     JitterItem* itemToGet = first;
     uint16_t expectedPacketIndex = nextOutputPacketIndex;
     nextOutputPacketIndex++;
+
+    if(itemToGet == nullptr)
+    {
+        return 0;
+    }
 
     if(itemToGet->packetIndex != expectedPacketIndex)
     {
@@ -183,7 +189,6 @@ uint16_t JitterBuffer::Get(uint8_t*& data)
     {
         first = nullptr;
         last = nullptr;
-        refilling = true;
     }
     else
     {
