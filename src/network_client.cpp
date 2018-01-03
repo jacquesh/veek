@@ -22,6 +22,9 @@ struct NetworkData
     uint8 lastSentVideoPacket;
     uint8 lastReceivedAudioPacket;
     uint8 lastReceivedVideoPacket;
+
+    uint64_t totalBytesSent;
+    uint64_t totalBytesReceived;
 };
 
 static NetworkData networkState = {};
@@ -124,10 +127,14 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
 
 void Network::UpdateReceive()
 {
+    if(networkState.netHost == nullptr)
+    {
+        return;
+    }
+
     ENetEvent netEvent;
     int serviceResult = 0;
-    while(networkState.netHost &&
-          ((serviceResult = enet_host_service(networkState.netHost, &netEvent, 0)) > 0))
+    while((serviceResult = enet_host_service(networkState.netHost, &netEvent, 0)) > 0)
     {
         switch(netEvent.type)
         {
@@ -204,14 +211,22 @@ void Network::UpdateReceive()
     {
         logWarn("ENET service error\n");
     }
+
+    networkState.totalBytesReceived += networkState.netHost->totalReceivedData;
+    networkState.netHost->totalReceivedData = 0;
 }
 
 void Network::UpdateSend()
 {
-    if(networkState.netHost)
+    if(networkState.netHost == nullptr)
     {
-        enet_host_flush(networkState.netHost);
+        return;
     }
+
+    enet_host_flush(networkState.netHost);
+
+    networkState.totalBytesSent += networkState.netHost->totalSentData;
+    networkState.netHost->totalSentData = 0;
 }
 
 bool Network::Setup()
@@ -301,3 +316,12 @@ void Network::DisconnectFromAllPeers()
     networkState.connState = NET_CONNSTATE_DISCONNECTED;
 }
 
+uint64_t Network::TotalIncomingBytes()
+{
+    return networkState.totalBytesReceived;
+}
+
+uint64_t Network::TotalOutgoingBytes()
+{
+    return networkState.totalBytesSent;
+}

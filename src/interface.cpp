@@ -265,8 +265,8 @@ void renderGame(InterfaceState* game, float deltaTime)
 
         case NET_CONNSTATE_CONNECTED:
         {
-            float netTotalIn = TotalNetworkIncomingBytes()/1024.0f;
-            float netTotalOut = TotalNetworkOutgoingBytes()/1024.0f;
+            float netTotalIn = Network::TotalIncomingBytes()/1024.0f;
+            float netTotalOut = Network::TotalOutgoingBytes()/1024.0f;
             ImGui::Text("Audio packet loss: %.2f%", Audio::GetPacketLoss()*100.0f);
             ImGui::Text("Total Incoming: %.1fKB", netTotalIn);
             ImGui::Text("Total Outgoing: %.1fKB", netTotalOut);

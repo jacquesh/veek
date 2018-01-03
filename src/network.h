@@ -69,7 +69,4 @@ struct NetworkOutPacket
 
 NetworkOutPacket createNetworkOutPacket(NetworkMessageType msgType);
 
-uint64_t TotalNetworkIncomingBytes();
-uint64_t TotalNetworkOutgoingBytes();
-
 #endif

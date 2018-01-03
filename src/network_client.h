@@ -19,6 +19,9 @@ namespace Network
     void ConnectToMasterServer(const char* serverHostname, bool createRoom, RoomIdentifier roomToJoin);
     ClientUserData* ConnectToPeer(NetworkUserConnectPacket& userPacket);
     void DisconnectFromAllPeers();
+
+    uint64_t TotalIncomingBytes();
+    uint64_t TotalOutgoingBytes();
 }
 
 #endif // _NETWORK_CLIENT_H

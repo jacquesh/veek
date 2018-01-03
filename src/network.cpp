@@ -15,19 +15,6 @@
 //       storage-indirection where we serialize off the network into a packet structure and then
 //       immediately copy out to where we actually want it.
 
-static uint64_t totalBytesIn = 0;
-static uint64_t totalBytesOut = 0;
-
-uint64_t TotalNetworkIncomingBytes()
-{
-    return totalBytesIn;
-}
-
-uint64_t TotalNetworkOutgoingBytes()
-{
-    return totalBytesOut;
-}
-
 #define SERIALIZE_NATIVE_TYPE_INPUT(TYPE);              \
     bool NetworkInPacket::serialize##TYPE(TYPE& value)  \
     {                                                   \
@@ -120,7 +107,6 @@ void NetworkOutPacket::send(ENetPeer* peer, uint8 channelID, bool isReliable)
         enetPacket->flags |= ENET_PACKET_FLAG_UNSEQUENCED | ENET_PACKET_FLAG_UNRELIABLE_FRAGMENT;
     }
 
-    totalBytesOut += currentPosition;
     enetPacket->dataLength = currentPosition;
     // TODO: Does it matter if reliable and unreliable packets get sent on the same channel?
     enet_peer_send(peer, channelID, enetPacket);
