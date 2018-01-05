@@ -28,17 +28,15 @@ void _log(LogLevel level, bool logToTerminal, bool logToFile,
 #ifdef NDEBUG
 #define logTerm(MSG, ...);
 #define logFile(MSG, ...);
-
-#define logInfo(MSG, ...);
-#define logWarn(MSG, ...);
-#define logFail(MSG, ...);
+#define logDbug(MSG, ...);
 #else
-#define logFile(MSG, ...);     _log(LOG_INFO, false, true, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#define logFile(MSG, ...);     _log(LOG_DBUG, false, true, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
 #define logTerm(MSG, ...);     _log(LOG_DBUG, true, false, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#define logDbug(MSG, ...);     _log(LOG_DBUG, true, true, __FILE__, __LINE__, MSG, ##__VA_ARGS__);
+#endif // NDEBUG
 
 #define logInfo(MSG, ...);     _log(LOG_INFO, true, true,  __FILE__, __LINE__, MSG, ##__VA_ARGS__);
 #define logWarn(MSG, ...);     _log(LOG_WARN, true, true,  __FILE__, __LINE__, MSG, ##__VA_ARGS__);
 #define logFail(MSG, ...);     _log(LOG_FAIL, true, true,  __FILE__, __LINE__, MSG, ##__VA_ARGS__);
-#endif // NDEBUG
 
 #endif

@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <time.h>
-
 #include "audio.h"
 #include "globals.h"
 #include "interface.h"

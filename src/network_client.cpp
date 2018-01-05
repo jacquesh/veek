@@ -34,7 +34,7 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
     uint8 dataType;
     incomingPacket.serializeuint8(dataType);
     NetworkMessageType msgType = (NetworkMessageType)dataType;
-    logFile("Received %llu bytes of type %d\n", incomingPacket.length, dataType);
+    logDbug("Received %llu bytes of type %d\n", incomingPacket.length, dataType);
 
     switch(msgType)
     {

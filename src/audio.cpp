@@ -88,6 +88,7 @@ static UnorderedList<RingBuffer*> sourceList(10);
 
 static RingBuffer* listenBuffer;
 
+// TODO: We should probably just use std::map here? Which is a tree, so iteration would be significantly faster (probably?)
 static std::unordered_map<UserIdentifier, UserAudioData> audioUsers;
 
 // NOTE: We assume all audio is mono.
@@ -268,7 +269,7 @@ static void decodeSingleFrame(OpusDecoder* decoder,
     }
     else if(framesDecoded > 0 && sourceBufferPtr == nullptr)
     {
-        logWarn("We got %d frames from PLC!\n", framesDecoded);
+        logDbug("We got %d frames from PLC!\n", framesDecoded);
     }
 }
 
@@ -365,7 +366,7 @@ void Audio::ProcessIncomingPacket(NetworkAudioPacket& packet)
     }
 
     UserAudioData& srcUser = srcUserIter->second;
-    logFile("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
+    logDbug("Received audio packet %d for user %d\n", packet.index, packet.srcUser);
 
     srcUser.jitter->Add(packet.index, packet.encodedDataLength, packet.encodedData);
 }
@@ -893,7 +894,7 @@ static Audio::NetworkAudioPacket* CreateOutputPacket(Audio::AudioBuffer& sourceB
 void Audio::SendAudioToUser(ClientUserData* user, NetworkAudioPacket* audioPacket)
 {
     audioPacket->index = user->lastSentAudioPacket++;
-    logFile("Send audio packet %d to user %d\n", audioPacket->index, user->ID);
+    logDbug("Send audio packet %d to user %d\n", audioPacket->index, user->ID);
 
     NetworkOutPacket outPacket = createNetworkOutPacket(NET_MSGTYPE_AUDIO);
     audioPacket->serialize(outPacket);
@@ -1005,8 +1006,6 @@ void Audio::Update()
             ProduceASingleAudioOutputPacket();
             outputCount++;
         }
-        logFile("Produced %d output packets this tick (%d samples remaining in presend)\n",
-                outputCount, presendBuffer->count());
     }
 
     for(auto& iter : audioUsers)
