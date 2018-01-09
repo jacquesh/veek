@@ -7,6 +7,7 @@ matrix:
         addons:
             apt:
                 packages:
+                    - libgl1-mesa-dev
                     - libxrandr-dev
                     - libxcursor-dev
                     - libxinerama-dev
@@ -26,6 +27,7 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
+                    - libgl1-mesa-dev
                     - libxrandr-dev
                     - libxcursor-dev
                     - libxinerama-dev
@@ -46,6 +48,7 @@ matrix:
                 packages:
                     - g++-multilib
                     - libc6-dev-i386
+                    - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
                     - libxcursor-dev:i386
                     - libxinerama-dev:i386
@@ -70,6 +73,7 @@ matrix:
                     - g++-4.9
                     - g++-multilib
                     - libc6-dev-i386
+                    - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
                     - libxcursor-dev:i386
                     - libxinerama-dev:i386
@@ -85,11 +89,7 @@ matrix:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
 
 before_install:
-    - ls /usr/lib/i386-linux-gnu/
-    - ls /usr/lib/i386-linux-gnu/pkgconfig
-    - printenv
     - eval "${MATRIX_EVAL}"
-    - printenv
 
 before_script:
     - mkdir build
