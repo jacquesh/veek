@@ -7,7 +7,10 @@ matrix:
         addons:
             apt:
                 packages:
-                    - xorg-dev
+                    - libxrandr-dev
+                    - libxcursor-dev
+                    - libxinerama-dev
+                    - libxxf86vm-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -60,7 +63,9 @@ matrix:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32 && PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
 
 before_install:
+    - printenv
     - eval "${MATRIX_EVAL}"
+    - echo $PKG_CONFIG_PATH
 
 before_script:
     - mkdir build
