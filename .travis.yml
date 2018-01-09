@@ -13,7 +13,7 @@ matrix:
                     - libxxf86vm-dev
                     - libopus-dev
                     - libenet-dev
-                    - libasound-dev
+                    - libasound
                     - pulseaudio
                     - libtheora-dev
                     - libv4l-dev
@@ -63,7 +63,34 @@ matrix:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
 
+      - os: linux
+        compiler: gcc
+        addons:
+            apt:
+                sources:
+                    - ubuntu-toolchain-r-test
+                packages:
+                    - g++-4.9
+                    - g++-multilib
+                    - libc6-dev-i386
+                    - libxrandr-dev:i386
+                    - libxcursor-dev:i386
+                    - libxinerama-dev:i386
+                    - libxxf86vm-dev:i386
+                    - libopus-dev:i386
+                    - libenet-dev:i386
+                    - libasound-dev:i386
+                    - pulseaudio:i386
+                    - libtheora-dev:i386
+                    - libv4l-dev:i386
+        env:
+            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
+            - ARGS_FOR_CMAKE="-DCMAKE_LIBRARY_ARCHITECTURE=i386-linux-gnu"
+
 before_install:
+    - ls /usr/lib/i386-linux-gnu/
+    - ls /usr/lib/i386-linux-gnu/pkgconfig
     - printenv
     - eval "${MATRIX_EVAL}"
     - printenv
@@ -71,7 +98,7 @@ before_install:
 before_script:
     - mkdir build
     - cd build
-    - cmake ..
+    - cmake ${ARGS_FOR_CMAKE} ..
 
 script: make
 
