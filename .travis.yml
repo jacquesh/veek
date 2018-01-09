@@ -60,7 +60,8 @@ matrix:
                     - libtheora-dev:i386
                     - libv4l-dev:i386
         env:
-            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32 && PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
 
 before_install:
     - printenv
