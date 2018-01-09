@@ -65,7 +65,7 @@ matrix:
 before_install:
     - printenv
     - eval "${MATRIX_EVAL}"
-    - echo $PKG_CONFIG_PATH
+    - printenv
 
 before_script:
     - mkdir build
