@@ -23,7 +23,10 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
-                    - xorg-dev
+                    - libxrandr-dev
+                    - libxcursor-dev
+                    - libxinerama-dev
+                    - libxxf86vm-dev
                     - libopus-dev
                     - libenet-dev
                     - libasound-dev
@@ -43,7 +46,10 @@ matrix:
                     - g++-4.9
                     - g++-multilib
                     - libc6-dev-i386
-                    - xorg-dev
+                    - libxrandr-dev:i386
+                    - libxcursor-dev:i386
+                    - libxinerama-dev:i386
+                    - libxxf86vm-dev:i386
                     - libopus-dev:i386
                     - libenet-dev:i386
                     - libasound-dev:i386
@@ -51,7 +57,7 @@ matrix:
                     - libtheora-dev:i386
                     - libv4l-dev:i386
         env:
-            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32 && PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
 
 before_install:
     - eval "${MATRIX_EVAL}"
