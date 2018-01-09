@@ -33,8 +33,29 @@ matrix:
         env:
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
+      - os: linux
+        compiler: gcc
+        addons:
+            apt:
+                sources:
+                    - ubuntu-toolchain-r-test
+                packages:
+                    - g++-4.9
+                    - g++-multilib
+                    - libc6-dev-i386
+                    - xorg-dev
+                    - libopus-dev:i386
+                    - libenet-dev:i386
+                    - libasound-dev:i386
+                    - pulseaudio:i386
+                    - libtheora-dev:i386
+                    - libv4l-dev:i386
+        env:
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && -LIB_CFLAGS=-m32"
+
 before_install:
     - eval "${MATRIX_EVAL}"
+    - dpkg --add-architecture i386
 
 before_script:
     - mkdir build
