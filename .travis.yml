@@ -39,7 +39,6 @@ matrix:
             apt:
                 packages:
                     - g++-multilib
-                    - xorg-dev
                     - libc6-dev-i386
                     - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
@@ -54,7 +53,7 @@ matrix:
                     - libv4l-dev:i386
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
-            - MATRIX_EVAL="CFLAGS=-m32 && LIB_CFLAGS=-m32"
+            - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
 
       - os: linux
         compiler: gcc
@@ -65,8 +64,6 @@ matrix:
                 packages:
                     - g++-4.9
                     - g++-multilib
-                    - xserver-xorg-dev
-                    - xorg-dev
                     - libc6-dev-i386
                     - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
@@ -81,7 +78,7 @@ matrix:
                     - libv4l-dev:i386
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
-            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && LIB_CFLAGS=-m32"
+            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
 
 before_install:
     - eval "${MATRIX_EVAL}"
