@@ -49,11 +49,6 @@ pkg_search_module(V4L2 REQUIRED libv4l2)
 pkg_search_module(PULSE libpulse)
 pkg_search_module(ALSA REQUIRED alsa)
 
-message("Theora libraries are: ${THEORA_STATIC_LIBRARIES}")
-
-# TODO: For some unknown reason, pkg_search_module misses these two, despite the fact that they're included if I called `pkg-config --libs --static theoraenc`
-list(APPEND THEORA_STATIC_LIBRARIES theoraenc theoradec)
-
 find_package(Threads REQUIRED)
 
 find_package(X11)

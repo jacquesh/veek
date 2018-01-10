@@ -65,6 +65,7 @@ matrix:
                 packages:
                     - g++-4.9
                     - g++-multilib
+                    - xserver-xorg-dev
                     - xorg-dev
                     - libc6-dev-i386
                     - libgl1-mesa-dev:i386
