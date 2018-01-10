@@ -7,14 +7,10 @@ matrix:
         addons:
             apt:
                 packages:
-                    - libgl1-mesa-dev
-                    - libxrandr-dev
-                    - libxcursor-dev
-                    - libxinerama-dev
-                    - libxxf86vm-dev
+                    - xorg-dev
                     - libopus-dev
                     - libenet-dev
-                    - libasound-dev
+                    - libasound2-dev
                     - pulseaudio
                     - libtheora-dev
                     - libv4l-dev
@@ -27,14 +23,10 @@ matrix:
                     - ubuntu-toolchain-r-test
                 packages:
                     - g++-4.9
-                    - libgl1-mesa-dev
-                    - libxrandr-dev
-                    - libxcursor-dev
-                    - libxinerama-dev
-                    - libxxf86vm-dev
+                    - xorg-dev
                     - libopus-dev
                     - libenet-dev
-                    - libasound-dev
+                    - libasound2-dev
                     - pulseaudio
                     - libtheora-dev
                     - libv4l-dev
@@ -47,6 +39,7 @@ matrix:
             apt:
                 packages:
                     - g++-multilib
+                    - xorg-dev
                     - libc6-dev-i386
                     - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
@@ -55,7 +48,7 @@ matrix:
                     - libxxf86vm-dev:i386
                     - libopus-dev:i386
                     - libenet-dev:i386
-                    - libasound-dev:i386
+                    - libasound2-dev:i386
                     - pulseaudio:i386
                     - libtheora-dev:i386
                     - libv4l-dev:i386
@@ -72,6 +65,7 @@ matrix:
                 packages:
                     - g++-4.9
                     - g++-multilib
+                    - xorg-dev
                     - libc6-dev-i386
                     - libgl1-mesa-dev:i386
                     - libxrandr-dev:i386
@@ -80,7 +74,7 @@ matrix:
                     - libxxf86vm-dev:i386
                     - libopus-dev:i386
                     - libenet-dev:i386
-                    - libasound-dev:i386
+                    - libasound2-dev:i386
                     - pulseaudio:i386
                     - libtheora-dev:i386
                     - libv4l-dev:i386
@@ -90,6 +84,7 @@ matrix:
 
 before_install:
     - eval "${MATRIX_EVAL}"
+    - printenv
 
 before_script:
     - mkdir build
