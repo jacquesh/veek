@@ -54,6 +54,7 @@ matrix:
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
             - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
+            - LDFLAGS=-L/usr/lib32
             - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
 
       - os: linux
@@ -80,6 +81,7 @@ matrix:
             - CFLAGS=-m32
             - CXXFLAGS=-m32
             - LIB_CFLAGS=-m32
+            - LDFLAGS=-L/usr/lib32
 
       - os: linux
         compiler: clang
@@ -105,6 +107,7 @@ matrix:
             - CFLAGS=-m32
             - CXXFLAGS=-m32
             - LIB_CFLAGS=-m32
+            - LDFLAGS=-L/usr/lib32
             - CC=clang --target=x86
             - CXX=clang --target=x86
             - MATRIX_EVAL="CC='clang --target=x86' && CXX='clang++ --target=x86'"
@@ -134,6 +137,7 @@ matrix:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
             - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
+            - LDFLAGS=-L/usr/lib32
 
 before_install:
     - eval "${MATRIX_EVAL}"
@@ -142,7 +146,7 @@ before_install:
 before_script:
     - ls /usr
     - ls /usr/lib
-    - ls /usr/lib64
+    - ls /usr/lib32
     - mkdir build
     - cd build
     - cmake ..
