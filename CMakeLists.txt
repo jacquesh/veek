@@ -3,7 +3,6 @@ project(veek)
 
 string(TIMESTAMP CURRENT_TIME "%Y-%m-%d_%H:%M:%S" UTC)
 
-SET(CMAKE_LIBRARY_ARCHITECTURE i386-linux-gnu)
 include(FindOpenGL) # For OPENGL_gl_LIBRARY
 include(GNUInstallDirs) # For CMAKE_INSTALL_LIBDIR
 include(ExternalProject) # For ExternalProject_Add
@@ -67,6 +66,7 @@ ExternalProject_Add(
                -DBUILD_EXAMPLE_PROGRAMS=OFF
                -DBUILD_DYNAMIC_LIBS=OFF
                -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/libsoundio/bin
+               -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
     PREFIX libsoundio
     UPDATE_COMMAND ""
     )
@@ -83,6 +83,7 @@ ExternalProject_Add(
                -DGLFW_BUILD_TESTS=OFF
                -DGLFW_BUILD_DOCS=OFF
                -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/glfw/bin
+               -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
     PREFIX glfw
     UPDATE_COMMAND ""
     )
