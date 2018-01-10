@@ -3,8 +3,6 @@ project(veek)
 
 string(TIMESTAMP CURRENT_TIME "%Y-%m-%d_%H:%M:%S" UTC)
 
-message("32-bit LLVM Build? ${LLVM_BUILD_32_BITS}")
-
 include(FindOpenGL) # For OPENGL_gl_LIBRARY
 include(GNUInstallDirs) # For CMAKE_INSTALL_LIBDIR
 include(ExternalProject) # For ExternalProject_Add
