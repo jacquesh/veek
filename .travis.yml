@@ -53,6 +53,7 @@ matrix:
                     - libv4l-dev:i386
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
             - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
 
       - os: linux
