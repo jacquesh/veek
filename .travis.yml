@@ -54,7 +54,77 @@ matrix:
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
             - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
+            - LLVM_BUILD_32_BITS=true
             - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
+
+      - os: linux
+        compiler: clang
+        addons:
+            apt:
+                packages:
+                    - g++-multilib
+                    - libc6-dev-i386
+                    - libgl1-mesa-dev:i386
+                    - libxrandr-dev:i386
+                    - libxcursor-dev:i386
+                    - libxinerama-dev:i386
+                    - libxxf86vm-dev:i386
+                    - libopus-dev:i386
+                    - libenet-dev:i386
+                    - libasound2-dev:i386
+                    - pulseaudio:i386
+                    - libtheora-dev:i386
+                    - libv4l-dev:i386
+        env:
+            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - CMAKE_SYSTEM_LIBRARY_PATH=/usr/lib/i386-linux-gnu
+            - LLVM_BUILD_32_BITS=true
+            - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
+
+      - os: linux
+        compiler: clang
+        addons:
+            apt:
+                packages:
+                    - g++-multilib
+                    - libc6-dev-i386
+                    - libgl1-mesa-dev:i386
+                    - libxrandr-dev:i386
+                    - libxcursor-dev:i386
+                    - libxinerama-dev:i386
+                    - libxxf86vm-dev:i386
+                    - libopus-dev:i386
+                    - libenet-dev:i386
+                    - libasound2-dev:i386
+                    - pulseaudio:i386
+                    - libtheora-dev:i386
+                    - libv4l-dev:i386
+        env:
+            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - LLVM_BUILD_32_BITS=true
+            - MATRIX_EVAL="CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
+
+      - os: linux
+        compiler: clang
+        addons:
+            apt:
+                packages:
+                    - g++-multilib
+                    - libc6-dev-i386
+                    - libgl1-mesa-dev:i386
+                    - libxrandr-dev:i386
+                    - libxcursor-dev:i386
+                    - libxinerama-dev:i386
+                    - libxxf86vm-dev:i386
+                    - libopus-dev:i386
+                    - libenet-dev:i386
+                    - libasound2-dev:i386
+                    - pulseaudio:i386
+                    - libtheora-dev:i386
+                    - libv4l-dev:i386
+        env:
+            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - LLVM_BUILD_32_BITS=true
 
       - os: linux
         compiler: gcc
@@ -79,6 +149,7 @@ matrix:
                     - libv4l-dev:i386
         env:
             - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+            - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
             - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9 && CFLAGS=-m32 && CXXFLAGS=-m32 && LIB_CFLAGS=-m32"
 
 before_install:
