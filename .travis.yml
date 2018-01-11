@@ -73,10 +73,9 @@ before_script:
 script: make
 
 before_deploy:
-  - export ARTEFACT_NAME=veek-$PLATFORM_NAME-${TRAVIS_COMMIT:0:7}
+  - export ARTEFACT_NAME=veek-$PLATFORM_NAME-$TRAVIS_TAG
   - tar -cf $ARTEFACT_NAME.tar veek server
   - gzip $ARTEFACT_NAME.tar
-  - ls
 
 deploy:
   provider: releases
