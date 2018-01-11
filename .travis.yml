@@ -14,6 +14,8 @@ matrix:
             - pulseaudio
             - libtheora-dev
             - libv4l-dev
+      env:
+        - ARTEFACT_NAME=linux64
 
     - os: linux
       compiler: gcc
@@ -52,6 +54,7 @@ matrix:
             - libtheora-dev:i386
             - libv4l-dev:i386
       env:
+        - ARTEFACT_NAME=linux32
         - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
         - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
         - CFLAGS=-m32
@@ -70,21 +73,18 @@ before_script:
 script: make
 
 before_deploy:
-  - ls
-  - mkdir veek-nightly
-  - ls
-  - tar -cf veek-nightly.tar veek server
-  - gzip veek-nightly.tar
+  - tar -cf veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar veek server
+  - gzip veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar
 
 deploy:
   provider: releases
-  api_key: "$GITHUB_AUTH_TOKEN"
-  file: "veek-nightly.tar.gz"
+  api_key: $GITHUB_AUTH_TOKEN
+  file: veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar
   skip_cleanup: true
-  name: Nightly
-  body: The latest development build
   prerelease: true
   draft: true
+  on:
+    condition: $CC = clang
 
 notifications:
   email:
