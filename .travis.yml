@@ -15,7 +15,7 @@ matrix:
             - libtheora-dev
             - libv4l-dev
       env:
-        - ARTEFACT_NAME=linux64
+        - PLATFORM_NAME=linux64
 
     - os: linux
       compiler: gcc
@@ -54,7 +54,7 @@ matrix:
             - libtheora-dev:i386
             - libv4l-dev:i386
       env:
-        - ARTEFACT_NAME=linux32
+        - PLATFORM_NAME=linux32
         - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
         - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
         - CFLAGS=-m32
@@ -73,14 +73,15 @@ before_script:
 script: make
 
 before_deploy:
-  - tar -cf "veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar" veek server
-  - gzip veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar
+  - export ARTEFACT_NAME=veek-$PLATFORM_NAME-${TRAVIS_COMMIT:0:7}
+  - tar -cf $ARTEFACT_NAME.tar veek server
+  - gzip $ARTEFACT_NAME.tar
   - ls
 
 deploy:
   provider: releases
-  api_key: "$GITHUB_AUTH_TOKEN"
-  file: "veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar"
+  api_key: $GITHUB_AUTH_TOKEN
+  file: $ARTEFACT_NAME.tar.gz
   skip_cleanup: true
   prerelease: true
   draft: true
