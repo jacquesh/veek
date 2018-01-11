@@ -72,8 +72,8 @@ script: make
 before_deploy:
   - ls
   - mkdir veek-nightly
-  - cp veek server veek-nightly\
-  - tar -cf veek-nightly.tar veek-nightly\
+  - ls
+  - tar -cf veek-nightly.tar veek server
   - gzip veek-nightly.tar
 
 deploy:
