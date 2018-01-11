@@ -69,6 +69,12 @@ before_script:
 
 script: make
 
+deploy:
+  provider: releases
+  api_key: "$GITHUB_AUTH_TOKEN"
+  file: "build/veek"
+  skip_cleanup: true
+
 notifications:
   email:
     on_success: never
