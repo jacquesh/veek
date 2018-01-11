@@ -73,13 +73,14 @@ before_script:
 script: make
 
 before_deploy:
-  - tar -cf veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar veek server
+  - tar -cf "veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar" veek server
   - gzip veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar
+  - ls
 
 deploy:
   provider: releases
-  api_key: $GITHUB_AUTH_TOKEN
-  file: veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar
+  api_key: "$GITHUB_AUTH_TOKEN"
+  file: "veek-$ARTEFACT_NAME-$TRAVIS_COMMIT.tar"
   skip_cleanup: true
   prerelease: true
   draft: true
