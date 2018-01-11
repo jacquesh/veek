@@ -83,10 +83,11 @@ deploy:
   api_key: $GITHUB_AUTH_TOKEN
   file: $ARTEFACT_NAME.tar.gz
   skip_cleanup: true
+  name: Veek $TRAVIS_TAG
   prerelease: true
-  draft: true
   on:
     condition: $CC = clang
+    tags: true
 
 notifications:
   email:
