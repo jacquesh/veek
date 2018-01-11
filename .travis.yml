@@ -1,75 +1,75 @@
 language: cpp
 
 matrix:
-    include:
-      - os: linux
-        compiler: clang
-        addons:
-            apt:
-                packages:
-                    - xorg-dev
-                    - libopus-dev
-                    - libenet-dev
-                    - libasound2-dev
-                    - pulseaudio
-                    - libtheora-dev
-                    - libv4l-dev
+  include:
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          packages:
+            - xorg-dev
+            - libopus-dev
+            - libenet-dev
+            - libasound2-dev
+            - pulseaudio
+            - libtheora-dev
+            - libv4l-dev
 
-      - os: linux
-        compiler: gcc
-        addons:
-            apt:
-                sources:
-                    - ubuntu-toolchain-r-test
-                packages:
-                    - g++-4.9
-                    - xorg-dev
-                    - libopus-dev
-                    - libenet-dev
-                    - libasound2-dev
-                    - pulseaudio
-                    - libtheora-dev
-                    - libv4l-dev
-        env:
-            - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-4.9
+            - xorg-dev
+            - libopus-dev
+            - libenet-dev
+            - libasound2-dev
+            - pulseaudio
+            - libtheora-dev
+            - libv4l-dev
+      env:
+        - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
 
-      - os: linux
-        compiler: clang
-        addons:
-            apt:
-                packages:
-                    - g++-multilib
-                    - libc6-dev-i386
-                    - libgl1-mesa-dev:i386
-                    - libxrandr-dev:i386
-                    - libxcursor-dev:i386
-                    - libxinerama-dev:i386
-                    - libxxf86vm-dev:i386
-                    - libopus-dev:i386
-                    - libenet-dev:i386
-                    - libasound2-dev:i386
-                    - pulseaudio:i386
-                    - libtheora-dev:i386
-                    - libv4l-dev:i386
-        env:
-            - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
-            - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
-            - CFLAGS=-m32
-            - CXXFLAGS=-m32
-            - LIB_CFLAGS=-m32
-            - LDFLAGS=-L/usr/lib32
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          packages:
+            - g++-multilib
+            - libc6-dev-i386
+            - libgl1-mesa-dev:i386
+            - libxrandr-dev:i386
+            - libxcursor-dev:i386
+            - libxinerama-dev:i386
+            - libxxf86vm-dev:i386
+            - libopus-dev:i386
+            - libenet-dev:i386
+            - libasound2-dev:i386
+            - pulseaudio:i386
+            - libtheora-dev:i386
+            - libv4l-dev:i386
+      env:
+        - PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+        - CMAKE_PREFIX_PATH=/usr/lib/i386-linux-gnu
+        - CFLAGS=-m32
+        - CXXFLAGS=-m32
+        - LIB_CFLAGS=-m32
+        - LDFLAGS=-L/usr/lib32
 
 before_install:
-    - eval "${MATRIX_EVAL}"
+  - eval "${MATRIX_EVAL}"
 
 before_script:
-    - mkdir build
-    - cd build
-    - cmake ..
+  - mkdir build
+  - cd build
+  - cmake ..
 
 script: make
 
 notifications:
-    email:
-        on_success: never
-        on_failure: change
+  email:
+    on_success: never
+    on_failure: change
