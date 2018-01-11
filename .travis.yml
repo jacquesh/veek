@@ -69,11 +69,19 @@ before_script:
 
 script: make
 
+before_deploy:
+  - ls
+  - ls ./build
+
 deploy:
   provider: releases
   api_key: "$GITHUB_AUTH_TOKEN"
   file: "build/veek"
   skip_cleanup: true
+  name: Nightly
+  body: The latest development build
+  prerelease: true
+  draft: true
 
 notifications:
   email:
