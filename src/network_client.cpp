@@ -51,8 +51,8 @@ void handleNetworkPacketReceive(NetworkInPacket& incomingPacket)
                 break;
             // TODO: We should probably ignore these if we've already received one of them
 
-            logInfo("Initialization data received: In room %u with %d other users\n",
-                    initPacket.roomId, initPacket.userCount);
+            logInfo("Initialization data received: In room %s with %d other users\n",
+                    initPacket.roomId.name, initPacket.userCount);
             for(int i=0; i<initPacket.userCount; i++)
             {
                 NetworkUserConnectPacket& userPacket = initPacket.existingUsers[i];
