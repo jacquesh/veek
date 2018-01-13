@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "soundio/soundio.h"
-
 #include "user.h"
 
 #ifndef _USER_CLIENT_H

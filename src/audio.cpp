@@ -911,20 +911,6 @@ static void ProduceASingleAudioOutputPacket()
     }
     assert(micBuffer.Length == AUDIO_PACKET_FRAME_SIZE);
 
-    if(audioState.generateToneInput)
-    {
-        double twopi = 2.0*3.1415927;
-        double frequency = 261.6; // Middle C
-        double timestep = 1.0/micBuffer.SampleRate;
-        static double sampleTime = 0.0;
-        for(int sampleIndex=0; sampleIndex<micBuffer.Capacity; sampleIndex++)
-        {
-            double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
-            micBuffer.Data[sampleIndex] = (float)sinVal;
-            sampleTime += timestep;
-        }
-    }
-
     float rms = ComputeRMS(micBuffer);
     audioState.currentBufferVolume = rms;
     switch(audioState.inputActivationMode)
@@ -995,19 +981,37 @@ void Audio::Update()
 {
     soundio_flush_events(soundio);
 
-    if(audioState.inputEnabled)
+    if(audioState.generateToneInput)
+    {
+        double twopi = 2.0*3.1415927;
+        double frequency = 261.6; // Middle C
+        double timestep = 1.0/presendBuffer->sampleRate;
+        static double sampleTime = 0.0;
+        for(int sampleIndex=0; sampleIndex<AUDIO_PACKET_FRAME_SIZE; sampleIndex++)
+        {
+            double sinVal = 0.05 * sin(frequency*twopi*sampleTime);
+            presendBuffer->write((float)sinVal);
+            sampleTime += timestep;
+        }
+    }
+    else if(audioState.inputEnabled)
     {
         // TODO: Rename the resampler to something that makes more sense.
         resampleRing2Ring(sendResampler, *inBuffer, *presendBuffer);
-
-        int outputCount = 0;
-        while(presendBuffer->count() >= AUDIO_PACKET_FRAME_SIZE)
+    }
+    else
+    {
+        for(int sampleIndex=0; sampleIndex<AUDIO_PACKET_FRAME_SIZE; sampleIndex++)
         {
-            ProduceASingleAudioOutputPacket();
-            outputCount++;
+            presendBuffer->write(0.0f);
         }
     }
 
+    while(presendBuffer->count() >= AUDIO_PACKET_FRAME_SIZE)
+    {
+        ProduceASingleAudioOutputPacket();
+        outPacketBalance--;
+    }
     for(auto& iter : audioUsers)
     {
         UserAudioData& srcUser = iter.second;
