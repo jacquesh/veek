@@ -1014,7 +1014,6 @@ void Audio::Update()
     while(presendBuffer->count() >= AUDIO_PACKET_FRAME_SIZE)
     {
         ProduceASingleAudioOutputPacket();
-        outPacketBalance--;
     }
     for(auto& iter : audioUsers)
     {
