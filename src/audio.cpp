@@ -983,6 +983,10 @@ void Audio::Update()
 
     if(audioState.generateToneInput)
     {
+        // NOTE: We need to clear the input buffer here because otherwise it will fill up and when
+        //       we disable tone input, we'll send a huge number of packets at once.
+        inBuffer->clear();
+
         double twopi = 2.0*3.1415927;
         double frequency = 261.6; // Middle C
         double timestep = 1.0/presendBuffer->sampleRate;
