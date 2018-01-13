@@ -45,8 +45,8 @@ void Platform::UnlockMutex(Mutex* mutex)
 Platform::Thread* Platform::CreateThread(Platform::ThreadStartFunction* entryPoint, void* data)
 {
     Thread* result = new Thread();
-    int success = pthread_create(&result->handle, nullptr, (UnixThreadEntryPoint*)entryPoint, data);
-    if(!success)
+    int error = pthread_create(&result->handle, nullptr, (UnixThreadEntryPoint*)entryPoint, data);
+    if(error)
     {
         delete result;
         return nullptr;

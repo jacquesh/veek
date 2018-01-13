@@ -350,17 +350,9 @@ int interfaceEntryPoint(void* data)
     if(!glfwInit())
     {
         logFail("Error when trying to initialize GLFW\n");
+        globals->isRunning = false;
         return 1;
     }
-
-    // TODO: Do we actually need this?
-    /*
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    */
 
     int initialWindowWidth = 800;
     int initialWindowHeight = 600;
@@ -370,6 +362,7 @@ int interfaceEntryPoint(void* data)
     {
         logFail("Error when trying to create GLFW Window\n");
         glfwTerminate();
+        globals->isRunning = false;
         return 1;
     }
     glfwSetWindowUserPointer(window, globals);
@@ -386,6 +379,7 @@ int interfaceEntryPoint(void* data)
     if(!Render::Setup())
     {
         glfwTerminate();
+        globals->isRunning = false;
         return 1;
     }
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
