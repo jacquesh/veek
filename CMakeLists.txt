@@ -42,15 +42,21 @@ set(SERVER_SRC_FILES ${SRC_DIR}/server.cpp
 
 find_package(PkgConfig REQUIRED)
 #pkg_search_module(GLFW REQUIRED glfw3) # NOTE: This doesn't work on Ubuntu 14.04, but does on 16.04
-pkg_search_module(ENET REQUIRED libenet)
 pkg_search_module(OPUS REQUIRED opus)
 pkg_search_module(THEORA REQUIRED theoraenc)
 pkg_search_module(V4L2 REQUIRED libv4l2)
 pkg_search_module(PULSE libpulse)
 pkg_search_module(ALSA REQUIRED alsa)
 
-find_package(Threads REQUIRED)
+find_library(OPUS_STATIC_LIBRARIES libopus.a)
+find_library(THEORA_ENCODE_STATIC_LIB libtheoraenc.a)
+find_library(THEORA_DECODE_STATIC_LIB libtheoradec.a)
+find_library(OGG_STATIC_LIB libogg.a)
+set(THEORA_STATIC_LIBRARIES ${THEORA_ENCODE_STATIC_LIB}
+                            ${THEORA_DECODE_STATIC_LIB}
+                            ${OGG_STATIC_LIB})
 
+find_package(Threads REQUIRED)
 find_package(X11)
 
 ExternalProject_Add(
@@ -91,6 +97,20 @@ find_library(Xxf86vm_LIB Xxf86vm)
 find_library(Xinerama_LIB Xinerama)
 set(GLFW_STATIC_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/lib/${CMAKE_STATIC_LIBRARY_PREFIX}glfw3${CMAKE_STATIC_LIBRARY_SUFFIX} ${Xrandr_LIB} ${Xcursor_LIB} ${Xxf86vm_LIB} ${Xinerama_LIB})
 set(GLFW_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/include)
+
+
+ExternalProject_Add(
+    enet
+    GIT_REPOSITORY ...
+    GIT_TAG ...
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/enet/bin
+               -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+    PREFIX enet
+    UPDATE_COMMAND ""
+    )
+set(ENET_BINDIR ${CMAKE_CURRENT_BINARY_DIR}/enet/bin)
+set(ENET_STATIC_LIBRARIES ${ENET_BINDIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}enet${CMAKE_STATIC_LIBRARY_SUFFIX})
+set(ENET_INCLUDE_DIRS ${ENET_BINDIR}/include)
 
 add_executable(veek ${SRC_FILES} ${IMGUI_SRC_FILES})
 add_dependencies(veek libsoundio glfw)
