@@ -101,8 +101,8 @@ set(GLFW_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/glfw/bin/include)
 
 ExternalProject_Add(
     enet
-    GIT_REPOSITORY ...
-    GIT_TAG ...
+    GIT_REPOSITORY https://github.com/lsalzman/enet.git
+    GIT_TAG 39a72ab199
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/enet/bin
                -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
     PREFIX enet
@@ -113,7 +113,7 @@ set(ENET_STATIC_LIBRARIES ${ENET_BINDIR}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_
 set(ENET_INCLUDE_DIRS ${ENET_BINDIR}/include)
 
 add_executable(veek ${SRC_FILES} ${IMGUI_SRC_FILES})
-add_dependencies(veek libsoundio glfw)
+add_dependencies(veek libsoundio glfw enet)
 include_directories(veek ${CMAKE_SOURCE_DIR}/include
                          ${SOUNDIO_INCLUDE_DIRS}
                          ${GLFW_INCLUDE_DIRS}
@@ -137,6 +137,7 @@ target_compile_definitions(veek PRIVATE SOUNDIO_STATIC_LIBRARY
                                         BUILD_VERSION="${CURRENT_TIME}_UNKNOWNCOMMIT")
 
 add_executable(server ${SERVER_SRC_FILES})
+add_dependencies(server enet)
 include_directories(server ${ENET_INCLUDE_DIRS})
 target_link_libraries(server ${ENET_STATIC_LIBRARIES}
                              ${CMAKE_THREAD_LIBS_INIT})
