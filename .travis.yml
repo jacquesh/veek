@@ -8,10 +8,10 @@ matrix:
         apt:
           packages:
             - xorg-dev
-            - libopus-dev=1.1.*
+            - libopus-dev
             - libasound2-dev
             - pulseaudio
-            - libtheora-dev=1.1.*
+            - libtheora-dev
             - libv4l-dev
       env:
         - PLATFORM_NAME=linux64
@@ -25,10 +25,10 @@ matrix:
           packages:
             - g++-4.9
             - xorg-dev
-            - libopus-dev=1.1.*
+            - libopus-dev
             - libasound2-dev
             - pulseaudio
-            - libtheora-dev=1.1.*
+            - libtheora-dev
             - libv4l-dev
       env:
         - MATRIX_EVAL="CC=gcc-4.9 && CXX=g++-4.9"
@@ -45,10 +45,10 @@ matrix:
             - libxcursor-dev:i386
             - libxinerama-dev:i386
             - libxxf86vm-dev:i386
-            - libopus-dev:i386=1.1.*
+            - libopus-dev:i386
             - libasound2-dev:i386
             - pulseaudio:i386
-            - libtheora-dev:i386=1.1.*
+            - libtheora-dev:i386
             - libv4l-dev:i386
       env:
         - PLATFORM_NAME=linux32
